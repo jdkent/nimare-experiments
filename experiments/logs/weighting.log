@@ -1,0 +1,7 @@
+        kind  studies  claimed var  actual err^2  over-weighted
+      images       21      0.09091       0.16536           1.82
+ coordinates       21      1.53790       0.67711           0.44
+
+coordinates are over-weighted relative to images by 0.24x
+(>1 means a coordinate study claims more precision than its errors justify, so it outvotes
+ an image study it should be losing to)

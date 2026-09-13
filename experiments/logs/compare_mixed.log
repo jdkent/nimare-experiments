@@ -1,0 +1,10 @@
+truth from all 21 images; 57121 voxels in the top quartile
+mixture: images for pain_01, pain_02, pain_03, pain_04, pain_05
+
+                     procedure    r all    r top      mag
+                5 images alone    0.756    0.756     0.76
+         SDM, coordinates only    0.762    0.680     0.42
+        SDM, 5 images + coords    0.818    0.763     0.53
+        CBES, coordinates only    0.788    0.804     2.04
+INFO:nimare.meta.cbma.effectsize:Using images for 21 studies; coordinates for the rest.
+       CBES, 5 images + coords    0.896    0.908     0.98

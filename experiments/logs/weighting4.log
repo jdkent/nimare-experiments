@@ -1,0 +1,13 @@
+WARNING:nimare.studyset.layout:Not applying transforms to coordinates in unrecognized space(s): 'mni152_2mm'
+2453 foci; peak inflation rho = 0.220 (reported mean |g| 1.264 vs truth at the peak 0.278)
+
+    d (mm)     pairs    w(d)   claim_c    act_c  c ratio   claim_i    act_i  i ratio   mis-wt
+   0-2          2453   1.000    0.0899   0.0627    0.698    0.1757   0.1840    1.047     0.67
+   2-4         62111   0.797    0.1010   0.0633    0.627    0.1656   0.1825    1.102     0.57
+   4-6        153854   0.529    0.1418   0.0647    0.457    0.1588   0.1797    1.131     0.40
+   6-8        357920   0.279    0.2619   0.0679    0.259    0.1541   0.1766    1.146     0.23
+   8-10       514847   0.116    0.6171   0.0731    0.119    0.1511   0.1742    1.153     0.10
+  10-13      1391947   0.029    3.0996   0.0823    0.027    0.1487   0.1719    1.156     0.02
+
+overall: coordinates 0.040, images 1.151, coordinates weighted 0.035x what they deserve
+(<1 = under-weighted: they claim more variance than their errors justify)

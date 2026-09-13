@@ -1,0 +1,8 @@
+tau^2 from the images: median 0.0506
+calibrated rho (means matched): 0.203
+
+        kind  claimed var  actual err^2  over-weighted
+      images      0.14258       0.16536           1.16
+ coordinates      1.92421       0.04447           0.02
+
+coordinates over-weighted relative to images: 0.02x

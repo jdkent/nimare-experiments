@@ -1,0 +1,4 @@
+global null: 25 sims, 30 studies x 8 noise foci, mixed thresholds
+nominal:  unc .050 / .0010 ;  corrected .05
+
+           configuration  unc<.05  unc<.001   FDR  FWEmc   s/fit

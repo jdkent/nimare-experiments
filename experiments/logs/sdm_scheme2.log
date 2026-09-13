@@ -1,0 +1,13 @@
+WARNING:nimare.studyset.layout:Not applying transforms to coordinates in unrecognized space(s): 'mni152_2mm'
+WARNING:nimare.meta.cbma.effectsize:Reported peak heights average z = 3.639 against 3.625 for peaks of pure noise at the same threshold, an excess of +0.014. Their magnitudes are therefore close to uninformative about the effect size -- they are largely a function of the reporting threshold and the sample size. The estimated scale will be far too large and no correction computed from the peak values can repair it. Because the bias is a function of (threshold, sample size), peak_bias='per-study' removes the part of it that varies between studies without needing images; fixing the common scale still needs images, via peak_bias_scale or a scalar peak_bias. The spatial pattern is driven by where the peaks are, which none of this touches.
+per-study rho: median 1.000
+
+                recreation       MSE   relative MSE
+    ES-SDM iso 20mm (base)    0.1500           100%
+       SDM-PSI anisotropic    0.1660           111%
+         CBES kernel + rho    0.2082           139%
+       CBES + oracle scale    0.2456           164%
+   iso 20mm + oracle scale    0.2167           144%
+              predict zero    0.2643           176%
+
+(<100% is what their scheme calls an improvement; 'predict zero' is not in it)

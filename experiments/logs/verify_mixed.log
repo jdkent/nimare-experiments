@@ -1,0 +1,14 @@
+A) all 21 images -- the ceiling, should be ~1.0 if the harness is sound
+WARNING:nimare.studyset.layout:Not applying transforms to coordinates in unrecognized space(s): 'mni152_2mm'
+INFO:nimare.meta.cbma.effectsize:Using images for 21 studies; coordinates for the rest.
+WARNING:nimare.meta.cbma.effectsize:This fit mixes images with coordinates but leaves peak_bias_scale at 1.0, so the coordinate studies are on a relative scale while the images are on the true Hedges' g scale. The two then disagree about the same voxel -- by a factor of about two on the NIDM pain images -- and the pooled value depends on how many studies of each kind the collection holds. Use peak_bias_scale='auto' to read the constant off the images.
+            all images  r_all 0.995  r_top 0.993  mag 1.03
+   _image_studies_ = 21
+
+B) only 5 images, rest coordinates
+INFO:nimare.meta.cbma.effectsize:Using images for 21 studies; coordinates for the rest.
+  [filter] loaded 21 -> kept 5
+WARNING:nimare.meta.cbma.effectsize:Reported peak heights average z = 3.638 against 3.625 for peaks of pure noise at the same threshold, an excess of +0.012. Their magnitudes are therefore close to uninformative about the effect size -- they are largely a function of the reporting threshold and the sample size. The estimated scale will be far too large and no correction computed from the peak values can repair it. Because the bias is a function of (threshold, sample size), peak_bias='per-study' removes the part of it that varies between studies without needing images; fixing the common scale still needs images, via peak_bias_scale or a scalar peak_bias. The spatial pattern is driven by where the peaks are, which none of this touches.
+WARNING:nimare.meta.cbma.effectsize:This fit mixes images with coordinates but leaves peak_bias_scale at 1.0, so the coordinate studies are on a relative scale while the images are on the true Hedges' g scale. The two then disagree about the same voxel -- by a factor of about two on the NIDM pain images -- and the pooled value depends on how many studies of each kind the collection holds. Use peak_bias_scale='auto' to read the constant off the images.
+     5 images + coords  r_all 0.896  r_top 0.908  mag 0.98
+   _image_studies_ = 5

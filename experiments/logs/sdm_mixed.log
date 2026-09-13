@@ -1,0 +1,29 @@
+=== pp ===
+%4% Estimated remaining time(s): 24 (ETA 2026-09-13 22:20:56)
+%9% Estimated remaining time(s): 10 (ETA 2026-09-13 22:20:42)
+%13% Estimated remaining time(s): 6 (ETA 2026-09-13 22:20:38)
+%18% Estimated remaining time(s): 9 (ETA 2026-09-13 22:20:42)
+%22% Estimated remaining time(s): 329 (ETA 2026-09-13 22:27:33)
+%27% Estimated remaining time(s): 462 (ETA 2026-09-13 22:31:04)
+%31% Estimated remaining time(s): 545 (ETA 2026-09-13 22:33:41)
+%36% Estimated remaining time(s): 584 (ETA 2026-09-13 22:35:44)
+%40% Estimated remaining time(s): 648 (ETA 2026-09-13 22:38:31)
+%45% Estimated remaining time(s): 617 (ETA 2026-09-13 22:39:13)
+%50% Estimated remaining time(s): 602 (ETA 2026-09-13 22:40:35)
+%54% Estimated remaining time(s): 572 (ETA 2026-09-13 22:41:15)
+%59% Estimated remaining time(s): 504 (ETA 2026-09-13 22:41:01)
+%63% Estimated remaining time(s): 482 (ETA 2026-09-13 22:42:15)
+%68% Estimated remaining time(s): 426 (ETA 2026-09-13 22:42:43)
+%72% Estimated remaining time(s): 368 (ETA 2026-09-13 22:42:26)
+%77% Estimated remaining time(s): 286 (ETA 2026-09-13 22:41:17)
+%81% Estimated remaining time(s): 247 (ETA 2026-09-13 22:42:11)
+%86% Estimated remaining time(s): 185 (ETA 2026-09-13 22:42:38)
+%90% Estimated remaining time(s): 136 (ETA 2026-09-13 22:43:17)
+o
+aCalling web browser to display the report
+o
+d
+sh: 1: xdg-open: not found
+=== mean ===
+wParser warning: argument 'name' missing or incorrect, it will be set to 'MyMean'.
+=== mi ===
