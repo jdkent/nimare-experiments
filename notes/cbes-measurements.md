@@ -681,3 +681,42 @@ argument for including them.
 *Seven, not seventy.* A real coordinate meta-analysis has thirty to a hundred studies. The
 bias-versus-noise decomposition says more will not help, since a shared bias does not average
 down, but that is an extrapolation from seven.
+
+### SDM-PSI: what can and cannot be said
+
+The only head-to-head in this repository is void. `compare_sdm.py` scored against a truth built
+from all 21 pain images -- the same images whose maps produced the coordinates both methods were
+given -- extracted peaks at an uncorrected z of 3.29, and capped. All three preconditions in
+`PROTOCOL.md` are broken, so the figures it produced (SDM 0.47 of the truth, CBES 1.99) should not
+be quoted, and they have been removed from the pull request.
+
+What survives is structural, and it is not one verdict but three.
+
+*Against ALE, for localisation.* Nothing measured here contradicts SDM-PSI being a sound
+coordinate-based method, and it has author validation against pooled individual data behind it.
+
+*Against an image-based meta-analysis when two or more images exist.* The evidence against
+coordinate-derived magnitude is a property of the input rather than of any estimator: reported
+peak values carry a shared bias of about +1.45 against 0.6 of noise, and a shared bias does not
+average down with more studies. SDM-PSI anchors its imputation on those same values, so it
+inherits it.
+
+*On absolute Hedges' g from coordinates.* One tabulated coordinate explains 5% to 9% of the
+variance in the truth at its own location. Imputation interpolates under a model; it cannot
+manufacture information the table does not contain. The ceiling is method-independent.
+
+Two things it does better than this estimator. It uses the bound that unreported voxels sit below
+threshold -- evidence of absence, which the measurements here identify as real information and
+which CBES's censoring term currently contributes almost nothing toward. And multiple imputation
+propagates uncertainty more honestly than a point estimate.
+
+One thing it does worse. It emits a number that looks like an image-based result without
+signalling that the scale is unearned. Deflating is the safer direction to be wrong in than
+inflating, but the output does not tell a reader either way.
+
+**A corrected comparison is blocked on tooling, not on design.** SDM-PSI is installed at
+`/tmp/claude-0/sdm` with its pain inputs, but the driver that sequenced `sdm_core pp`, `mean` and
+`mi` lived in a previous session's scratchpad and is lost, and the argument syntax is
+undocumented. The design needed is otherwise settled: split the 21 studies, give ten to both
+methods as cluster-extent coordinates with no cap, hold eleven back for the truth, and reduce the
+imputations from 50 and raise the threads from 1 so the run finishes.
