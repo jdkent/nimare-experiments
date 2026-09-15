@@ -4001,3 +4001,49 @@ earned. A unit test caught it at 7e-5 relative; two lines of limits would have c
 
 Items 1 and 3 are the ones that would change what gets built, rather than explain what already
 was.
+
+## The algebra pays: heterogeneous sample sizes identify the magnitude, heterogeneous thresholds do not
+
+This is the first result here that came from the algebra *first* and the simulation second, and it
+is also the first that bears on whether to run CBES on a given collection at all.
+
+**Derivation.** A silence constrains `(pi, mu)` only through `P = pi S(mu) + (1 - pi) S(0)` with
+`S(mu) = P(|g| < c | mu)`. Studies with different `(sigma, c)` give different equations -- but the
+reporting cutoff measured in sampling standard deviations is just the reported statistic back
+again. Checked numerically: `c / sigma` is 2.31 to 2.42 for `z = 2.3` across `n` from 12 to 120,
+the drift being the t-versus-normal correction. So
+
+    S(0) = 2 Phi(z) - 1,                                  depends on the THRESHOLD alone
+    S(mu) = Phi(z - mu sqrt(n)) - Phi(-z - mu sqrt(n)),    depends on the threshold AND mu sqrt(n)
+
+Varying the threshold moves both components together through the same tail, leaving the equations
+nearly collinear. Varying the sample size moves the active component through `mu sqrt(n)` while
+leaving `S(0)` **exactly** unchanged. That contrast is what separates the two parameters.
+
+**Test.** 20 studies in every arm, so nothing is about having more data. The bounded fraction of
+the profile interval is the probe, since the interval is finite exactly where the likelihood pins
+`mu` down -- an identifiability measure rather than a proxy for one. True `pi` is 1.0:
+
+| studies | bounded overall | bounded near signal | fitted pi | mean abs g | truth |
+|---|---|---|---|---|---|
+| alike, n 28-32, one cut | 0.025 | 0.422 | 0.823 | 0.225 | 0.238 |
+| **sample size spread 12-120** | 0.035 | **0.691** | **0.913** | 0.238 | 0.238 |
+| threshold spread 2.3-4.5 | 0.026 | 0.414 | 0.815 | 0.235 | 0.238 |
+| both spread | 0.035 | 0.676 | 0.901 | 0.238 | 0.238 |
+
+Spreading the sample size moves the bounded fraction near signal from 0.42 to 0.69 and the fitted
+prevalence from 0.82 to 0.91. Spreading the threshold moves nothing at all -- 0.414 against 0.422,
+0.815 against 0.823 -- exactly as the cancellation says. And "both" is indistinguishable from
+"sample size only", which is the sharp version of the claim: the threshold contributes nothing
+even in combination.
+
+**So: a magnitude is recoverable from a literature of widely differing sample sizes and not from a
+literature of uniformly sized studies, however many of them there are.** That is the opposite of
+the usual posture toward heterogeneity, it is now in the class docstring, and it is the piece of
+guidance a user actually needs before pointing this estimator at a collection.
+
+It also retrospectively explains the pain-versus-HCP disagreement that four dials failed to
+explain (prevalence, statistic, tau2, reference construction). The HCP bed was built from
+*equal-sized* synthetic studies; the NIDM pain collection has real, widely varying sample sizes.
+That is a testable prediction rather than a story, and it is the next thing to check: re-run the
+HCP comparison with sample sizes spread over the same range as pain's.
