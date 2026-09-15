@@ -783,3 +783,59 @@ That is three schemes tested and failed -- naive pooling, pooling with the coord
 onto the image scale, and gating. Coordinates degrade an image-based estimate however they are
 attached to it. What survives is partition: coordinates answer where images are absent, and are
 reported as their own quantity rather than modulating the image estimate.
+
+### Where coordinates help: through their silence, not their values
+
+The whole-brain scoreboard says images win pattern and total error while the mixture wins the
+level. `where_do_coordinates_help.py` asks *where*, scoring the same split-half NIDM pain design
+per voxel with two images held fixed, eight splits, and reporting signed error because the
+absolute one can be gamed by shrinkage.
+
+By decile of the held-out truth:
+
+```
+truth decile    voxels  |err| images  |err| mixed  signed images  signed mixed
+           0     23520         0.212        0.177         +0.211        +0.176
+           3     23512         0.175        0.134         +0.139        +0.095
+           6     23512         0.209        0.151         +0.099        +0.025
+           7     23520         0.228        0.165         +0.091        -0.003
+           8     23520         0.251        0.205         +0.104        -0.023
+           9     23520         0.262        0.303         +0.137        +0.006
+```
+
+At the top decile, where the `|x|` upward bias of an absolute value is negligible for both arms
+and the comparison is clean, **the mixture is essentially unbiased (+0.006) against +0.137 for
+two images alone** -- and its absolute error is *worse* (0.303 against 0.262). Bias down twentyfold,
+variance up. That is the same bias-for-variance trade the `ratio` and `rmse` columns encode,
+localised to the voxels where it can be read without an artefact.
+
+By how many coordinate studies actually reported near the voxel -- and this is the surprise:
+
+```
+coord studies    voxels  |err| images  |err| mixed  signed images  signed mixed
+            0    217916         0.204        0.163         +0.133        +0.061
+            1     15545         0.260        0.254         +0.169        +0.127
+            2      1525         0.318        0.318         +0.226        +0.212
+            3       198         0.333        0.311         +0.273        +0.228
+```
+
+**The bias reduction is largest where no coordinate study reports at all** -- 54% at count 0,
+against 6% at count 2. It shrinks monotonically as more coordinate studies report nearby. That is
+the opposite of what the magnitude channel would predict, and it identifies the mechanism.
+
+A coordinate study that reported nothing near a voxel still enters the **censoring term**: its
+silence is evidence the effect there is small, and that corrects the upward bias of a two-image
+estimate over the 218,000 voxels (87% of the mask) where no focus lands. Where a study *did*
+report, its peak value carries the shared +1.45 inflation measured on this collection, which
+pushes the estimate back up and cancels most of the benefit.
+
+So the coordinate corpus **helps through its silence and hurts through its values**, and the two
+act in opposite directions at every voxel. The net is positive on the level only because silence
+covers most of the brain.
+
+The design consequence is sharper than "coordinates dilute". The value of a coordinate table in a
+mixed collection is almost entirely in the *censoring* term -- the fact that a study looked and
+reported nothing -- and almost none of it is in the reported magnitudes. An estimator that used
+coordinate tables only as presence/absence evidence, discarding the peak heights entirely, would
+capture the benefit measured here and avoid the cost. That is a testable design and it has not
+been tried.
