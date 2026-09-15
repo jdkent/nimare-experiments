@@ -3707,3 +3707,82 @@ Habit to add to the list that already has "report n and SE beside any number" an
 relative error per stratum": **a calibration arm is not optional, and it has to be an arm whose
 answer is known analytically.** Arm A costs one line in the arm list and would have caught this
 the first time `se/sd` was ever printed.
+
+## The inflation was an unidentified prevalence, and it is fixed
+
+The retraction above left a better-posed question: the baseline was near 1 and the excess did not
+follow the share the way it should if the censoring term produced it. The configuration that
+settles it turns out to be the one nobody was looking at.
+
+**Give every study an image.** Then the reporting indicator is *structurally* empty -- image
+studies are omitted from it at every voxel -- so the coordinate channel cannot be responsible for
+anything. Direct check:
+
+    2 images: coordinate_share max 1.000000, nonzero voxels 15625; mean prevalence 0.5605
+   20 images: coordinate_share max 0.000000, nonzero voxels     0; mean prevalence 0.5773
+
+Yet that arm measured *worst* of any, in one bed on shared seeds:
+
+| arm (20 images, 20 studies) | null | g=0.2 | g=0.4 | g=0.6 | g=0.8 |
+|---|---|---|---|---|---|
+| A selection off (textbook IVW) | 1.14 | 1.24 | 1.02 | 1.00 | 1.05 |
+| D zero-inflated, indicator empty | **2.21** | **2.30** | 1.28 | 0.99 | 1.06 |
+
+What it was paying for is visible in the numbers above: **a prevalence of 0.577 against a true
+1.000, fitted from nothing.** Only the indicator separates "no effect in this study" from "a
+small effect plus noise"; a two-component mixture fitted to 20 Gaussian values with known
+variances will explain noise as a mixture, and does. The uncertainty in that phantom parameter is
+then profiled out of the information about `mu` by the Schur complement. And the signature fits:
+the inflation is concentrated at null and weak voxels (2.21, 2.30) and absent at strong ones
+(0.99, 1.06), because where the effect is weak "a small effect in every study" and "a large
+effect in a few" fit equally well.
+
+**The fix.** Hold `pi` at 1 wherever no study contributes an indicator, and skip the profiling
+there. Two subtleties, both load-bearing:
+
+  * The limit cannot be left to the algebra. With `pi` clamped at `1 - 1e-6`, `(1 - r)/(1 - pi)`
+    tends to the *ratio of the two component densities*, not to zero, so the cross block stays
+    order one and the Schur complement would still subtract a term no parameter earned. My first
+    patch assumed it vanished; the test caught it at 7e-5 relative.
+  * Forcing the responsibility to exactly 1 (not just near it) makes the collapse an identity.
+    The all-image mixture fit now returns the non-mixture fit bit for bit, which is asserted as
+    `np.allclose` on `se` and `g` rather than as a loose tolerance.
+
+Post-fix, arm D is bit-identical to arm A in every stratum, and the shipped interval table's
+all-image row goes from se/sd 2.23 / 2.26 / 1.55 to **1.16 / 1.22 / 1.19**, with the half-width
+at the effect from 0.34 to **0.26**. Arms with any indicator at all are unchanged to the last
+digit, which is the check that matters: this is a degenerate-case guard, not a new estimator.
+
+### Two other causes ruled out along the way
+
+**The reporting rule is not it.** The model censors on `|g| < c`; a paper reports local maxima
+above a threshold. Those differ, and a voxel on a blob's shoulder can sit far above the cutoff
+and still be silent. Feeding the estimator its own rule instead -- report every supra-threshold
+voxel, 386 foci per collection against 172 -- changes nothing:
+
+| arm | null | g=0.2 | g=0.4 | g=0.6 | g=0.8 |
+|---|---|---|---|---|---|
+| model-matched (&#124;g&#124; >= c) | 1.80 | 1.61 | 1.18 | 1.80 | 1.90 |
+| as published (maxima) | 1.83 | 1.61 | 1.18 | 1.79 | 1.90 |
+
+Bias is likewise identical (-0.048 against -0.048 at g=0.2). Doubling the reported foci and
+making the silence mean exactly what the model thinks it means moves neither the estimate nor its
+error. That is a strong negative: the over-shrinkage at the window is not the local-maximum
+condition.
+
+**The bed contributes 4%.** The simulator's per-study `g` has an empirical sd across studies of
+0.1797 at null voxels against a reported `sqrt(g_var)` of 0.1873, so the noise sits 4% below the
+`1/n + g^2/(2n)` the model assumes and every `se` is 4% generous by construction. Small, but it
+is part of why a textbook arm reads 1.14 rather than 1.00, and it belongs on the record.
+
+### What is left, and the next prediction
+
+A conservative interval where the coordinates *do* act: 1.28 to 2.03 at two images, falling
+monotonically as `coordinate_share` rises (1.87 -> 1.33). That is now the same mechanism seen
+from the other side -- the share is how much the indicator says about `pi`, so more share means a
+better-determined prevalence and a smaller profiling penalty.
+
+Which makes a sharp prediction. The `pi`/`mu` ridge runs along curves of roughly constant
+`pi*mu`, so the *product* should be far better determined than either factor. `g_marginal` and
+`se_marginal` are already emitted, so if the ridge is the mechanism, `se_marginal/sd(g_marginal)`
+should sit near 1 exactly where `se/sd` for `g` is worst. Running.

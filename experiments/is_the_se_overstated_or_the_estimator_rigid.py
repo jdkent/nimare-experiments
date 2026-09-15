@@ -63,6 +63,10 @@ ARMS = [
     ("A textbook IVW (20 images, no selection)", dict(n_images=20), dict(selection_model="none")),
     ("B images only (2 images, no selection)", dict(n_images=2), dict(selection_model="none")),
     ("C shipped (2 images, zero-inflated)", dict(n_images=2), dict()),
+    # D isolates the cost of the mixture itself. With every study carrying an image there are no
+    # coordinate-only studies, so the reporting indicator is structurally empty and the only
+    # difference from A is that the prevalence is fitted and profiled out.
+    ("D 20 images, zero-inflated", dict(n_images=20), dict()),
 ]
 
 if __name__ == "__main__":
