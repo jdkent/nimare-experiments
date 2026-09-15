@@ -4316,3 +4316,76 @@ One process note. A fifth claim in the first draft was `simplify(m'(0)) == 0` at
 a tautology dressed as a proof -- it would have printed `[ok]` and established nothing. Removed.
 jdkent's examples guard against exactly this with anti-vacuity asserts, and it is worth copying
 the habit rather than only the format.
+
+## Profiling: the win was in the image loader, and the algebra had nothing to give
+
+jdkent asks for profiling and for faster algebraic strategies with equivalent output. Profiled a
+whole-brain fit at 4 mm, 20 studies, 2 images.
+
+**Without the null, 2.0 s total:** `_censoring_terms` 0.62 s (32%), **`gc.collect` 0.43 s (22%)**,
+`_working_sets` 0.19 s, `_update_prevalence` 0.13 s.
+
+**With a permutation null at only 40 iterations, 58.8 s total:** `_censoring_terms` **34.5 s
+(59%)** over 1647 calls, `_update_prevalence` 8.5 s, `_mu_derivatives` 4.4 s. At the default
+`n_iters = 1000` that is most of the wall clock, since each permutation runs a full EM.
+
+### The loader: 61.7x, and it was free
+
+The `gc.collect` is nilearn's. `safe_get_data` runs a full collection on every call, and
+`masker.transform` reaches it -- NiMARE's own conftest says so, and `meta/cbma/utils.py` already
+avoids it elsewhere with direct boolean indexing. `_load_image_studies` was not:
+
+    masker.transform (aligned image, 29398 voxels) : 136.72 ms
+    boolean index instead                          :   2.22 ms     61.7x
+
+Four reads at two image studies is 0.55 s of a 2.0 s fit, and it grows linearly with the image
+count. Shipped, with the fast path declined when the grids differ or the masker carries
+standardisation, detrending, smoothing or a target grid -- those change the values, and skipping
+them for speed would be a different estimator. Values agree to 1.8e-7: nilearn resamples even
+onto an identical grid, so the fast path skips an interpolation rather than reproducing it. Below
+the float32 the maps are stored in, but **not bit-identical**, and said so in the commit.
+
+### The algebra had nothing to give, and the docstring was wrong about why
+
+`_censoring_terms`' docstring said the cost is "spread over four memory-bound kernels, so what
+pays is removing a pass rather than speeding one up". Measured on 600,000 pairs:
+
+| kernel | ms |
+|---|---|
+| `ndtr(upper)` | 10.66 |
+| `ndtr(lower)` | 8.13 |
+| `exp` density, upper | 2.98 |
+| `exp` density, lower | 3.01 |
+| one multiply pass | 0.40 |
+| one divide pass | 0.44 |
+| `np.where(sign > 0, ...)` | 2.60 |
+
+**45% of it is two normal CDFs**, which no rearrangement of the surrounding arithmetic reaches.
+Three were tried and benchmarked against the shipped version for speed *and* agreement:
+
+| variant | ms | speedup | max relative drift |
+|---|---|---|---|
+| shipped | 41.82 | 1.00 | -- |
+| one reciprocal for two divisions | 41.68 | 1.00 | 2e-16 |
+| `second` from `first` by the identity | 38.32 | **1.09** | 5e-14 |
+| both | 39.68 | 1.05 | 5e-14 |
+
+The identity is `u phi(u) - l phi(l) = u(phi(u) - phi(l)) + k phi(l)` with `l = u - k`, so
+`second = (u/sigma) * first - k phi(l)/sigma^2` reuses `first` instead of forming the two
+products. Correct, and worth 9%. **Not taken:** 9% for a rewrite of the estimator's most
+delicate function, with drift, is a bad trade.
+
+### Two further ideas, checked and rejected
+
+  * **Drop the lower tail's CDF.** Its median contribution is 2e-5 of the silent probability,
+    which sounds negligible -- but its maximum is 0.30, and `phi(lower)` exceeds 1% of the
+    score's numerator for **38%** of pairs. It is not droppable.
+  * **Cache the silent working set across permutations.** The null holds the silence pattern
+    fixed, so the indicator pairs look permutation-invariant and reusable. They are not:
+    `inv_sigma_ind = 1/sqrt(null_var + tau2[voxel])` and `tau2` is re-estimated from each
+    permutation's image values. Checked before implementing, which is the only reason it did
+    not become a wrong-answer bug.
+
+So the honest summary: one large real win in the loader, nothing available in the censoring
+algebra, and the lever for the permutation null is `n_cores` -- it is a thousand independent
+fits and that is inherent to the design, not an inefficiency.
