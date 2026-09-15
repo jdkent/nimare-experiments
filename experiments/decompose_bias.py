@@ -27,6 +27,7 @@ import nibabel as nib
 from scipy import ndimage
 from joblib import Parallel, delayed
 from nimare.meta.cbma import CBES
+from nimare.meta.cbma.effectsize import peak_stat_to_hedges_g
 from nimare.studyset import Studyset
 import reporting
 
@@ -58,7 +59,7 @@ READ_MM = nib.affines.apply_affine(AFF, np.asarray(READ_AT))
 
 def one(seed):
     rng = np.random.default_rng(seed)
-    studies, reported_g, truth_at_focus = [], [], []
+    studies, reported_g, reported_naive, truth_at_focus = [], [], [], []
     for k in range(N_STUDIES):
         n = int(rng.integers(20, 41))
         noise = ndimage.gaussian_filter(rng.standard_normal(SHAPE), SMOOTH_VOX)
@@ -73,7 +74,15 @@ def one(seed):
             points.append({"space": "MNI", "coordinates": [float(v) for v in mm],
                            "values": [{"kind": "Z", "value": float(zv)}]})
             if np.linalg.norm(mm - READ_MM) <= NEAR_MM:
-                reported_g.append(zv / np.sqrt(n))       # g implied by the reported statistic
+                # Two conversions, because the difference between them turned out to be a
+                # whole stage of the bias. `z / sqrt(n)` is Cohen's d read straight off the
+                # statistic; the estimator instead takes z to a t and the t to a d, which is
+                # convex in z and therefore inflates a selected maximum further.
+                reported_naive.append(zv / np.sqrt(n))
+                reported_g.append(
+                    float(peak_stat_to_hedges_g(np.array([abs(zv)]), np.array([n]),
+                                                stat_type="z", design="one-sample")[0][0])
+                )
                 truth_at_focus.append(TRUTH[tuple(ijk)])  # truth where the focus actually is
         studies.append({"id": f"s{k}", "name": f"s{k}", "metadata": meta, "analyses": [
             {"id": f"s{k}-1", "name": "1", "metadata": meta, "points": points}]})
@@ -91,8 +100,9 @@ def one(seed):
         est = CBES(**kwargs)
         g = est.fit(ss).get_map("g", return_type="array").ravel()[pos]
         out[name] = float(g)
-    return (float(np.mean(reported_g)), float(np.mean(truth_at_focus)),
-            out["none"], out["shipped"], len(reported_g) / N_STUDIES)
+    return (float(np.mean(reported_naive)), float(np.mean(reported_g)),
+            float(np.mean(truth_at_focus)), out["none"], out["shipped"],
+            len(reported_g) / N_STUDIES)
 
 
 if __name__ == "__main__":
@@ -101,21 +111,24 @@ if __name__ == "__main__":
     rows = [r for r in Parallel(n_jobs=8)(delayed(one)(s) for s in range(N_SIMS))
             if r is not None]
     a = np.array(rows, dtype=float)
-    reported, at_focus, none, shipped, share = (a[:, i] for i in range(5))
+    naive, reported, at_focus, none, shipped, share = (a[:, i] for i in range(6))
     print(f"{'stage':44s} {'value':>7s} {'cumulative':>11s} {'step':>7s}")
     print(f"{'1. truth at the read-out voxel':44s} {TRUE_G:7.3f} {0.0:+11.3f} {'':>7s}")
     print(f"{'   truth where the foci actually landed':44s} {at_focus.mean():7.3f} "
           f"{at_focus.mean()-TRUE_G:+11.3f} {at_focus.mean()-TRUE_G:+7.3f}   <- localisation")
-    print(f"{'2. mean g implied by the reported peaks':44s} {reported.mean():7.3f} "
-          f"{reported.mean()-TRUE_G:+11.3f} {reported.mean()-at_focus.mean():+7.3f}"
+    print(f"{'2. z / sqrt(n) of the reported peaks':44s} {naive.mean():7.3f} "
+          f"{naive.mean()-TRUE_G:+11.3f} {naive.mean()-at_focus.mean():+7.3f}"
           f"   <- winner's curse")
-    print(f"{'3. pooled, selection_model=none':44s} {none.mean():7.3f} "
+    print(f"{'3. the same peaks through z -> t -> d':44s} {reported.mean():7.3f} "
+          f"{reported.mean()-TRUE_G:+11.3f} {reported.mean()-naive.mean():+7.3f}"
+          f"   <- conversion convexity")
+    print(f"{'4. pooled, selection_model=none':44s} {none.mean():7.3f} "
           f"{none.mean()-TRUE_G:+11.3f} {none.mean()-reported.mean():+7.3f}"
           f"   <- weighting + kernel")
-    print(f"{'4. pooled, shipped selection model':44s} {shipped.mean():7.3f} "
+    print(f"{'5. pooled, shipped selection model':44s} {shipped.mean():7.3f} "
           f"{shipped.mean()-TRUE_G:+11.3f} {shipped.mean()-none.mean():+7.3f}"
           f"   <- selection model")
     print(f"\nfoci landing within {NEAR_MM:.0f} mm of the read-out voxel: "
           f"{share.mean():.2f} per study")
-    print("\nA positive step at stage 4 would mean the censored likelihood pushes the estimate")
-    print("up, when correcting for unobserved mass below a threshold should pull it down.")
+    print("\nA positive step at the last stage would mean the censored likelihood pushes the")
+    print("estimate up, when correcting for unobserved mass below a threshold should pull down.")

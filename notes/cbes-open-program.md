@@ -742,3 +742,69 @@ images alone. That puzzle is still open (task #37).
 If one of the two maps is to be recommended for a relative reading, the evidence favours `g` --
 which is the opposite of what the current documentation does, since it tells the reader to
 distrust `g`'s magnitude and read `prevalence` ordinally.
+
+# CORRECTION: my simulators reported a known-variance z, the estimator expects a t
+
+This invalidates the magnitude of every bias number recorded above for `g`. Read this before
+using any of them.
+
+**What happened.** My beds generate a study's map as `g_true + noise/sqrt(n)` with unit-variance
+noise, then multiply by `sqrt(n)` to get a statistic. That is a *normal* statistic with known
+variance: `z = d * sqrt(n)` exactly. The estimator receives it as `Z` and, correctly for real
+data, treats a reported z as a p-value-preserving image of a **t** on `n - 1` degrees of freedom:
+it maps z back to t and then to d. In the far tail -- and every reported peak is in the far
+tail -- that map is strongly expansive. At `z = 5.33`, `n = 30`: `z / sqrt(n) = 0.98` while the
+estimator returns `g = 1.25`, 27% larger.
+
+So my simulator and the estimator disagreed about what the reported number means, and the
+estimator is the one that is right for real data: fMRI group maps are t-maps, and a published z
+is nearly always a transformed t.
+
+**Measured, at the same foci, with the same reporting pipeline:**
+
+```
+statistic convention                  foci  mean stat  truth there  mean g    bias
+known-variance z (what my beds did)    430      5.389        0.672   1.302  +0.630
+proper t, reported as T                428      5.420        0.670   0.966  +0.296
+```
+
+Less than half. Roughly 0.33 of the bias attributed to the estimator all session is a convention
+error of mine.
+
+**What this invalidates.** Every quantitative claim about the size of `g`'s bias:
+
+- the coverage table's `bias` column, and therefore its coverage numbers -- a bias near +0.17
+  (0.296 at the foci less 0.127 of localisation) against an `se` near 0.18 does not give 0.10
+  coverage, it gives something respectable
+- `b0 = 0.506` in the weight-share fit
+- the stage decomposition, whose "conversion convexity +0.323" step *is* this error, not a
+  property of the estimator (and the Jensen term inside it is only +0.043 -- the rest is the
+  level shift of the z-to-t map)
+- the ratios in the scale-error test, and the absolute biases in the marginal-cancellation test
+
+**What survives**, because it is a comparison made under one convention rather than an absolute:
+
+- `se/sd` near 1 in every coverage arm -- that is a statement about the standard error, and the
+  standard error was not converted through anything
+- the *functional form* of the weight-share model, `bias(f) = b0 (1-f) / ((1-f) + r f)`, and the
+  finding that the image *share* rather than the donor count is what matters; `b0` and `r` must
+  be re-measured
+- the naive-count-versus-fitted-prevalence comparison: both estimators read the same collections,
+  so the ordering gap (80% against 42%) is a like-for-like result
+- flattening reported heights improving the map by +0.080 -- again a within-convention contrast
+- the power-spread result (E3), for the same reason
+- the occupancy-model window of detectability, which never went through CBES's conversion at all
+
+**The rule I broke.** My own note says suspect the test before the theory. For most of a session I
+had a large, stable, reproducible bias and went looking for mechanisms in the estimator --
+inventing a "pooling step" contribution, then a "conversion convexity" one -- when the first
+question should have been whether the number I was feeding in meant what the estimator thought it
+meant. Task #30 in this program was *exactly this bug* in the field simulator, fixed earlier and
+then reintroduced in a new bed. A convention mismatch is not a subtle failure mode here; it is
+the recurring one, and it deserves a standing check rather than vigilance.
+
+**And one genuine finding falls out of it.** The z-to-t map at a reported peak is a long
+extrapolation into the t tail and is therefore very sensitive to the assumed degrees of freedom.
+A 27% amplification at `n = 30` means an error in the effective df propagates strongly into `g`.
+Papers do not always report the df behind a z-map, and software differs in what it puts there.
+That is a real caveat about the estimator, it is independent of my bug, and it is worth measuring.
