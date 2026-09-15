@@ -3195,3 +3195,33 @@ the magnitude claim, which is where CBES wins, and 8 SDM runs beat 21.
 Blocker: `sdm_parse pp` works; `sdm_parse mean` exits 0 without producing `analysis_MyMean`, and
 `MyMean=mean` exits 2. No pdftotext for the tutorial, and the argument names are not in the
 binary's strings. The 50-imputation coefficient from the earlier full-collection run is intact.
+
+## The `benchmark` CI check: two failures, both spurious, demonstrated not asserted
+
+`bench_cbma.TimeCBMA.time_mkdachi2_studyset` was flagged twice -- 1.61x on `a011f45` and 1.54x on
+`ecddf5c`. Neither commit can cause it: the first changes only `test_meta_effectsize.py`, the
+second only a docstring. And the PR's changes to files that *are* on MKDAChi2's path are inert --
+`meta/utils.py` is purely additive (new `_padded_flat_to_masked`, `_gpd_*`, `_max_statistic_maps`,
+none called by MKDAChi2) and `studyset/requirements.py` adds one key (`"sum": np.sum`) to a dict
+literal inside a cached branch.
+
+Reproduced locally, same benchmark body, 8 samples after a warm-up:
+
+| revision | median |
+|---|---|
+| f22be2c (PR base) | 48.1 ms |
+| origin/main | 48.7 ms |
+| PR head | **46.4 ms** |
+
+All 46-49 ms, with the head slightly *faster*. CI claimed 42.8 -> 66.1 ms. The 66 ms exists only
+in CI.
+
+The mechanism is runner variance, and the CI logs show it on the **base** side of the same two
+runs: `time_mkdadensity_dense` 506+-5ms vs 637+-3ms, `time_mkdachi2_dense` 797+-3ms vs 1.05+-0s,
+`time_kda` 50.6 vs 56.8 ms. Swings of 25-30% on identical code, because asv builds and benchmarks
+the base and the PR in separate virtualenvs at different moments on a shared runner. A 1.5x flag
+on a 42 ms benchmark is within that.
+
+`benchmark` then passed on the head with no change from me, which is the confirmation. No comment
+posted on the PR: the check is green there, so there is nothing to stand down from -- but the
+local numbers are recorded here in case it recurs.
