@@ -267,3 +267,19 @@ is uninterpretable. Report three numbers: the refusal rate, the rate among those
 overall -- and treat the middle one as the error rate. The same applies to any arm where
 replications can fail to fit: "0.95 coverage over 100 replications, 30 of which were unfittable"
 is a statement about 70 replications selected for being fittable.
+
+## Batch pushes, or CI never finishes a run
+
+Eight pushes in ninety minutes, each one cancelling the previous run under the repository's
+concurrency group. The only "suite completed" notices that arrived were for superseded commits;
+no commit had actually completed a full matrix. The effect is that a stream of small pushes buys
+*less* information than one push would, because every run is killed before it finishes, and the
+gap is invisible -- the notices look like all-clears.
+
+It also wastes the one legitimate re-run: the failing run may already be superseded by the time
+the failure is read, and re-running it cancels the head's run (recorded above).
+
+So batch documentation and note-only commits locally and push once the work is at a natural stop,
+or after a measurement lands. Push immediately only for something a reviewer or a running job
+depends on. The rule of thumb that fits what happened here: if the last push was under ten minutes
+ago and nothing external is waiting on this one, hold it.
