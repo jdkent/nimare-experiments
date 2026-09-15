@@ -499,3 +499,37 @@ Basis size explains the correlation; something else sets the level. The named su
 threshold: these probes infer each study's cut as the smallest reported value, the signal-dependent
 floating cut that has caused trouble throughout this project. T5 suggested that is benign when the
 shape is known, and the field setting is exactly where it would stop being benign.
+
+## 14. The rerun overturns T6, and with it an argument made against SDM-PSI
+
+With 48 basis functions and the intensity constant fixed:
+
+| images | coordinates | estimator | r | rmse | ratio |
+| --- | --- | --- | --- | --- | --- |
+| 2 | 30 | images only | +0.946 | 0.089 | 1.38 |
+| 2 | 30 | **coordinates only** | **+0.934** | 0.107 | **1.37** |
+| 2 | 30 | joint | +0.948 | 0.088 | 1.37 |
+
+Thirty coordinate studies recover the field almost as well as two images, against the +0.442 and
+5.74-fold inflation the handicapped version reported for the same arm. The joint is marginally
+ahead of the images, +0.948 against +0.946, which is within noise but is at least no longer a
+loss.
+
+Two things follow.
+
+**The residual inflation was never the coordinate model's.** It is 1.38 in the images-only arm and
+1.37 in the coordinate arm, so it belongs to the basis, the ridge and taking absolute values in the
+scoring -- my harness, common to every arm. Three probes were spent chasing it as a property of the
+point process.
+
+**The information-ceiling argument was over-extended, including against SDM-PSI.** The measured
+ceiling -- one tabulated coordinate explaining 5% to 9% of the variance in the truth at its own
+location -- bounds what a single coordinate's *value* carries. It does not bound a method that
+reads the whole table, as this project's own point-process model reaching +0.934 demonstrates.
+Any argument of the form "no method can recover the magnitude, because the per-coordinate ceiling
+is low" is wrong, and it was used here against both CBES and SDM-PSI.
+
+What survives against a method that takes reported peak values at face value is narrower and
+still stands: those values carry a shared bias of about +1.45 against 0.6 of noise, which does not
+average down. The remedy is to model the selection rather than the value, which is what the
+intensity formulation does.
