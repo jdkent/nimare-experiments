@@ -1,0 +1,40 @@
+MOTOR_LH: 786 subjects, 29398 voxels at 4 mm
+12 synthetic studies of 20 subjects, 1 as images, 8 splits; truth from the held-out subjects
+
+  split 1/8: 11 coordinate studies, 13.3 foci each
+  split 2/8: 11 coordinate studies, 13.6 foci each
+  split 3/8: 11 coordinate studies, 12.2 foci each
+  split 4/8: 11 coordinate studies, 12.5 foci each
+  split 5/8: 11 coordinate studies, 12.3 foci each
+  split 6/8: 11 coordinate studies, 11.5 foci each
+  split 7/8: 11 coordinate studies, 12.2 foci each
+  split 8/8: 11 coordinate studies, 12.1 foci each
+
+        estimate       r  rank r    AUC  ratio  mean err  err at top    rmse
+     images only  +0.714  +0.445  0.918   1.32    +0.068      -0.007   0.200
+   mixed (ships)  +0.705  +0.467  0.924   0.96    -0.008      -0.111   0.183
+    silence only  +0.741  +0.455  0.928   1.05    +0.010      -0.144   0.162
+
+Paired across splits (n = 8):
+
+  silence-only minus mixed (ships)
+              r    +0.037  p 0.0000
+         rank r    -0.012  p 0.0237
+            AUC    +0.004  p 0.0066
+          ratio    +0.085  p 0.0000
+       mean err    +0.018  p 0.0000
+     err at top    -0.034  p 0.0001
+           rmse    -0.021  p 0.0000
+
+  silence-only minus images only
+              r    +0.028  p 0.0002
+         rank r    +0.011  p 0.0000
+            AUC    +0.010  p 0.0000
+          ratio    -0.271  p 0.0000
+       mean err    -0.058  p 0.0000
+     err at top    -0.137  p 0.0000
+           rmse    -0.038  p 0.0000
+
+The question this was built for: does the pain conclusion hold where the truth comes
+from different subjects and the construct is motor rather than pain. And whether the
+ratio column is near enough to 1 for a single image to support an absolute magnitude.

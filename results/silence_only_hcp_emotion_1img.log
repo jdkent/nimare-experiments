@@ -1,0 +1,40 @@
+EMOTION_FACES: 786 subjects, 29398 voxels at 4 mm
+12 synthetic studies of 20 subjects, 1 as images, 8 splits; truth from the held-out subjects
+
+  split 1/8: 11 coordinate studies, 6.1 foci each
+  split 2/8: 11 coordinate studies, 7.4 foci each
+  split 3/8: 11 coordinate studies, 6.5 foci each
+  split 4/8: 11 coordinate studies, 5.9 foci each
+  split 5/8: 11 coordinate studies, 8.2 foci each
+  split 6/8: 11 coordinate studies, 6.2 foci each
+  split 7/8: 11 coordinate studies, 8.2 foci each
+  split 8/8: 11 coordinate studies, 6.4 foci each
+
+        estimate       r  rank r    AUC  ratio  mean err  err at top    rmse
+     images only  +0.839  +0.615  0.975   1.22    +0.068      +0.009   0.213
+   mixed (ships)  +0.828  +0.622  0.971   0.92    -0.026      -0.040   0.213
+    silence only  +0.834  +0.619  0.976   0.96    -0.012      -0.145   0.195
+
+Paired across splits (n = 8):
+
+  silence-only minus mixed (ships)
+              r    +0.006  p 0.0278
+         rank r    -0.003  p 0.3350
+            AUC    +0.004  p 0.0001
+          ratio    +0.045  p 0.0003
+       mean err    +0.014  p 0.0003
+     err at top    -0.105  p 0.0000
+           rmse    -0.017  p 0.0000
+
+  silence-only minus images only
+              r    -0.005  p 0.0166
+         rank r    +0.004  p 0.0000
+            AUC    +0.000  p 0.0213
+          ratio    -0.264  p 0.0000
+       mean err    -0.080  p 0.0000
+     err at top    -0.154  p 0.0000
+           rmse    -0.018  p 0.0021
+
+The question this was built for: does the pain conclusion hold where the truth comes
+from different subjects and the construct is motor rather than pain. And whether the
+ratio column is near enough to 1 for a single image to support an absolute magnitude.

@@ -2673,3 +2673,67 @@ weighted sum (1.35 to 1.12), and between-study variance dominates the weighting 
 0.93). `experiments/are_the_weights_the_residual.py` places the foci at fixed positions so the
 weights are identical in every replication and only the magnitudes vary -- a deliberate break with
 realism, stated as such, for a mechanism this bed cannot otherwise isolate.
+
+## Redesigning the estimator around silence
+
+The instruction: rebuild around the silence of coordinates and remove the now-dead code
+aggressively. What that means concretely, worked out before deleting anything.
+
+**The premise.** Coordinate tables contribute *presence and absence only*. Magnitudes come from
+images. Measured on three collections (NIDM pain, HCP MOTOR_LH, HCP EMOTION_FACES), that has the
+lowest rmse in all three (paired p <= 0.0021) and the best-calibrated level in all three.
+
+**What dies, and why it is genuinely dead rather than merely unused:**
+
+* The **kernel** -- `fwhm`, `_kernel_support`, `_study_voxel_weights`, `_focus_geometry`,
+  `kernel_min_weight`. Checked by grep: these are reached only from `_accumulate`, i.e. only to
+  spread coordinate *magnitudes* over voxels. Silence geometry is `coverage_radius`, which stays.
+  This retires #56 by deletion.
+* All of **`peak_bias`** -- the factors, the scale, the calibration from donors, the
+  `scale_source_`/`n_scale_donors_`/`scale_interval_` plumbing, `_scale_is_pinned`,
+  `peak_stat_to_hedges_g`, `null_peak_overshoot`, `peak_information`, `null_peak_mean_g`. The
+  entire winner's-curse correction exists to repair reported peak heights. No heights, no
+  correction. This also retires the all-donor calibration crash and the two-donor gate.
+* **Threshold inference** -- `infer_threshold_from_minimum`, `_expected_min_peak`, `"study-min"`,
+  `"pooled-min"`. All three infer the cut from the smallest reported *statistic*. The threshold
+  is still needed (silence is only informative against a cut) but must now be supplied or
+  defaulted. This retires #53 by deletion.
+* **The peak statistic itself** -- `stat_column`, `_resolve_stat_column`, `_reported_z`. A
+  consequence worth naming: the estimator no longer needs a reported statistic per focus, so it
+  can consume the tables most of the coordinate literature actually publishes.
+* **`g_relative` and `g_absolute`** and `_relative_g`. They exist because the coordinate scale was
+  unidentified. With magnitudes from images only, `g` is on the effect-size scale by
+  construction and there is nothing to relativise.
+* **`_permute_magnitudes`** -- there are no coordinate magnitudes to permute.
+
+**What survives, checked rather than assumed.** The censoring machinery entire
+(`_censoring_terms`, `_ReportingPairs`, `_SilentPairs`, `_coverage_entries`,
+`_apply_selection_model`, `_working_sets`, `_update_prevalence`, `_fit_chunk`,
+`_observed_information`), image loading and pooling, `tau2`, `prevalence`, `coverage_radius`.
+
+**The null survives, which I had expected to be the blocker.** `_permute_image_values` reassigns
+each image's values among its own voxels -- many states even with one image, unlike a sign flip --
+and tests the same hypothesis the magnitude shuffle did: within a study, effect size is unrelated
+to location. The coordinate silence pattern is *fixed* across permutations, so it contributes the
+same structure to the observed statistic and to every null draw, and cancels. The relocation null
+is not needed, which matters because it was already measured and rejected: not conditional on
+multiplicity, and permuting whole rows broke the multiplicity invariant.
+
+**One decision is forced rather than optional.** `n_eff` is Kish over the pooled weights, and with
+coordinate magnitudes gone only images carry a weight, all equal to 1 -- so `n_eff = k` and
+`dof = k - 1`, which is **0 at one image** and makes the documented interval `nan`. #62 stops
+being a consistency question. Taking the roster: the likelihood genuinely uses every study's
+report or silence, and with equal image weights the Kish count adds nothing over a plain count.
+
+### A near-miss worth recording
+
+`null_effect_variance` is the one surviving caller of the conversion being deleted, so its
+`d = 0` value had to be inlined. I wrote the usual approximation, `J**2 / N` for one sample, and
+checked it against the pre-surgery module rather than assuming: **0.04608 against 0.05150 at
+N = 20, wrong by 12%.** `d_to_g` uses the *exact* variance,
+`(N-1)(1 + N d**2) h**2 / (N (N-3)) - d**2`, which at `d = 0` is `(N-1) h**2 / (N (N-3))`, while
+the two-sample branch does use the approximate form. The two designs do not share a formula and
+assuming they did would have silently mis-scaled every silence in the model.
+
+Both designs now match the old path to 0.000e+00. The habit that caught it is the one already in
+`PROTOCOL.md`: name the check that would show the change is wrong, and run it before moving on.
