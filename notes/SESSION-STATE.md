@@ -27,6 +27,17 @@ it before proposing a mechanism.
 
 ## The definitive coverage table
 
+> **SUPERSEDED WHILE YOU WERE AWAY, and read this first.** Every arm below scores
+> `g +/- 1.96 se` -- a *normal* interval. The class docstring tells callers to refer `se` to a **t
+> on `dof`**, and `dof` is a Kish effective count that comes out near **4.5** on a twelve-study
+> fit, so the documented critical value is 2.67 and the documented interval is 36% wider than the
+> one measured here. Under it, at the default kernel, **every configuration covers 0.98 to 1.00 --
+> including coordinates-only, which reads 0.75 below.** Coverage stops discriminating between
+> configurations; only width does. The re-run is in flight and this section will be replaced by
+> it; the bias, `se/sd` and `dof` columns are unaffected and the conclusions that rest on those
+> still hold. The fuller account, including why `se/sd > 1` is the diagnostic that actually
+> matters, is in `notes/cbes-open-program.md`.
+
 Truth 0.800, prevalence 1 at every site, calibrated reporting regime (every study reports, 3-4
 clusters each), **100 replications per arm**, studies reporting a genuine *t*, every coordinate
 table produced by a cluster-forming threshold with no cap on the number of foci. `half/truth` is
