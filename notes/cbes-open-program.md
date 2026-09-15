@@ -1246,3 +1246,46 @@ methodological one: a prediction "falsified" by a measurement that later turns o
 mis-instrumented is not falsified, and the retraction needs revisiting when the instrument is
 fixed -- I had not gone back over the earlier falsifications after finding the convention bug, and
 should have.
+
+## Audit: which results rested on the known-variance z convention
+
+Prompted by discovering that a "falsified" prediction was only falsified by a mis-instrumented
+measurement. Rather than keep stumbling on these, here is the full list, checked by grepping for
+beds that declare `kind: "Z"` while building a statistic as something times `sqrt(n)`.
+
+Re-run on a genuine t, conclusions confirmed or corrected:
+
+| bed | outcome |
+| --- | --- |
+| `interval_coverage` | redone; bias halves, coverage 0.72/0.28 rather than 0.10/0.00, `se/sd` and the weight-share *form* unchanged |
+| `is_g_a_scale_error` | redone; ratio spread 1.17x not 1.65x, and the U-shape prediction reinstated |
+| `prevalence_within_map` | redone; ordering *worse* (19% / 6% exact, not 50% / 12%) |
+| `prevalence_vs_naive` | redone; conclusion unchanged and sharper |
+| `are_heights_decoration` | redone; **conclusion reversed and retracted** |
+| `decompose_bias` | its "conversion convexity" stage *is* this bug; the other stages stand |
+| `identification_by_power_spread` (E3) | re-running |
+| `marginal_cancellation` (E7) | re-running |
+
+Unaffected, and why:
+
+- `threshold_sensitivity`, `calibrate_coverage_bed`, `heights_on_real_data` -- written after the
+  fix, or on real data where the estimator's assumption is the correct one.
+- `reporting_probability` and the occupancy/window-of-detectability work -- the exact detection
+  model never passes through the estimator's conversion at all.
+- Every earlier real-data result (held-out HCP, NIDM pain split-half, the NeuroVault paradigm
+  sets) -- real collections report real t or z maps, so there is no mismatch to make.
+
+**Still to audit, not yet done:** the false-positive-rate beds (`mixed_null`, `mixed_null2`,
+`mixed_null3`, `few_images_null`, `approx_null_images`, `config_matrix`, `sim_validate`,
+`threshold_correction_fit`). These measure error rates rather than magnitudes, and a permutation
+p-value is invariant to a monotone per-study transform of the values -- but the conversion is
+*not* a common transform, it depends on each study's `n`, so a roster with heterogeneous sample
+sizes could in principle see its null shifted. The error rates were established in earlier
+sessions and are load-bearing for the PR, so this needs checking rather than assuming. Logged as
+a task.
+
+The general point for the protocol: after finding an instrumentation bug, **go back over every
+conclusion the instrument produced, including the ones that were negative.** A bug that inflates
+an estimate also inflates the evidence against predictions that said the estimate would be
+smaller, and those retractions need revisiting too. I found this one by accident rather than by
+audit, which is the wrong way round.

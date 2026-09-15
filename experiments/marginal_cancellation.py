@@ -70,24 +70,23 @@ def one(seed):
         for b, h in zip(BLOBS, has):
             if h:
                 field = np.maximum(field, b)
-        noise = ndimage.gaussian_filter(rng.standard_normal(SHAPE), SMOOTH_VOX)
-        noise *= 1.0 / (noise.std() + 1e-12)
-        gmap = field + noise / np.sqrt(n)
-        foci, _ = reporting.report_peaks((gmap * np.sqrt(n))[MASK_BOOL], MASK_BOOL, SHAPE,
+        t_map = reporting.study_t_field(field, n, SMOOTH_VOX, rng, shape=SHAPE)
+        foci, _ = reporting.report_peaks(t_map[MASK_BOOL], MASK_BOOL, SHAPE,
                                          ZOOMS, "cluster", "max")
         meta = {"sample_sizes": [n]}
         points = []
         for ijk, zv in foci:
             mm = nib.affines.apply_affine(AFF, ijk)
             points.append({"space": "MNI", "coordinates": [float(v) for v in mm],
-                           "values": [{"kind": "Z", "value": float(zv)}]})
+                           "values": [{"kind": "T", "value": float(zv)}]})
             for s, (centre, _, _) in enumerate(SITES):
                 if np.linalg.norm(np.asarray(ijk) - np.asarray(centre)) <= 3:
                     reported_near[s] += 1
         studies.append({"id": f"s{k}", "name": f"s{k}", "metadata": meta, "analyses": [
             {"id": f"s{k}-1", "name": "1", "metadata": meta, "points": points}]})
 
-    est = CBES(fwhm=10.0, mask=MASK, null_method="none", use_images=False, peak_bias=None)
+    est = CBES(fwhm=10.0, mask=MASK, null_method="none", use_images=False, peak_bias=None,
+               threshold=3.2905267314919255)
     res = est.fit(Studyset({"id": "m", "name": "m", "studies": studies},
                            target=None, mask=MASK))
     g = res.get_map("g", return_type="array").ravel()
@@ -100,7 +99,11 @@ def one(seed):
 
 
 if __name__ == "__main__":
-    print(f"{N_STUDIES} coordinate-only studies, {N_SIMS} replications\n")
+    reporting.assert_statistic_convention(
+        reporting.study_t_field(np.zeros(SHAPE), 30, SMOOTH_VOX,
+                                np.random.default_rng(13), shape=SHAPE), 30, "T")
+    print("statistic convention check passed: studies report a t on n - 1 degrees of freedom")
+    print(f"{N_STUDIES} coordinate-only studies, {N_SIMS} replications, threshold supplied\n")
     rows = [r for r in Parallel(n_jobs=6)(delayed(one)(s) for s in range(N_SIMS))
             if r is not None]
     g = np.array([r[0] for r in rows]); pi = np.array([r[1] for r in rows])

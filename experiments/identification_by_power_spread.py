@@ -39,8 +39,10 @@ TRUE_PI_SWEEP = (0.25, 0.50, 0.75, 1.00)
 N_SIMS = int(os.environ.get("NSIMS", 24))
 N_STUDIES = 24
 LOCALISATION_SD = 4.0
-#: Thresholds in real use: FDR-ish, p<0.005, p<0.001, and a stricter corrected height.
-THRESHOLDS = (2.5758, 3.0902, 3.2905, 3.7190)
+#: Thresholds in real use, as two-sided p values so each study's cut sits on its own t scale.
+#: Naming them on the z scale and thresholding a known-variance z there was the convention
+#: error that inflated every recovered magnitude by about a third; see PROTOCOL.md.
+THRESHOLD_PS = tuple(2.0 * stats.norm.sf(z) for z in (2.5758, 3.0902, 3.2905, 3.7190))
 ROSTERS = ("fixed", "n varies", "both vary")
 
 
@@ -52,12 +54,16 @@ def build_mask():
     return nib.Nifti1Image(np.ones(shape, dtype=np.int32), affine)
 
 
+DEFAULT_P = 2.0 * stats.norm.sf(3.2905)
+
+
 def draw_roster(rng, roster):
+    """Per-study ``(n, reporting p)``. The cut is derived per study from p and n - 1."""
     if roster == "fixed":
-        return [(30, 3.2905)] * N_STUDIES
+        return [(30, DEFAULT_P)] * N_STUDIES
     if roster == "n varies":
-        return [(int(rng.integers(15, 121)), 3.2905) for _ in range(N_STUDIES)]
-    return [(int(rng.integers(15, 121)), float(rng.choice(THRESHOLDS)))
+        return [(int(rng.integers(15, 121)), DEFAULT_P) for _ in range(N_STUDIES)]
+    return [(int(rng.integers(15, 121)), float(rng.choice(THRESHOLD_PS)))
             for _ in range(N_STUDIES)]
 
 
@@ -65,12 +71,14 @@ def one(seed, roster, true_pi):
     rng = np.random.default_rng(seed)
     mask = build_mask()
     studies = []
-    for k, (n, u) in enumerate(draw_roster(rng, roster)):
-        meta = {"sample_sizes": [n]}
+    for k, (n, report_p) in enumerate(draw_roster(rng, roster)):
+        u = float(stats.t.isf(report_p / 2.0, n - 1))
+        meta = {"sample_sizes": [n], "reporting_threshold": u}
         points = []
         if rng.random() < true_pi:
-            var = 1.0 / n + TRUE_MU**2 / (2.0 * n)
-            z = rng.normal(TRUE_MU, np.sqrt(var)) * np.sqrt(n)
+            # Noncentral t: the effect is the noncentrality, the denominator carries n - 1
+            # degrees of freedom, which is the statistic the estimator's conversion assumes.
+            z = float(stats.nct.rvs(df=n - 1, nc=TRUE_MU * np.sqrt(n), random_state=rng))
             if abs(z) >= u:
                 loc = np.asarray(SITE) + rng.normal(0, LOCALISATION_SD, 3)
                 points.append((loc, z))
@@ -81,8 +89,11 @@ def one(seed, roster, true_pi):
         studies.append({"id": f"s{k}", "name": f"s{k}", "metadata": meta, "analyses": [
             {"id": f"s{k}-1", "name": "1", "metadata": meta, "points": [
                 {"space": "MNI", "coordinates": [float(c) for c in loc],
-                 "values": [{"kind": "Z", "value": float(z)}]} for loc, z in points]}]})
-    est = CBES(fwhm=10.0, mask=mask, peak_bias=None, null_method="none")
+                 "values": [{"kind": "T", "value": float(z)}]} for loc, z in points]}]})
+    # The threshold is handed in rather than inferred, since inference from the smallest
+    # reported value is what miscalibrates the prevalence and would confound this comparison.
+    est = CBES(fwhm=10.0, mask=mask, peak_bias=None, null_method="none",
+               threshold="reporting_threshold")
     res = est.fit(Studyset({"id": "i", "name": "i", "studies": studies},
                            target=None, mask=mask))
     at = mm2vox(np.asarray([SITE]), mask.affine)[0]
