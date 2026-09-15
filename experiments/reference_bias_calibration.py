@@ -1,0 +1,66 @@
+"""How much does the conditional reference over-state mu? Measured where mu is known.
+
+The real-data reference counts a study as active at a voxel when its own map clears its own cut
+there. That selects on the same noise it then measures, so it is biased up, and the size of the
+bias decides how to read a CBES/reference ratio near 1: if the reference runs 20% high, a ratio
+of 1.0 means CBES runs 20% high too.
+
+The bias cannot be measured on real data, where mu is unknown. It can be measured in the field
+simulator, where the true effect at every voxel is recorded, by building exactly the same
+reference and comparing it against that truth.
+"""
+import os, sys, warnings; warnings.simplefilter("ignore")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import numpy as np
+import nibabel as nib
+from nimare.generate import create_effect_size_coordinate_studyset
+from nimare.transforms import t_to_z
+
+TRUE_G = 0.8
+N_SIMS = 40
+N_STUDIES = 24
+U = 3.2905
+shape, step = (21, 21, 21), 4.0
+affine = np.eye(4)
+affine[:3, :3] *= step
+affine[:3, 3] = -step * (np.array(shape) - 1) / 2
+
+print(f"true g = {TRUE_G} at the blob centre, {N_SIMS} simulations, {N_STUDIES} studies\n")
+print(f"{'active if |z| >':>15} {'reference':>10} {'true mu there':>14} {'bias':>8}")
+for cut in (3.2905, 4.0, 4.5, 5.0):
+    refs, truths = [], []
+    for seed in range(N_SIMS):
+        rng = np.random.default_rng(1000 + seed)
+        g_maps, z_maps, true_maps = [], [], []
+        for k in range(N_STUDIES):
+            n = int(rng.integers(20, 41))
+            # Same construction the simulator uses: a smooth field with a blob of known height.
+            noise = rng.normal(size=shape)
+            from scipy.ndimage import gaussian_filter
+            noise = gaussian_filter(noise, sigma=10.0 / 2.355 / step)
+            noise /= noise.std()
+            grid = np.stack(np.indices(shape), axis=-1) * step + affine[:3, 3]
+            blob_sigma = 10.0 / (2.0 * np.sqrt(2.0 * np.log(2.0)))
+            squared = (grid ** 2).sum(axis=-1)
+            signal = TRUE_G * np.exp(-squared / (2.0 * blob_sigma ** 2))
+            z = t_to_z(signal * np.sqrt(n) + noise, n - 1)
+            g_maps.append(signal + noise / np.sqrt(n))   # observed g at each voxel
+            z_maps.append(z)
+            true_maps.append(signal)
+        G, Z, T = np.array(g_maps), np.array(z_maps), np.array(true_maps)
+        active = np.abs(Z) >= cut
+        n_active = active.sum(axis=(0,)) if active.ndim == 3 else active.sum(axis=0)
+        with np.errstate(invalid="ignore"):
+            ref = np.where(n_active > 0,
+                           (np.abs(G) * active).sum(axis=0) / np.maximum(n_active, 1), np.nan)
+        use = (n_active >= 2) & np.isfinite(ref)
+        if use.sum() < 20:
+            continue
+        refs.append(float(ref[use].mean()))
+        # Truth is the same for every study, so the true mu at those voxels is the blob height.
+        truths.append(float(T[0][use].mean()))
+    if not refs:
+        print(f"{cut:15.2f}   too few voxels")
+        continue
+    ref_mean, true_mean = np.mean(refs), np.mean(truths)
+    print(f"{cut:15.2f} {ref_mean:10.3f} {true_mean:14.3f} {ref_mean / true_mean:8.3f}")

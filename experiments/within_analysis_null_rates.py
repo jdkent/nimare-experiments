@@ -9,7 +9,8 @@ shuffle keeps each value inside its own study. Two things to establish:
   * what the restriction costs in power, since a study reporting one focus now contributes no
     randomness and even a 6-focus study contributes only 720 arrangements.
 
-A global null (effect 0, prevalence 0) makes every rejection a false one. Power is read at the
+A global null (effect 0, prevalence 0) makes every rejection a false one, and the familywise
+rate is the share of *maps* carrying one. Power is read at the
 truth voxel of a focal effect. Run on a 25-voxel box at 4mm so 100 simulations per cell is
 affordable; the null is per-voxel, so a smaller brain changes the multiplicity but not the
 per-voxel rate.
@@ -56,7 +57,11 @@ def one(seed, sample_size, n_studies, effect_size, n_noise_foci):
     logp = maps["logp_level-voxel"].ravel()
     reject_fwe = logp >= -np.log10(ALPHA)
     if effect_size == 0.0:
-        return (float(np.mean(p[covered] <= ALPHA)), float(np.mean(reject_fwe[covered])),
+        # The familywise rate is the probability of *any* false rejection, not the average
+        # share of voxels rejected. An earlier version returned the share, which sits near zero
+        # even in a map that does reject somewhere, so it could not show whether the test held
+        # its level -- it read 0.0000 where the familywise rate was about 0.10.
+        return (float(np.mean(p[covered] <= ALPHA)), float(reject_fwe[covered].any()),
                 np.nan, np.nan, False)
     # Power is read at the truth, which is the voxel a reader cares about.
     at = np.ravel_multi_index(mm2vox(np.asarray([TRUTH]), mask.affine)[0], mask.shape)

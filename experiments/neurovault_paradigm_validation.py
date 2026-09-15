@@ -94,9 +94,16 @@ def to_g(z_masked, n_subjects):
     return d_to_g(d, n_subjects)
 
 
+# Resting state has no task contrast, so a "effect size" there is not the quantity this
+# estimator is about; the unlabelled bucket is not a paradigm at all.
+EXCLUDE = ("none", "other", "null", "rest eyes open", "rest eyes closed", "none / other",
+           "resting state")
 entries = json.load(open(MAPS))
 by = {}
 for m in entries:
+    if (m["paradigm"] or "").strip().lower() in EXCLUDE:
+        continue
+    # One map per collection per paradigm, so no single collection dominates a group.
     by.setdefault(m["paradigm"], {}).setdefault(m["collection"], m)
 groups = sorted(((p, list(c.values())) for p, c in by.items()),
                 key=lambda kv: -len(kv[1]))
