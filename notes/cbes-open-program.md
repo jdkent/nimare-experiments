@@ -1066,3 +1066,43 @@ The two beds also differ in how much silence there is to explain -- reporting fr
 is the section 22 mechanism again: more unexplained silence, more for the censoring term to
 attribute, more inflation. That is the variable to isolate next, rather than declaring either bed
 the representative one.
+
+### The threshold trade-off across all three outputs, and why one choice still wins
+
+Mean absolute error across the four sites (20 coordinate-only studies, 30 replications, true
+magnitude 0.70 at every site, cluster-extent reporting at a forming cut of z = 3.0902):
+
+```
+threshold setting           median cut   prevalence      g   g_marginal
+study-min (the default)          4.015        0.201  0.173        0.270
+pooled-min                       3.532        0.056  0.211        0.166
+the true forming cut             3.090        0.037  0.251        0.116
+the library default 3.2905       3.291        0.008  0.235        0.132
+```
+
+No single choice is best for all three, so the trade-off is real -- but it is not symmetric, and
+one choice still wins once the *reasons* are looked at rather than the numbers alone.
+
+**`prevalence` and `g_marginal` both want a plausible fixed threshold.** The library's own
+constant gives a mean absolute prevalence error of **0.008** -- 0.248 / 0.501 / 0.752 / 0.972
+against 0.25 / 0.50 / 0.75 / 1.00 -- against 0.201 for the default inference. On `g_marginal` the
+true cut and the fixed constant are the two best (0.116, 0.132) and the default is worst by a
+factor of two.
+
+**`g` prefers the default inference, for a bad reason.** `g` is biased *high* by peak selection,
+and a cutoff assumed too high makes the censoring term attribute more of the reported mass to
+truncation, which pulls the magnitude down. So `study-min`'s advantage on `g` (0.173 against
+0.251) is an accidental partial cancellation of a different bias by a threshold error, not the
+threshold being right. Relying on it means relying on two errors staying in proportion, which is
+exactly the kind of coincidence this program has found breaking down whenever a regime changes.
+
+`g` is also not constant across the four sites at any setting -- 0.866 / 0.803 / 0.876 / 0.947 at
+`study-min`, 0.986 / 0.926 / 0.943 / 0.947 at the true cut, for a truth of 0.70 everywhere -- so
+it remains contaminated by the prevalence whatever the threshold. The threshold choice is not
+what fixes that; heterogeneous study power is (E3).
+
+**Recommendation, with the evidence attached:** supply a plausible fixed threshold, or leave
+`threshold` at the library constant, and treat `study-min` as appropriate only where tables came
+from voxelwise-height thresholding -- the one regime where the smallest reported value really is
+near the cut. On cluster-extent tables it is reliably too high by about 0.9 z, and it damages the
+two outputs that are identified while flattering the one that is not.

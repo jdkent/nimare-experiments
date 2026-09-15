@@ -90,20 +90,36 @@ if __name__ == "__main__":
     print("statistic convention check passed: studies report a t on n - 1 degrees of freedom")
     print(f"{N_STUDIES} coordinate-only studies, {N_SIMS} replications, true mu {TRUE_MU}")
     print(f"the bed's cluster-forming cut is z = {FORMING_Z:.4f}\n")
-    print(f"{'threshold setting':26s} {'median cut':>11s}   "
-          + " ".join(f"pi@{p:.2f}" for p in SITE_PREVALENCE) + f"   {'mean g':>7s}")
-    print(f"{'(the truth)':26s} {'':>11s}   "
-          + " ".join(f"{p:7.2f}" for p in SITE_PREVALENCE) + f"   {TRUE_MU:7.2f}")
-    for label, threshold in (("study-min (the default)", "study-min"),
-                             ("pooled-min", "pooled-min"),
-                             ("the true forming cut", FORMING_Z),
-                             ("the library default 3.2905", 3.2905267314919255)):
+    truth_pi = np.array(SITE_PREVALENCE)
+    truth_marg = truth_pi * TRUE_MU
+    settings = (("study-min (the default)", "study-min"),
+                ("pooled-min", "pooled-min"),
+                ("the true forming cut", FORMING_Z),
+                ("the library default 3.2905", 3.2905267314919255))
+    results = {}
+    for label, threshold in settings:
         rows = [r for r in Parallel(n_jobs=8)(delayed(one)(s, threshold)
                                               for s in range(N_SIMS)) if r is not None]
-        pi = np.array([r[0] for r in rows]); g = np.array([r[1] for r in rows])
-        cut = np.array([r[2] for r in rows])
-        print(f"{label:26s} {np.nanmean(cut):11.3f}   "
-              + " ".join(f"{v:7.3f}" for v in pi.mean(0))
-              + f"   {g.mean():7.3f}", flush=True)
+        results[label] = (np.array([r[0] for r in rows]), np.array([r[1] for r in rows]),
+                          np.array([r[2] for r in rows]))
+
+    def block(name, truth, index):
+        print(f"\n--- {name} ---")
+        print(f"{'threshold setting':26s} {'median cut':>11s}   "
+              + " ".join(f"@pi={p:.2f}" for p in SITE_PREVALENCE) + f"   {'mean|err|':>9s}")
+        print(f"{'(the truth)':26s} {'':>11s}   "
+              + " ".join(f"{v:7.3f}" for v in truth) + f"   {0.0:9.3f}")
+        for label, _ in settings:
+            pi, g, cut = results[label]
+            value = {0: pi, 1: g, 2: pi * g}[index].mean(0)
+            print(f"{label:26s} {np.nanmean(cut):11.3f}   "
+                  + " ".join(f"{v:7.3f}" for v in value)
+                  + f"   {np.abs(value - truth).mean():9.3f}")
+
+    block("prevalence", truth_pi, 0)
+    block("g, the conditional magnitude (truth %.2f everywhere)" % TRUE_MU,
+          np.full(len(SITE_PREVALENCE), TRUE_MU), 1)
+    block("g_marginal = g * prevalence", truth_marg, 2)
     print("\nPredicted: study-min infers a cut above the forming one, because a reported focus")
-    print("is a cluster maximum, and a high cut inflates the prevalence.")
+    print("is a cluster maximum, and a high cut inflates the prevalence. The question the")
+    print("three blocks answer is whether one threshold choice can serve all three outputs.")
