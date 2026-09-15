@@ -1263,8 +1263,8 @@ Re-run on a genuine t, conclusions confirmed or corrected:
 | `prevalence_vs_naive` | redone; conclusion unchanged and sharper |
 | `are_heights_decoration` | redone; **conclusion reversed and retracted** |
 | `decompose_bias` | its "conversion convexity" stage *is* this bug; the other stages stand |
-| `identification_by_power_spread` (E3) | re-running |
-| `marginal_cancellation` (E7) | re-running |
+| `identification_by_power_spread` (E3) | redone; confirmed more cleanly, plus a caveat that the bed has no winner's curse |
+| `marginal_cancellation` (E7) | redone; confirmed and sharper |
 
 Unaffected, and why:
 
@@ -1275,14 +1275,19 @@ Unaffected, and why:
 - Every earlier real-data result (held-out HCP, NIDM pain split-half, the NeuroVault paradigm
   sets) -- real collections report real t or z maps, so there is no mismatch to make.
 
-**Still to audit, not yet done:** the false-positive-rate beds (`mixed_null`, `mixed_null2`,
-`mixed_null3`, `few_images_null`, `approx_null_images`, `config_matrix`, `sim_validate`,
-`threshold_correction_fit`). These measure error rates rather than magnitudes, and a permutation
-p-value is invariant to a monotone per-study transform of the values -- but the conversion is
-*not* a common transform, it depends on each study's `n`, so a roster with heterogeneous sample
-sizes could in principle see its null shifted. The error rates were established in earlier
-sessions and are load-bearing for the PR, so this needs checking rather than assuming. Logged as
-a task.
+**Audited clean: the error-rate beds never had it.** `within_analysis_null_rates` -- the bed
+behind the PR's numbers -- uses NiMARE's own `create_effect_size_coordinate_studyset`, which emits
+`observed_z = t_to_z(observed_d / scale, dof)`: a proper p-value-preserving image of a t on the
+right degrees of freedom. `mixed_null` and its variants do it correctly by hand, as
+`t_to_z(val * sqrt(n), n - 1)`. `few_images_null`, `approx_null_images` and `config_matrix` draw a
+reported z directly from `rng.uniform(3.3, 5.0)`, and there is no true effect size in those beds
+for a converted statistic to disagree with. So the PR's error rates stand.
+
+Which sharpens the lesson rather than softening it: **`mixed_null` contains the correct idiom,
+written in an earlier session.** I had the right pattern in this repository and wrote four new
+beds today without reusing it. That is a regression in practice, not a gap in knowledge, and it
+is why the convention now lives in one place (`reporting.study_t_field`) with a check every bed
+runs (`reporting.assert_statistic_convention`) rather than in whichever line I happen to type.
 
 The general point for the protocol: after finding an instrumentation bug, **go back over every
 conclusion the instrument produced, including the ones that were negative.** A bug that inflates
