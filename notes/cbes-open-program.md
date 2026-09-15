@@ -2346,3 +2346,34 @@ the excess in this bed more likely to be misspecification of the **reporting pro
 likelihood. That is a different and more interesting defect than a variance bug, and it is
 testable: the bed's reporting is a cluster-forming cut with a fixed assumed extent, while the
 estimator's censoring term assumes height thresholding.
+
+### Why `se/sd > 1` is anomalous in one direction only
+
+I had left two readings of `se/sd` open: that the observed information is the right error for `mu`
+in the selection model and the replication spread is simply a different quantity, or that the
+information is overstated. A variance decomposition settles which way the anomaly points.
+
+The censored likelihood conditions on the **positions** of the reported foci and models their
+magnitudes; it does not model where the peaks fell. So `se` estimates a variance conditional on
+the design -- which studies contributed, at which distances. The replication `sd` is marginal over
+designs, because every replication draws fresh studies, fresh sample sizes, fresh noise and
+therefore fresh focus positions. By the usual decomposition,
+
+```
+sd^2  =  E[ Var(g_hat | design) ]  +  Var( E[g_hat | design] )   >=   E[ Var(g_hat | design) ]
+```
+
+so a well-calibrated conditional `se` should come out **smaller** than the marginal `sd`, by
+however much the design varies. `se/sd` ought to sit at or below 1.
+
+It is 1.1 to 2.4. The anomaly is therefore not a yardstick mismatch that could excuse either
+direction -- the mismatch that does exist pushes the ratio the other way, so the measured excess
+understates how overstated the `se` is. That is evidence for the second reading, and it is
+independent of anything about `tau2` or the critical value.
+
+Which leaves a sharper question than "is the se right". The oracle bed covers 94.5% to 98.4% with
+known variances, so the information is about right where the model holds. The excess appears when
+the reporting process is realistic. `experiments/is_it_the_reporting_scheme.py` changes only how
+foci are extracted -- cluster-forming cut versus voxelwise FDR versus Bonferroni -- while holding
+the estimator fixed, which is the one comparison that separates a bad model of reporting from a
+bad likelihood.
