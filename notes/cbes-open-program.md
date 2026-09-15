@@ -2942,3 +2942,40 @@ So the -0.039 is not in the report limb. Remaining candidates, none tested: Hedg
 an inverse-variance weight (a known 2-3% downward pull, too small on its own), tau2 estimated
 about the naive mean and so biased low (measured to move `g` from 0.883 to 0.822 at a true 0.8
 when alternated), and the stratum definition itself -- 7 voxels at truth >= 0.25.
+
+## The compression is gone. That was the old design's headline failure.
+
+Never measured for the redesign until now, and it is the single biggest improvement.
+
+Three-bin stratification cannot answer this -- it mixes the slope with the floor, and the top bin
+held 7 voxels. So: four well-separated foci at true g of 0.2, 0.4, 0.6, 0.8 inside *one* map,
+8 collections, 20 studies, 2 images, regressing estimate on truth over the 198 signal voxels.
+
+| estimate | slope | intercept | @0.2 | @0.4 | @0.6 | @0.8 | recovered range |
+|---|---|---|---|---|---|---|---|
+| images only | 0.872 | +0.044 | 0.242 | 0.446 | 0.586 | 0.764 | 3.2-fold |
+| **CBES g** | 0.729 | +0.050 | 0.188 | 0.345 | 0.605 | **0.798** | **4.2-fold** |
+| CBES g_marginal | 0.750 | +0.017 | 0.151 | 0.293 | 0.589 | 0.765 | 5.1-fold |
+
+`g` recovers **4.2-fold for a true 4-fold**. The old design gave 1.2-fold for 11-fold. An unknown
+overall scale would leave the ratio alone, so the old compression was a real defect; it is now
+gone, and if anything slightly over-spread.
+
+And the *shape* of the improvement is the right one. `g` beats images-only at the strong foci
+(0.798 for a true 0.800, 0.605 for 0.600) and sits further below at the weak ones (0.188 for
+0.200 against images-only's inflated 0.242). A focus whose true effect is 0.2 against a cutoff
+near 0.6 g was reported mostly by luck and *should* be shrunk. But that is also the entire source
+of the slope of 0.73, so **the weak end is where to expect over-correction, not the strong end**.
+
+### This retracts the -0.039 "bias where the effect is largest"
+
+The three-bin measurement that drove #66 binned truth >= 0.25 into one column spanning 0.25 to
+0.50, averaging voxels whose estimate is slightly high with voxels whose estimate is low and
+reporting the mixture as a bias. At the focus itself `g` is 0.798 for a true 0.800 -- essentially
+unbiased. So the quantity two experiments were chasing was partly an artefact of the binning.
+Both falsifications still stand on their own terms (alpha = 1 and 0 mm are still the joint
+optimum), but the motivating number was weaker than stated.
+
+Slope and intercept are the honest summary for this estimator. Recorded in the docstring, which
+previously claimed the coordinate channel "corrects the bias rather than the compression" -- now
+measurably wrong and replaced.
