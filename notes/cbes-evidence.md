@@ -899,3 +899,123 @@ Condensed in the code to what changes a user's choice. The measurements behind e
         As in every other :class:`~nimare.estimator.Estimator`.
 
 ```
+
+
+---
+
+## `_censoring_terms`, as its docstring carried it
+
+The measurements behind the report limb, the restored `-1` pairs, and the profiling that decided against rewriting it.
+
+```
+def _censoring_terms(mu, cutoff_scaled, twice_cutoff_scaled, inv_sigma, inv_sigma_sq, sign):
+    r"""Probability of each observed *reporting indicator*, and the pieces of its derivatives.
+
+    A coordinate table carries one bit per study per voxel: the study reported something near
+    here, or it did not. Both values of that bit are informative, and the two are complementary
+    probabilities of the same event, so they are computed together and told apart by ``sign``:
+    ``+1`` for a silent pair, whose probability is :math:`P(|g| < c \mid \mu)`, and ``-1`` for
+    a pair that reported, whose probability is :math:`1 - P(|g| < c \mid \mu)` with its height
+    discarded.
+
+    **The ``-1`` limb's probability is overstated, and the error peaks mid-window.** A paper
+    reports a voxel only if it cleared ``c`` *and* the value there was a local maximum, which
+    this :math:`P(|g| \\ge c)` does not require. Measured against a known truth, the model's
+    reporting rate exceeded the observed one by 1.00, 1.78, 1.08 and 1.13 at true ``g`` of 0.2,
+    0.4, 0.6 and 0.8 -- non-monotone, so no uniform reweighting of the limb can absorb it, and
+    raising its probability to a power was measured making every focus worse. Correcting it needs
+    the survival of a suprathreshold local maximum, and that needs a field smoothness this model
+    does not carry. See ``CBES`` under "Why the indicator and not the heights".
+
+    **Dropping the ``-1`` pairs biases the magnitude down, and hard.** They used to contribute
+    nothing at all, on the reasoning that a coordinate carries no usable height -- but omitting
+    them leaves the *silent* pairs as the only evidence about the indicator, so the model reads
+    the observed silence fraction against a denominator that excludes every study that reported.
+    On a one-voxel likelihood with the truth known exactly, 20 studies of which 2 supply images
+    and a cutoff of 0.60 g, that returned a mean :math:`\hat\mu` of 0.351 for a true 0.500
+    (rmse 0.192); with the indicator restored, 0.524 (rmse 0.129).
+
+    Returned as one dict because the E step and the M step both need these at the same ``mu``.
+    **This is the most expensive single function in the estimator** -- 59% of a whole-brain fit
+    with a permutation null, which at the default ``n_iters`` is most of the wall clock, since
+    each permutation runs a full EM.
+
+    Profiled rather than assumed, and the assumption was wrong: the cost is *not* spread evenly
+    over memory-bound kernels. On 600,000 pairs the two ``ndtr`` calls take 10.7 ms and 8.1 ms
+    against 3.0 ms each for the two densities and 0.4 ms for an arithmetic pass, so **45% of
+    the time is two normal CDFs** and no rearrangement of the surrounding algebra reaches it.
+    Three were measured -- one reciprocal in place of two divisions, ``second`` obtained from
+    ``first`` through
+    :math:`u\phi(u) - l\phi(l) = u(\phi(u) - \phi(l)) + k\phi(l)`, and both together -- and
+    they came out at 1.00x, 1.09x and 1.05x with up to 5e-14 of drift. Not worth the churn.
+
+    Nor can the lower tail be dropped to save its CDF: its median contribution is 2e-5 of the
+    silent probability, which sounds negligible, but its maximum is 0.30 and it exceeds 1% of
+    the score's numerator for 38% of pairs. The two levers that do work are ``n_cores``, the
+    null being a thousand independent fits, and the compaction in :meth:`CBES._fit_chunk`,
+    which shrinks the array as voxels retire.
+
+    Everything that does not move between EM iterations is passed in already divided: ``mu`` is
+    the only argument that changes, so ``cutoffs / sigma`` and the reciprocals are hoisted to
+    the caller. The lower tail looks negligible and is not -- at a typical cutoff it is a third
+    of the score's numerator -- so it is kept. The arithmetic writes into its own temporaries
+    wherever numpy allows it, each avoided temporary being hundreds of megabytes of traffic.
+    """
+    # upper = (c - mu) / sigma;  lower = (-c - mu) / sigma = upper - 2c/sigma
+    upper = mu * -inv_sigma
+```
+
+
+---
+
+## reporting_cutoff_to_g: the degrees-of-freedom sensitivity table
+
+```
+    **The assumed degrees of freedom are load-bearing, because a threshold sits far into the
+    tail where that map is steep.** Holding ``n`` at 30 and varying only the assumed residual
+    degrees of freedom:
+
+    ============  =======  =======  ========  =========  ======
+    cutoff z       df=29    df=60    df=120    df=1000   spread
+    ============  =======  =======  ========  =========  ======
+    3.30           0.653    0.626     0.614      0.604    1.08x
+    4.00           0.830    0.776     0.752      0.733    1.13x
+    5.00           1.133    1.009     0.959      0.918    1.23x
+    6.00           1.522    1.273     1.178      1.105    1.38x
+    ============  =======  =======  ========  =========  ======
+
+    The effective degrees of freedom of a published map are frequently *above* ``n - 1`` --
+    variance smoothing raises them, and some mixed-effects tools do that deliberately -- and
+    papers seldom state them, so a threshold read off a published z is likely to be placed a
+    little too high, which makes a silence look less surprising than it was.
+```
+
+
+---
+
+## _study_cutoffs_z: what the retired inference cost
+
+```
+        It can no longer be inferred. The old rules read it off the smallest reported statistic,
+        undoing the order statistic for the number of peaks; with the heights no longer read,
+        there is nothing to read it from. So it is **supplied or assumed**, which is also the
+        honest position: the earlier inference was measured at 0.201 of prevalence error against
+        0.008 for a fixed constant on cluster-extent tables, because it cannot tell a
+        cluster-forming cut from a voxelwise one and overshoots the first by about 1 z.
+```
+
+
+---
+
+## _indicator_entries: the extent and limb measurements
+
+```
+        Measured on a known truth, asserting the report across the sphere gave an rmse of
+        0.457 against 0.114 for the named voxel alone.
+
+        Omitting the ``-1`` limb entirely is worse than including it at the named voxel: the
+        silent pairs are then the only evidence about the indicator, so the model reads the
+        observed silence fraction against a denominator that excludes every study that
+        reported, and over-shrinks. Where the truth is largest that cost 0.091 of rmse against
+        0.074 and -0.060 of bias against -0.042.
+```
