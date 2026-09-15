@@ -1030,3 +1030,56 @@ The practical consequence is a diagnostic rather than a fix. The quantity a user
 threshold in that study's own units. Large means "this is the reporting fraction, read it as
 one"; near zero means "this is the reporting fraction times an inflation the data barely
 constrain". Both are computable from what the fit already holds.
+
+## 23. The estimator is more accurate if it ignores the reported magnitudes entirely
+
+The strongest result in this program, and it got much stronger when the statistic convention was
+fixed. 16 coordinate-only studies, 30 replications, five sites, mean true g 0.600. Locations,
+counts, study membership, sample sizes and thresholds untouched; only the reported statistics
+altered.
+
+```
+height input        r(g, truth)  mean g at sites  mean pi  r(pi, truth)
+as reported               0.429            0.786    0.875         0.526
+study-flattened           0.638            0.804    0.908         0.559
+all-flattened             0.713            0.789    0.914         0.629
+
+paired against 'as reported':
+  study-flattened   r changes +0.2090  (sd 0.1473, paired p 0.000)
+  all-flattened     r changes +0.2840  (sd 0.1315, paired p 0.000)
+```
+
+**Replacing every reported height in the collection with a single constant improves the
+correlation with the truth from 0.429 to 0.713** -- a 66% relative gain, paired p < 0.001. And it
+does so at the same level: mean `g` at the sites is 0.789 against 0.786. Same magnitude, far
+better pattern.
+
+Under the buggy convention this read +0.080 for study-flattening and a null -0.015 for
+all-flattening, and I wrote that the within-study spread was harmful while the between-study
+level "carries what little there is". That was wrong, and the correction reverses it: all-
+flattened now beats study-flattened by a further +0.075, so the between-study level carries
+negative information too.
+
+**Why the correction made it worse rather than better.** The estimator converts a reported
+statistic through a map that is steep in the tail (section 21). That map is convex, so a larger
+overshoot is amplified more than a smaller one -- the differential amplification of a quantity
+that is already pure selection noise. Feeding it a known-variance z understated the steepness and
+so understated the damage. On the right convention, the heights are not merely uninformative;
+passing them through the conversion actively scrambles the pattern.
+
+`prevalence` improves too, 0.526 to 0.629, which is consistent with it being count-driven and
+with the level-versus-pattern split above.
+
+**What follows, stated as plainly as the result deserves.** A coordinate-based effect-size
+estimator that used only *where* and *how often* foci appear, with magnitudes ignored or used
+only to set one global scale, would recover the spatial pattern substantially better than this
+one does. That is not an argument for a new method on aesthetic grounds; it is a measured 0.284
+improvement in correlation from deleting an input. The point-process formulation (task #40) is the
+natural home for it, and the reporting-probability estimand (section 19) is what such a model
+would report.
+
+The immediate, much cheaper version: an option that replaces every reported magnitude with the
+collection's mean before fitting. In this bed it would have been the single largest accuracy
+improvement available. It needs checking on real collections, where the heights at least carry
+the between-study differences in sample size and threshold that this bed also varies -- but the
+bed varies them and the result still favours deletion.
