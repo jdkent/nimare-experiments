@@ -29,9 +29,20 @@ roughly the amount random-field theory says. Sweeping the bed's own smoothness t
   * if the bias is flat in smoothness, the residual is something else and a smoothness field
     would buy nothing.
 
-Note the direction is stated in advance, and it is the opposite of the naive guess. A smoother
-field has larger blobs but fewer independent maxima competing within one, and the winner's curse
-is driven by the number of effective competitors.
+The direction is stated in advance, and so is the assumption it rests on, because without that
+assumption it is not clean. **Holding the region fixed**, a smoother field spans fewer independent
+resels, so its maximum is a maximum over fewer effective competitors and the winner's curse is
+smaller -- the bias should fall as smoothness rises. But the region is not fixed here: at a fixed
+cluster-forming cut a smoother field yields *larger* clusters, so the resel count inside a cluster
+need not fall at all, and the two effects oppose each other. A third effect pushes the same way as
+neither: with a very smooth field the observed maximum can sit further from the true peak, so the
+reported focus describes a location where the truth is lower.
+
+So a flat column would be genuinely ambiguous -- it could mean smoothness does not matter, or that
+two effects of similar size cancel -- and only a monotone column in either direction is
+interpretable. That is a weakness of this design and it is better to know it before reading the
+output than to invent an explanation for whichever shape appears. If the column is flat the next
+step is to hold the cluster region fixed by construction rather than by threshold.
 
 `fwhm_mm` is reported alongside, from the bed's own estimate, so the sweep can be read against
 the smoothness a paper would print rather than against a simulator parameter.
