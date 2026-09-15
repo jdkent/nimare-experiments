@@ -568,3 +568,73 @@ So it does not hallucinate, with either rate law. There is a small positive floo
 which is expected -- six or seven noise peaks per study are still reported and the model must
 explain them with something -- but it sits an order of magnitude below real signal. This was the
 cheapest possible check and it came after every celebratory result rather than before them.
+
+## 16. What the point-process estimand actually is
+
+The model fits one field common to every study, so the question of what that field means when
+studies differ was never asked. `estimand.py` asks it: studies either have the effect or have
+none, with prevalence `pi`, and those that have it carry a study-level perturbation of size `tau`.
+
+| prevalence | tau | ratio to mu | ratio to pi*mu |
+| --- | --- | --- | --- |
+| 1.00 | 0.0 | 1.68 | 1.68 |
+| 1.00 | 0.5 | 1.70 | 1.70 |
+| 0.50 | 0.0 | 1.37 | 2.73 |
+| 0.50 | 0.5 | 1.31 | 2.63 |
+| 0.25 | 0.0 | **1.28** | **5.13** |
+| 0.25 | 0.5 | 1.30 | 5.21 |
+
+Prevalence falls fourfold and the estimate moves only 1.68 to 1.28, where the marginal would have
+gone to 0.42. **The point-process field is essentially the conditional magnitude**, with about a
+quarter of attenuation at low prevalence -- not a compromise between the two, which is what a
+Jensen argument had predicted and what an earlier note claimed outright as "the marginal". Both
+were wrong. And `tau` does nothing at all: 1.68 against 1.70, 1.28 against 1.30. Magnitude
+heterogeneity does not shift the estimand; only zero-inflation does, and weakly.
+
+So the intensity formulation **does not change the estimand**. It targets the same conditional
+quantity CBES already targets, which is the quantity no image-based meta-analysis estimates.
+
+### Which estimand each method targets
+
+| estimand | meaning | estimated by |
+| --- | --- | --- |
+| `mu` | effect among studies that have one here | CBES `g`, the point-process field |
+| `pi` | fraction of studies with an effect here | CBES `prevalence` |
+| `pi * mu` | effect averaged over all studies, zeros included | CBES `g_marginal`, **and every IBMA** |
+| foci density | rate of reported peaks | ALE, MKDA, CBMR |
+
+Every IBMA estimator in NiMARE -- DerSimonian-Laird, Hedges, weighted least squares, the
+likelihood estimators -- pools per-study effect maps as draws around one pooled mean, so a study
+with no effect at a voxel enters the average as a zero and the expectation over studies is
+`pi * mu`. On a real Hedges' g scale, since each per-study `g` comes from an image with a known
+sample size.
+
+Two consequences.
+
+**`g_marginal` shares its estimand with an IBMA**, differing only in an unidentified scale. That
+is why it validated best against held-out references all session: not a better estimator, the only
+CBES map pointed at the same quantity as the reference.
+
+**`g` has no image-based reference at all.** No IBMA estimates the conditional. Worse, the
+conditional is arguably not identifiable from images either, because computing it needs each study
+classified as having-an-effect-or-not at each voxel, which is a thresholding decision and
+reintroduces the selection the estimator exists to correct.
+
+Part of the apparent inflation of `g` is therefore mismatch rather than error, worth `1/pi`, which
+on pain is 1.4 to 1.8. It does **not** explain the compression: measured prevalence rises 0.556 to
+0.702 across strata, so `1/pi` falls only 1.80 to 1.42, a factor of 1.27 against an observed ratio
+fall of 9.4.
+
+### What can be claimed
+
+*Supported.* Relative statements within one map, shape correlation 0.89 to 0.94 across every
+condition including misspecified rate laws and low prevalence. Localisation. "When a study finds
+this region, how large is the effect it finds", which is what the conditional means. And --
+the one no other estimator offers -- **predicted reporting**: given a threshold and a sample size,
+how many foci a study should report near a voxel, which is literally what the model is fit to and
+is directly usable for planning, replication judgements and simulating coordinate data.
+
+*Unsupported.* An absolute Hedges' g comparable to an IBMA, which is a category error before any
+bias enters. Cross-collection magnitude comparison when thresholds or sample sizes differ, since
+the estimand's definition moves with the rate function's curvature. Separating prevalence from
+magnitude. Power calculations for a new study, which need the marginal on a real scale.
