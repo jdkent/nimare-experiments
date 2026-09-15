@@ -1426,3 +1426,36 @@ Still owed before this goes near the PR: a second collection (the NeuroVault par
 a sensitivity check on the voxel set, which is currently CBES's own coverage. A paired test across
 splits is running, since the splits share studies and an unpaired comparison would be swamped by
 the between-split variance.
+
+### Paired across splits, which is the right test since the halves share studies
+
+```
+estimate              rank r   (sd)     AUC    (sd)
+CBES g_marginal        0.425  0.094   0.763  0.097
+MKDA density / KDA     0.294  0.083   0.652  0.056
+CBES prevalence        0.240  0.114   0.667  0.057
+CBES g                 0.216  0.086   0.653  0.083
+ALE                    0.203  0.045   0.643  0.030
+
+paired against MKDA density, the strongest convergence arm:
+  CBES g           rank r  -0.078  (sd 0.146, p 0.128)     AUC  +0.001  (sd 0.092, p 0.980)
+  CBES g_marginal  rank r  +0.131  (sd 0.097, p 0.002)     AUC  +0.111  (sd 0.068, p 0.001)
+  CBES prevalence  rank r  -0.054  (sd 0.093, p 0.097)     AUC  +0.016  (sd 0.039, p 0.241)
+  ALE              rank r  -0.091  (sd 0.077, p 0.005)     AUC  -0.009  (sd 0.036, p 0.433)
+```
+
+The split is statistically clean, not a matter of eyeballing means.
+
+- **`g` against the best convergence arm: AUC +0.001, p 0.980.** Indistinguishable. Not "slightly
+  worse" or "about the same" -- the point estimate of the difference is one thousandth of an AUC
+  unit. The magnitude machinery buys nothing over a smoothing kernel on this measure.
+- **`g_marginal`: +0.111 AUC at p 0.001 and +0.131 rank correlation at p 0.002.** Significant on
+  both, with a paired sd of 0.068 on the AUC difference, so ten splits are enough to see it.
+- **`prevalence`: +0.016 AUC, p 0.241.** Level, as expected for a count-channel quantity scored
+  against convergence statistics.
+- ALE sits slightly below MKDA on rank correlation (-0.091, p 0.005) and level on AUC.
+
+So the answer to #38, with the pre-committed caveat attached: the product earns its keep and
+neither factor does, on a reference that is itself the product. That is three independent routes
+to the same conclusion -- estimand, mechanism, and now localisation -- and it is the strongest
+case in this program for treating `g_marginal` as the deliverable and `g` as a diagnostic.
