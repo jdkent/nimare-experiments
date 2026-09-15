@@ -1723,3 +1723,48 @@ Also worth knowing: the suite contains no CBES benchmark, so the PR's own new co
 at all. Adding one would be a genuine improvement and is deliberately not being done here -- it
 widens the PR beyond what was asked -- but it is the reason a benchmark failure on this PR is
 *a priori* unlikely to be about the PR.
+
+### And the prediction resolves against me: the coordinate channel IS corrected
+
+Truth 0.800, 12 studies, 40 replications, the same bed:
+
+```
+configuration                                   mean g    bias  mean se  cover
+2 of 12: peak_bias=None (what the table used)    0.904  +0.104    0.141   0.93
+2 of 12: per-study, scale read off the images    0.753  -0.047    0.109   1.00
+```
+
+At the image fraction that matters -- two of twelve, `f = 0.17` -- the recommended configuration
+cuts the bias from **+0.104 to -0.047**, less than half the magnitude and now slightly *under* the
+truth rather than over it. So the coordinate values really are being corrected, not merely
+outvoted.
+
+**This retracts a headline I reported twice.** "The coordinate channel is diluted, never
+corrected" is false of the estimator; it is true only of `peak_bias=None`. And the weight-share
+model that fitted so beautifully --
+
+```
+    bias(f) = b0 (1 - f) / ((1 - f) + r f),   b0 = 0.260, r = 6.40, max residual 0.022
+```
+
+-- is a correct and well-specified model of the configuration the documentation tells users not
+to rely on. Its excellent fit was never evidence that dilution is the mechanism available; it was
+evidence that dilution is the mechanism *when you switch the correction off*, which is what I had
+done in all twelve arms.
+
+The projections that hung off it go too: "2 images of 20 studies leaves the magnitude 20% high"
+was computed from `b0` and `r`, and on this evidence the calibrated setting would do materially
+better. They need re-deriving from calibrated arms before being quoted anywhere.
+
+What survives is narrower and still useful: with the correction switched off, dilution is the
+whole story and the image *share* rather than the donor count governs it. That is a real finding
+about the mechanism of `peak_bias=None`, and it explains why `peak_bias='per-study'` alone -- with
+`peak_bias_scale` left at its default 1.0 -- moved nothing (+0.259 to +0.255): the per-study
+factors correct the part of the bias that varies between studies, and without a scale read off
+images there is nothing to fix the common part, exactly as the docstring says.
+
+**The lesson, which is the same one as this morning in a new place.** I characterised a method for
+a whole session in a configuration its own documentation warns against, having read that warning
+earlier in the session and written it into the notes. The habit is not "read the docs" -- I had --
+it is: **make the documented default the first arm of every comparison, and label any other
+setting as the variant it is.**
