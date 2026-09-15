@@ -274,3 +274,50 @@ The oracle arm remains biased at 0.688, so the high-threshold rate approximation
 `exp(-(u - m)^2 / 2)` is still mis-specified and the soft-versus-hard comparison in that table is
 not yet readable. Replacing it with a real expected-maxima formula is the next step before T4 can
 answer the question it was built for.
+
+---
+
+## 11. Option C works, and the rate function was never the blocker
+
+T4 stalled because I treated "write the expected-maxima rate" as a hard derivation. It is not:
+the testbed contains the exact field generator, so the peak-height law can be **measured**. Draw
+zero-mean fields, take every interior local maximum, keep the sorted heights, and the density of
+reported maxima where the field's mean is `m` and the cut is `u` is
+
+    rho_max * [ Sbar(u - m) + Sbar(u + m) ]
+
+with `Sbar` the survival of that height law, the upper term for maxima clearing `+u` and the
+lower for minima clearing `-u`. Exact for this field rather than a high-threshold approximation,
+so a failure downstream belongs to the architecture and not to the rate. In three dimensions the
+same law comes from Cheng and Schwartzman, with the non-zero-mean extension of Zhao, Cheng and
+Schwartzman, or from the data's own smoothness -- measuring it here is a shortcut for the
+testbed, not one that hides a hard step.
+
+With that in place, T5 fits one latent scale from images as Gaussian observations and coordinates
+as a point process, with the intensity constant shared across studies:
+
+| images | coordinates | estimator | recovered scale | error |
+| --- | --- | --- | --- | --- |
+| 2 | 12 | images only | 0.790 | −0.010 |
+| 2 | 12 | **coordinates only** | **0.833** | **+0.033** |
+| 2 | 12 | joint | 0.791 | −0.009 |
+| 2 | 30 | coordinates only | 0.836 | +0.036 |
+| 5 | 12 | coordinates only | 0.806 | +0.006 |
+
+**Coordinates alone recover the scale to within 1% to 5%.** Every scheme tried before this had
+them two- to fourfold out. The difference is that this reads the intensity -- where and how often
+foci appear, given each study's threshold and sample size -- and never touches the reported
+value. It is the first result in this project where a coordinate-only magnitude is not badly
+biased, and it contradicts the pessimism the rest of these notes built up from CBES's behaviour.
+That pessimism was about modelling the marks, and was right about the marks.
+
+Three limits before this is over-read.
+
+*It estimates one scalar with a known spatial shape.* That is far easier than recovering the
+field, which is the problem that matters. T6 tests the field.
+
+*The joint does not beat images alone*, 0.791 against 0.790, because two images already pin a
+single scalar. Any gain from joining has to appear in the field, where images are absent.
+
+*One dimension understates selection*, per the calibration check in section 10, so the numbers
+will not transfer even if the direction does.

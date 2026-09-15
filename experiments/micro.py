@@ -339,7 +339,226 @@ def detection_curve():
           f"mean inferred cut {np.mean(inferred):.2f}.\n")
 
 
+
+
+# ------------------------------------------------------- the rate function, measured not derived
+_PEAK_CACHE = {}
+
+
+def peak_height_law(n_fields=3000):
+    """The zero-mean field's own peak-height law: maxima per point, and their height survival.
+
+    T4 stalled on writing an expected-maxima rate by hand. That was never the blocker -- the
+    generator is right here, so the law can be *measured* rather than approximated. Draw
+    zero-mean fields, take every interior local maximum, and keep the sorted heights. Then the
+    density of reported maxima where the field's mean is ``m`` and the cut is ``u`` is
+
+        rho_max * [ Sbar(u - m) + Sbar(u + m) ]
+
+    with ``Sbar`` the survival of that height law -- the upper term for maxima clearing ``+u``
+    and the lower for minima clearing ``-u``, which two-sided reporting also keeps. This is exact
+    for this field instead of being a high-threshold approximation, so a failure downstream is
+    the architecture's and not the rate function's.
+
+    In three dimensions the same law comes from random field theory (Cheng and Schwartzman, with
+    the non-zero-mean extension of Zhao, Cheng and Schwartzman) or from the data's own smoothness,
+    so measuring it here is a shortcut for the testbed, not a cheat that hides a hard step.
+    """
+    if n_fields in _PEAK_CACHE:
+        return _PEAK_CACHE[n_fields]
+    heights = []
+    for _ in range(n_fields):
+        z = noise()[0]
+        interior = (z[1:-1] >= z[:-2]) & (z[1:-1] >= z[2:])
+        heights.append(z[1:-1][interior])
+    heights = np.sort(np.concatenate(heights))
+    rho_max = heights.size / float(n_fields * LENGTH)
+    _PEAK_CACHE[n_fields] = (heights, rho_max)
+    return heights, rho_max
+
+
+def survival(heights, value):
+    """Fraction of peak heights above `value`, with a floor so the log-likelihood stays finite."""
+    idx = np.searchsorted(heights, value, side="right")
+    return np.maximum((heights.size - idx) / heights.size, 1e-9)
+
+
+def joint_model():
+    """Option C: one latent field, images as Gaussian observations, coordinates as a point process.
+
+    The two failed schemes both treated a coordinate as a noisy measurement of the same number the
+    image measures, and lost to the images alone. This does not: a coordinate study contributes
+    only through *where and how often* it reported, via a rate that knows its threshold and its
+    sample size, and never through the value it printed.
+
+    Four estimators of the common scale, all given the same studies:
+
+      * images only -- the benchmark the other schemes could not beat;
+      * coordinates only, through the point process;
+      * joint, images plus the point process;
+      * ORACLE, the joint fit handed each study's true cut rather than inferring it.
+
+    The intensity constant is shared across studies, without which the Poisson likelihood
+    profiles out to a multinomial over locations and the counts -- the whole signal -- disappear.
+    """
+    print("T5: one latent field, images as Gaussians and coordinates as a point process")
+    heights, rho_max = peak_height_law()
+    shape_field = truth_field()
+    shape_field = shape_field / shape_field.max()
+    a_true = 0.8
+
+    def draw(n_images, n_coords, seed):
+        local = np.random.default_rng(seed)
+        images, tables = [], []
+        for _ in range(n_images):
+            n_subj = int(local.integers(15, 40))
+            obs = a_true * shape_field + noise()[0] / np.sqrt(n_subj)
+            images.append((obs, n_subj))
+        for j in range(n_coords):
+            n_subj = int(local.integers(15, 40))
+            z = a_true * shape_field * np.sqrt(n_subj) + noise()[0]
+            cut, per_cluster = ((2.5, False), (4.5, False), (3.0, True))[j % 3]
+            idx = report(z, cut, per_cluster)
+            if idx.size:
+                tables.append((idx, cut, n_subj, float(np.abs(z[idx]).min())))
+        return images, tables
+
+    def fit(images, tables, use_images, use_coords, oracle_cut):
+        def neg(a):
+            total = 0.0
+            if use_images:
+                for obs, n_subj in images:
+                    sd = 1.0 / np.sqrt(n_subj)
+                    total += 0.5 * (((obs - a * shape_field) / sd) ** 2).sum()
+            if use_coords and tables:
+                rates, counts = [], []
+                for idx, cut, n_subj, inferred in tables:
+                    u = cut if oracle_cut else inferred / np.sqrt(1.0)
+                    m = a * shape_field * np.sqrt(n_subj)
+                    r = rho_max * (survival(heights, u - m) + survival(heights, u + m))
+                    rates.append(r)
+                    counts.append(idx.size)
+                integral = sum(float(r.sum()) for r in rates)
+                n_total = sum(counts)
+                c_hat = n_total / max(integral, 1e-12)      # one shared intensity, profiled out
+                for (idx, _, _, _), r in zip(tables, rates):
+                    total -= np.log(c_hat * r[idx] + 1e-300).sum()
+                total += c_hat * integral
+            return total
+        return optimize.minimize_scalar(neg, bounds=(0.1, 2.0), method="bounded").x
+
+    print(f"  {'images':>7} {'coords':>7} {'estimator':>26} {'scale':>7} {'error':>7}")
+    for n_images, n_coords in ((2, 12), (2, 30), (5, 12)):
+        rows = {}
+        for seed in range(12):
+            images, tables = draw(n_images, n_coords, seed)
+            rows.setdefault("images only", []).append(fit(images, tables, True, False, False))
+            rows.setdefault("coordinates only", []).append(fit(images, tables, False, True, False))
+            rows.setdefault("joint", []).append(fit(images, tables, True, True, False))
+            rows.setdefault("ORACLE joint, true cuts", []).append(
+                fit(images, tables, True, True, True))
+        for name in ("images only", "coordinates only", "joint", "ORACLE joint, true cuts"):
+            a = float(np.mean(rows[name]))
+            print(f"  {n_images:>7} {n_coords:>7} {name:>26} {a:7.3f} {a - a_true:+7.3f}")
+        print()
+    print(f"  true scale {a_true}. The joint beating images alone is what the two failed"
+          f"\n  combination schemes could not do.\n")
+
+
+
+
+def joint_field():
+    """The real problem: recover the whole field, not one scalar with a known shape.
+
+    T5 showed the *scale* is identifiable from coordinates once the intensity is modelled
+    correctly. That is a much easier problem than the one that matters, because it assumes the
+    spatial shape is already known and only its amplitude is in question. Here the shape is
+    unknown: the field is expanded on a fixed set of evenly spaced bumps and every coefficient is
+    fitted, from images alone, from coordinates alone, and from both.
+
+    This is where joining should finally pay. Images are unbiased but few, so the field they
+    recover is noisy; coordinates are many and say where effects repeatedly appear. If the point
+    process contributes real spatial information, the joint fit beats the images by themselves --
+    which is exactly what pooling, rescaled pooling and gating all failed to do.
+    """
+    print("T6: recovering the whole field, images and coordinates jointly")
+    heights, rho_max = peak_height_law()
+    x = np.arange(LENGTH)
+    n_basis = 24
+    centres = np.linspace(0, LENGTH, n_basis, endpoint=False)
+    width = LENGTH / n_basis / 1.5
+    basis = np.stack([
+        np.exp(-0.5 * (np.minimum(np.abs(x - c), LENGTH - np.abs(x - c)) / width) ** 2)
+        for c in centres
+    ])
+    truth = truth_field()
+
+    def field_of(coef):
+        return coef @ basis
+
+    def draw(n_images, n_coords, seed):
+        local = np.random.default_rng(seed)
+        images, tables = [], []
+        for _ in range(n_images):
+            n_subj = int(local.integers(15, 40))
+            images.append((truth + noise()[0] / np.sqrt(n_subj), n_subj))
+        for j in range(n_coords):
+            n_subj = int(local.integers(15, 40))
+            z = truth * np.sqrt(n_subj) + noise()[0]
+            cut, per_cluster = ((2.5, False), (4.5, False), (3.0, True))[j % 3]
+            idx = report(z, cut, per_cluster)
+            if idx.size:
+                tables.append((idx, float(np.abs(z[idx]).min()), n_subj))
+        return images, tables
+
+    def fit(images, tables, use_images, use_coords, ridge=1e-2):
+        def neg(coef):
+            field = field_of(coef)
+            total = ridge * float(coef @ coef)
+            if use_images:
+                for obs, n_subj in images:
+                    total += 0.5 * (((obs - field) * np.sqrt(n_subj)) ** 2).sum()
+            if use_coords and tables:
+                rates = []
+                for idx, u, n_subj in tables:
+                    m = field * np.sqrt(n_subj)
+                    rates.append(rho_max * (survival(heights, u - m)
+                                            + survival(heights, u + m)))
+                integral = sum(float(r.sum()) for r in rates)
+                n_total = sum(idx.size for idx, _, _ in tables)
+                c_hat = n_total / max(integral, 1e-12)
+                for (idx, _, _), r in zip(tables, rates):
+                    total -= np.log(c_hat * r[idx] + 1e-300).sum()
+                total += c_hat * integral
+            return total
+        start = np.full(n_basis, 0.3)
+        out = optimize.minimize(neg, start, method="Powell",
+                                options={"maxiter": 4000, "xtol": 1e-3, "ftol": 1e-3})
+        return field_of(out.x)
+
+    print(f"  {'images':>7} {'coords':>7} {'estimator':>20} {'r':>7} {'rmse':>7} {'ratio':>7}")
+    for n_images, n_coords in ((2, 30), (5, 30)):
+        rows = {}
+        for seed in range(6):
+            images, tables = draw(n_images, n_coords, seed)
+            for name, ui, uc in (("images only", True, False),
+                                 ("coordinates only", False, True),
+                                 ("joint", True, True)):
+                est = np.abs(fit(images, tables, ui, uc))
+                rows.setdefault(name, []).append((
+                    stats.pearsonr(est, truth)[0],
+                    float(np.sqrt(np.mean((est - truth) ** 2))),
+                    float(est.mean() / max(truth.mean(), 1e-9)),
+                ))
+        for name in ("images only", "coordinates only", "joint"):
+            r, rmse, ratio = np.mean(np.array(rows[name]), axis=0)
+            print(f"  {n_images:>7} {n_coords:>7} {name:>20} {r:+7.3f} {rmse:7.3f} {ratio:7.2f}")
+        print()
+    print("  The joint beating images alone on r or rmse is what every scheme so far has failed"
+          "\n  to do. A ratio near 1.00 means the scale came out right as well.\n")
+
+
 if __name__ == "__main__":
-    which = sys.argv[1:] or ["calibration", "channel_sweep", "identifiability", "detection_curve"]
+    which = sys.argv[1:] or ["calibration", "channel_sweep", "identifiability", "detection_curve", "joint_model", "joint_field"]
     for name in which:
         globals()[name]()
