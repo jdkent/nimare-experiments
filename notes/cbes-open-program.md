@@ -3480,3 +3480,54 @@ paradigms, preprocessing, sample sizes from 14 to 43 -- which cannot be dialled 
   by exactly `(1 + delta_k)` and tau is between-study spread in the magnitude and nothing else.
 
 Fourth and fifth times this session that a confident-looking number was a defect in the harness.
+
+## The report-probability defect: mechanism confirmed by intervention, scalar fix ruled out
+
+The diagnosis was that the likelihood uses `P(|g| >= c)` where a paper reports a voxel only if it
+cleared `c` **and** was a local maximum, overstating the reporting rate by 1.00, 1.78, 1.08, 1.13
+at true g of 0.2, 0.4, 0.6, 0.8. Implicated in four deficits: the 0.4-focus shortfall, `se/sd` of
+1.55 to 3.74, the HCP magnitude at 0.63, and the prevalence absorbing heterogeneity.
+
+**The fix is not a reweighting** -- `alpha` was tried twice and made things worse. It is that both
+limbs must be complementary probabilities of the *same* event. With `E = P(|g| >= c | mu)` and `q`
+the chance that a study exceeding here actually names this voxel:
+
+    reported    q E          instead of   E
+    silent      1 - q E      instead of   1 - E
+
+Still a proper likelihood. And the arithmetic says where the benefit comes from:
+
+    report limb   score = (qE)'/(qE) = E'/E      -- q cancels entirely
+    silent limb   score = -q E' / (1 - q E)      -- scaled by roughly q
+
+So `q` leaves the report limb alone and weakens the *silence* pull by about `q`, which is exactly
+the over-shrinkage diagnosed. No smoothness needed to state it.
+
+Measured, 6 collections:
+
+| q | g@0.2 | g@0.4 | g@0.6 | g@0.8 | mean \|err\| |
+|---|---|---|---|---|---|
+| **1.00 (shipped)** | -23% | **-11%** | +1% | +0% | **8.9%** |
+| 0.90 | -22% | -9% | +4% | +4% | 9.4% |
+| 0.80 | -20% | -6% | +7% | +8% | 10.3% |
+| 0.70 | -19% | -4% | +10% | +12% | 11.0% |
+| 0.56 | -16% | **+1%** | +16% | +16% | 12.2% |
+
+**The mechanism is confirmed.** At q = 0.56 -- the reciprocal of the 1.78 measured at the 0.4
+focus -- that focus closes exactly, -11% to +1%. Acting on `P(report)` moves mu in the predicted
+direction by the predicted amount, which no amount of reasoning had established.
+
+**But no constant q helps overall.** Every value below 1 is worse on mean error, monotonically,
+because the required correction is mu-dependent and non-monotone (1.00, 1.78, 1.08, 1.13): a
+scalar lifts the weak foci and overshoots the strong ones. So the shipped q = 1 is the best
+constant -- the third time this session the shipped configuration has turned out to be the
+optimum of the tractable family (the others: alpha = 1 on the report limb, 0 mm report radius).
+
+### What this makes actionable
+
+The fix needs `q(mu)` -- the probability that an exceeding voxel is a local maximum -- which is a
+function of the field's **smoothness**. And unlike cluster extent, which jdkent correctly said
+papers do not report reliably, **estimated smoothness (FWHM) is routinely reported**: SPM and FSL
+both print it, and it appears in methods sections. So the concrete route is a `smoothness`
+metadata field feeding an RFT expected-maxima density, which turns this from "needs a quantity we
+cannot have" into "needs a field papers already publish". Links to #63.
