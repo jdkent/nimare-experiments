@@ -2637,6 +2637,39 @@ at the documented `t`. So the near-nominal coverage in the heterogeneity arms is
 model is right; it is two errors of opposite sign, and either one fixed alone makes coverage
 worse. That is worth knowing before anyone quotes the τ arms as reassurance -- I nearly did.
 
-One residual: with the censoring term off, coordinates-only `se/sd` is still 1.35. With donors it
-is 1.12 and under heterogeneity 0.93, so the residual is specific to the coordinates-only
-configuration and shrinks when either changes. Not yet located.
+The three donor-plus-heterogeneity rows complete the picture and add one thing:
+
+```
+donors  true tau  configuration  fitted tau2  mean se      sd  se/sd     bias  cover
+     6      0.30       baseline       0.0604    0.150   0.132   1.13   -0.063   0.92
+     6      0.30      tau2 none       0.0000    0.109   0.140   0.78   -0.032   0.82
+     6      0.30 selection none       0.0557    0.110   0.134   0.82   -0.044   0.88
+```
+
+**The `tau2` underestimation is largely a coordinates-only problem.** With six donors
+DerSimonian-Laird recovers 0.0604 of a true 0.0900 -- 67%, against 16% coordinates-only. Images
+carry direct variance information and the estimate improves accordingly, which is another thing
+donors buy that was not on the list.
+
+The `tau2 none` row at real heterogeneity is a sanity check the bed passes: ignoring genuine
+heterogeneity gives `se/sd` 0.78 and coverage 0.82, too narrow in exactly the way it should be.
+
+One residual: with the censoring term off, coordinates-only `se/sd` is still 1.35, while with
+donors it is 1.12 and under heterogeneity 0.93 or 0.82. So the residual is specific to the
+coordinates-only homogeneous configuration and shrinks when either the donors or the heterogeneity
+change.
+
+One candidate was ruled out by reading the code rather than simulating: `_apply_peak_bias` scales
+`g` by `rho_k` and `var_g` by `rho_k**2`, consistently, so the correction does not put the estimate
+and its variance on different scales.
+
+What is left is that **the kernel weights are random and correlated with the values.** A
+coordinate study contributes at the weight of whichever of its foci is nearest the voxel, and both
+which focus that is and how far it lands are functions of that study's noise; the pooled variance
+treats the weights as known constants. A study that drew a high peak close to the voxel contributes
+a large value *at a large weight*, and the formula does not know the weight was chosen partly by
+the noise that set the value. The dilution pattern fits: weight-1 image contributions dominate the
+weighted sum (1.35 to 1.12), and between-study variance dominates the weighting noise (1.35 to
+0.93). `experiments/are_the_weights_the_residual.py` places the foci at fixed positions so the
+weights are identical in every replication and only the magnitudes vary -- a deliberate break with
+realism, stated as such, for a mechanism this bed cannot otherwise isolate.
