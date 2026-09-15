@@ -2417,3 +2417,40 @@ profile-likelihood interval, which needs no `dof` at all. That last is the princ
 the most work.
 
 Recording it rather than changing it, because it moves every interval the estimator reports.
+
+### The roster `dof` is not a fix, and that closes the calibration question
+
+Referring the `se` to the censoring roster instead of `n_eff` is the obvious remedy for the
+inconsistency above, and it is worth about 15-20% of width. It does not change which arms cover.
+Projecting the roster critical value onto each arm's own bias and spread:
+
+```
+arm                              dof(n_eff)  cov(t)  dof(roster)  cov(roster)
+12 st, 0 img, fwhm 10                   4.5    0.98          9.0         0.95
+12 st, 0 img, fwhm 16                   7.8    0.52          9.0         0.49
+12 st, 0 img, fwhm 24                   9.7    0.13          9.0         0.17
+12 st, 2 img calibrated                 4.4    1.00          9.0         0.99
+12 st, 2 img peak_bias=None             4.4    0.99          9.0         0.96
+24 st, 0 img, fwhm 10                   9.1    0.56         18.9         0.51
+24 st, 0 img, fwhm 24                  20.2    0.00         18.9         0.00
+24 st, 2 img calibrated                 8.6    0.96         18.9         0.96
+24 st, 2 img peak_bias=None             8.6    0.74         18.9         0.77
+```
+
+The same spread, 0.00 to 0.99, either way. **The bias decides which arms cover; the `dof` decides
+only how wide they are.** So the `dof` question is a consistency defect worth fixing on its own
+terms and not a route to a calibrated interval.
+
+And there is nothing unexplained left in the calibration. The bias-to-width model predicts
+`cov(t)` across all sixteen arms to a mean absolute error of **0.021** -- better than the 0.034 it
+achieves on `cov(z)`, so the median `dof` is a sufficient summary of the per-replication variation
+in the critical value. Everything the coverage column does is accounted for by two numbers, the
+bias and the width, and the only open questions are why the `se` is about twice the estimator's
+spread (#60) and what to do about the bias.
+
+That is worth stating plainly because it retires a line of enquiry. Three separate hypotheses
+about the interval have now been tested and closed -- `tau2` truncation (falsified, fitted `tau2`
+is exactly zero), the critical value (real, 36% of width, does not change which arms cover), and
+the `dof` reference (real, 15-20% of width, does not change which arms cover). The interval is not
+mis-scaled. It is wide because the `se` is large, and it misses because the point estimate is
+biased, and those are the only two things left.
