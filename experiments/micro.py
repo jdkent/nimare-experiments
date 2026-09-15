@@ -277,34 +277,64 @@ def detection_curve():
             tables.append((idx, np.abs(z[idx])))
             true_cuts.append(cut)
 
-    def fit_scale(cuts, soft=None):
-        """Profile the Poisson intensity likelihood in the scale, at the given per-study cuts."""
+    def rate_of(m, u, soft):
+        """Density of reported maxima: the zero-mean maxima rate, shifted by the local mean.
+
+        A local maximum above `u` in a field whose mean is `m` there is as likely as one above
+        `u - m` in a zero-mean field, which is the high-threshold approximation. `soft` replaces
+        the hard cut with a logistic reporting probability of that width.
+        """
+        if soft is None:
+            return np.exp(-0.5 * np.maximum(u - m, 0.0) ** 2)
+        return 1.0 / (1.0 + np.exp(-(m - u) / soft))
+
+    def fit_scale(cuts, soft=None, shared_intensity=True):
+        """Poisson likelihood in the scale, with the overall maxima density shared or per-study.
+
+        This distinction is the whole test. An inhomogeneous Poisson log-likelihood is
+        ``sum_i log lambda(x_i) - integral lambda``. Writing ``lambda_k = C_k * r_k(x)`` and
+        letting each study have its own ``C_k`` profiles out to a multinomial over locations,
+        which discards every count and leaves only the *shape* of the intensity -- deleting
+        exactly the channel that was argued to carry the signal.
+
+        With one ``C`` shared across studies the counts are back in play, and the scale is
+        identified by how the count changes with each study's threshold and sample size. That is
+        the difference between "how many foci did this study report" being a free parameter and
+        being a prediction.
+        """
         def neg(a):
             m = a * shape * np.sqrt(n_subj)
+            rates = [rate_of(m, u, soft) for u in cuts]
+            counts = [idx.size for idx, _ in tables]
+            if not shared_intensity:
+                total = 0.0
+                for (idx, _), r in zip(tables, rates):
+                    dens = r / max(r.sum(), 1e-12) + 1e-12
+                    total += np.log(dens[idx]).sum()
+                return -total
+            # One shared C, profiled out analytically: C_hat = sum(counts) / sum_k sum_x r_k(x).
+            integral = sum(float(r.sum()) for r in rates)
+            n_total = sum(counts)
+            c_hat = n_total / max(integral, 1e-12)
             total = 0.0
-            for (idx, _), u in zip(tables, cuts):
-                if soft is None:
-                    rate = np.exp(-0.5 * np.maximum(u - m, 0.0) ** 2)
-                else:
-                    # Detection as a logistic in the statistic, shared across studies: the
-                    # reporting probability rises smoothly rather than switching at a cut.
-                    rate = np.exp(-0.5 * np.maximum(u - m, 0.0) ** 2)
-                    rate = rate / (1.0 + np.exp(-(m - u) / soft))
-                rate = rate / max(rate.sum(), 1e-12) + 1e-12
-                total += np.log(rate[idx]).sum()
+            for (idx, _), r in zip(tables, rates):
+                total += np.log(c_hat * r[idx] + 1e-300).sum()
+            total -= c_hat * integral
             return -total
         return optimize.minimize_scalar(neg, bounds=(0.1, 2.0), method="bounded").x
 
     inferred = [float(np.min(v)) for _, v in tables]
-    print(f"  {'estimator':>34} {'scale':>7} {'error':>7}")
-    for label, cuts, soft in (
-        ("true per-study cut, hard", true_cuts, None),
-        ("cut from smallest reported, hard", inferred, None),
-        ("cut from smallest reported, soft", inferred, 0.75),
-        ("true per-study cut, soft", true_cuts, 0.75),
+    print(f"  {'estimator':>34} {'intensity':>10} {'scale':>7} {'error':>7}")
+    for label, cuts, soft, shared in (
+        ("ORACLE true cut, hard", true_cuts, None, False),
+        ("ORACLE true cut, hard", true_cuts, None, True),
+        ("cut from smallest reported, hard", inferred, None, True),
+        ("cut from smallest reported, soft", inferred, 0.75, True),
+        ("ORACLE true cut, soft", true_cuts, 0.75, True),
     ):
-        a = fit_scale(cuts, soft)
-        print(f"  {label:>34} {a:7.3f} {a - a_true:+7.3f}")
+        a = fit_scale(cuts, soft, shared)
+        kind = "shared" if shared else "per-study"
+        print(f"  {label:>34} {kind:>10} {a:7.3f} {a - a_true:+7.3f}")
     print(f"\n  true scale {a_true}. Mean true cut {np.mean(true_cuts):.2f}, "
           f"mean inferred cut {np.mean(inferred):.2f}.\n")
 

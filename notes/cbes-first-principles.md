@@ -241,3 +241,36 @@ That is a better argument for the two-image scope than either version before it:
 needed to make an unidentifiable problem identifiable, they are needed because the
 coordinate-only likelihood is biased and nearly flat, which is exactly what produces an estimate
 that tracks the reporting convention instead of the effect.
+
+### A modelling trap found by the micro-test: a free per-study intensity deletes the counts
+
+T4's first version could not recover the effect scale even when handed each study's true
+reporting threshold -- 0.616 against a true 0.8 -- which meant the harness was being measured
+rather than the idea. The cause was not the crude rate function but the likelihood around it.
+
+An inhomogeneous Poisson log-likelihood is `sum_i log lambda(x_i) - integral lambda`. Write
+`lambda_k = C_k * r_k(x)` with a free intensity constant per study, and `C_k` profiles out
+analytically to leave a **multinomial over locations**: every count disappears and only the
+*shape* of the intensity survives. That is exactly the channel argued in section 2 to carry the
+signal, deleted by a modelling choice that looks innocuous.
+
+Sharing one `C` across studies restores it:
+
+| estimator | intensity constant | recovered scale | error |
+| --- | --- | --- | --- |
+| oracle, true per-study cut | per-study | 0.616 | −0.184 |
+| oracle, true per-study cut | shared | 0.688 | −0.112 |
+| cut inferred from smallest reported | shared | 0.729 | −0.071 |
+
+The scale is then identified by *how the count changes with each study's threshold and sample
+size*, rather than each study's foci count being a free parameter that explains itself.
+
+This is a constraint on any point-process formulation of the problem, including the CBMR-style
+frameworks the literature note recommends building on: if study-level covariates are allowed to
+absorb each study's overall rate, the model becomes a shape-only estimator and cannot see effect
+size at all. It will still fit, and it will look right.
+
+The oracle arm remains biased at 0.688, so the high-threshold rate approximation
+`exp(-(u - m)^2 / 2)` is still mis-specified and the soft-versus-hard comparison in that table is
+not yet readable. Replacing it with a real expected-maxima formula is the next step before T4 can
+answer the question it was built for.
