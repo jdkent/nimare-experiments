@@ -115,3 +115,56 @@ map with a checkable reference -- the only one sharing an estimand with an image
 meta-analysis -- is the one carrying no uncertainty. Propagating it needs the covariance of the
 prevalence and the magnitude, which the observed information already contains, since the
 prevalence is profiled out of it by a Schur complement.
+
+---
+
+## E2 answered: the compression is affine but not invertible, and worse than compressed
+
+`prevalence_calibration` sweeps a grid of true prevalence at three configurations, 12 simulations
+per cell, 24 studies, read at the truth voxel.
+
+| N range | effect | true pi | fraction reporting | pi_hat | sd |
+| --- | --- | --- | --- | --- | --- |
+| 20-40 | 0.8 | 0.00 | 0.035 | **0.218** | 0.213 |
+| 20-40 | 0.8 | 0.40 | 0.215 | 0.530 | 0.279 |
+| 20-40 | 0.8 | 1.00 | 0.427 | 0.901 | 0.136 |
+| 20-40 | 0.4 | 0.00 | 0.035 | 0.218 | 0.213 |
+| 20-40 | 0.4 | 0.40 | 0.031 | 0.157 | 0.217 |
+| 20-40 | 0.4 | 0.80 | 0.069 | 0.427 | 0.317 |
+| 20-40 | 0.4 | 1.00 | 0.080 | **0.302** | 0.216 |
+| 10-200 | 0.8 | 0.00 | 0.035 | 0.144 | 0.184 |
+| 10-200 | 0.8 | 1.00 | 0.503 | 0.936 | 0.082 |
+
+Affine fits against the two candidate truths:
+
+| N range | effect | slope vs true pi | intercept | r | slope vs reporting | r |
+| --- | --- | --- | --- | --- | --- | --- |
+| 20-40 | 0.8 | 0.719 | 0.216 | 0.994 | 1.831 | 0.994 |
+| 20-40 | 0.4 | **0.176** | 0.173 | **0.684** | 3.619 | 0.789 |
+| 10-200 | 0.8 | 0.804 | 0.063 | 0.981 | 1.675 | 0.966 |
+
+Three findings.
+
+**There is a floor of 0.14 to 0.22 at a true prevalence of zero.** The map reads a fifth of
+studies having an effect where none do. That is the same phenomenon as the point-process null
+floor, on a different scale.
+
+**The relationship is strikingly affine for strong effects but the coefficients are not stable.**
+Correlations of 0.994 and 0.981 mean a correction exists in principle; slopes of 0.719 against
+0.804 and intercepts of 0.216 against 0.063, differing only in the sample-size range, mean you
+would need to know the collection's effect size and N distribution to choose it -- and knowing the
+effect size removes the reason to want the map.
+
+**At a weak effect it is non-monotone.** 0.218, 0.194, 0.157, 0.270, 0.427, 0.302 as the truth
+goes 0 to 1: it reads *lower* at a prevalence of 1.0 than at 0.8. The per-simulation standard
+deviation, 0.22 to 0.32, exceeds the entire range of the means. For weak effects prevalence is
+close to noise.
+
+**The caveat on all of it.** This varies prevalence *across collections* at one voxel. The
+docstring claims something else -- that ordering across *voxels within one map* survives -- which
+is a different quantity and could still hold. `prevalence_within_map` tests the claim as made,
+with four sites of known differing prevalence inside a single fit.
+
+This also closes the power argument. Achievability needs prevalence on a real scale to say which
+side of the 0.8 ceiling a planned study sits on, and none of the above supports putting it there,
+least of all for the weak effects where the question is live.
