@@ -854,9 +854,31 @@ in the censoring term, drop their magnitudes from the pooled mean. NIDM pain, 2 
   coordinates only  +0.218  +0.205  0.650    +1.451      +1.230   1.587
 ```
 
-**Silence-only beats the shipping configuration on all six metrics** -- higher `r`, `rank r` and
-`AUC`, smaller bias overall and at the top decile, lower `rmse`. If coordinates are used alongside
-images at all, using only their silence looks strictly better than using their magnitudes.
+**Silence-only is better than the shipping configuration on all six point estimates, and
+paired-significant on five of them.** Paired across the eight splits:
+
+```
+  vs mixed (ships)              difference  paired p        vs images only   difference  paired p
+              r                     +0.054    0.0355                     r      -0.080    0.0009
+         rank r                     +0.075    0.0035                rank r      -0.030    0.0527
+            AUC                     +0.010    0.3453                   AUC      -0.021    0.0378
+       mean err (closer to 0)       -0.088    0.0005              mean err      -0.126    0.0000
+     err at top (closer to 0)       -0.205    0.0001            err at top      -0.241    0.0000
+           rmse (lower)             -0.096    0.0004                  rmse      -0.069    0.0021
+```
+
+The AUC difference against the shipping configuration is **not** significant (p 0.35), so "wins on
+all six" overstates it -- the honest claim is five of six, with the top-decile AUC indistinguishable.
+Everything else against the shipping mix is significant and in the same direction.
+
+Against images-only the trade is significant on both sides: better on all three magnitude
+columns (p 0.0021 or below) and worse on `r` (p 0.0009) and `AUC` (p 0.0378), with `rank r`
+borderline (p 0.0527).
+
+**One caveat on all these p-values.** Eight splits drawn from 21 studies overlap heavily -- each
+split uses 10 of them -- so the splits are not independent and the effective sample size is below
+eight. The paired tests are therefore optimistic about significance, though the effect sizes on
+the error columns (-0.205 at the top decile) are large enough that the direction is not in doubt.
 
 **Against images-only it is a real trade.** Magnitude decisively better -- `rmse` 0.277 against
 0.346, and top-decile bias **-0.020 against +0.221**, essentially unbiased -- and pattern worse,
