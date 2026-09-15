@@ -156,3 +156,19 @@ before their tests reported:
 The falsification was the most immediately useful of the four, because it retired a mechanism I
 would otherwise have carried into the write-up as an explanation for an old puzzle. A prediction
 written down cannot be quietly reshaped to fit what arrives; one held in mind can, and will.
+
+### Postscript: I broke the pgrep rule within the hour of writing it
+
+Having written the rule above, I then armed a monitor with
+`until ! pgrep -f "is_g_a_scale_error.py" | grep -qv "^$$\$"`. The `grep -v` was an attempt to
+exclude the waiter's own PID, which does not work: `pgrep -f` also matches the tail and subshell
+processes in the pipeline, each with a different PID from `$$`.
+
+Two conclusions, both duller and more useful than "be careful":
+
+- The rule needs to be **never write `pgrep -f <script>` in a waiter at all**, not "exclude
+  yourself when you do". Exclusion is one more thing to get wrong and it silently degrades to
+  waiting forever, which is the failure mode that looks like success.
+- A rule written in a document does not fire at the moment of writing code. The thing that would
+  have fired is a *habit*: launch with `run_in_background`, capture the PID, wait on `kill -0`.
+  Where a habit is available, prefer it to a rule.

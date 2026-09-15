@@ -743,6 +743,12 @@ If one of the two maps is to be recommended for a relative reading, the evidence
 which is the opposite of what the current documentation does, since it tells the reader to
 distrust `g`'s magnitude and read `prevalence` ordinally.
 
+> **Superseded.** Every number in this section was measured on the known-variance z convention.
+> Re-run with a genuine t and a supplied threshold, the ordering is far worse for both maps and
+> the margin nearly disappears: `g` exact ordering 22% over five sites against `prevalence`'s 19%
+> over four. The recommendation above no longer follows from a 3-point gap on differently-sized
+> tasks. The ratio-spread conclusion also changes; see the corrected section below.
+
 # CORRECTION: my simulators reported a known-variance z, the estimator expects a t
 
 This invalidates the magnitude of every bias number recorded above for `g`. Read this before
