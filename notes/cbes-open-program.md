@@ -2509,3 +2509,42 @@ Stating it in advance because the last three predictions recorded this way -- th
 model transferring, coverage eroding with collection size, `tau2` truncation explaining the
 width -- came out two right and one wrong, and the wrong one was worth more than either of the
 others.
+
+### That prediction was mis-specified, and the smoke test says something better
+
+Three fits, before the full run:
+
+```
+cluster, infers u    g 1.093   bias +0.293   foci/study  3.58
+cluster, told u      g 1.049   bias +0.249   foci/study  3.58
+fdr,     told u      g 1.040   bias +0.240   foci/study 47.92
+```
+
+**The prediction is wrong, and it was wrong because the test does not vary what I said it
+varied.** `scheme` sets the multiplicity correction and therefore the *threshold*; the selection
+event is set by `focus`, and `focus="max"` takes the maximum statistic within each surviving
+cluster under *every* scheme. So FDR reports far more clusters at a lower cut, but each reported
+focus is still a spatial maximum. I claimed the test would show whether the reporting event
+matches the theory, and it cannot: the event is the same in all three arms.
+
+What the arms do say is worth more than what I predicted. Going from 3.58 to **47.92 foci per
+study** -- a thirteenfold change in how much of the map is tabulated, at a much lower threshold --
+moves the bias from +0.249 to +0.240. **Table density and threshold level barely touch it.** The
+inflation is not about how selectively peaks are reported.
+
+Which leaves spatial maximum selection as the whole of it, and that is consistent: the maximum of
+a smooth field over a blob exceeds the value at the blob's centre, whatever cut admitted the blob.
+It also explains why `peak_bias="per-study"` does nothing. Its `rho_k` comes from the random-field
+peak-height distribution, which depends on the field's **smoothness** -- and the estimator is
+never told the smoothness, so `rho_k` is wrong by a factor common to every study. That is exactly
+the shape of "an unidentified common scale".
+
+Telling the estimator the true threshold is worth +0.293 to +0.249, about 0.044 -- real, and the
+one part of the story `threshold="study-min"` is responsible for. It bears on #53 and it is much
+smaller than the 0.20 of prevalence accuracy that decision turns on.
+
+The constructive line this opens: **papers report smoothness.** If the residual is a
+smoothness-dependent factor then a smoothness metadata field could pin the scale with no image
+donor at all, which is the thing four other remedies failed to do. Testable by sweeping the bed's
+own smoothness and checking whether the bias tracks it the way random-field theory says it should.
+Recorded as a direction rather than a result.

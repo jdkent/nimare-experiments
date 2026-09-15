@@ -41,17 +41,24 @@ import reporting
 N = int(os.environ.get("NSIMS", 80))
 
 
-def one(seed, scheme, focus, selection_model="zero-inflated"):
+def one(seed, scheme, focus, selection_model="zero-inflated", true_threshold=False):
     rng = np.random.default_rng(seed)
     studies, n_foci, reported = [], 0, 0
     for k in range(12):
         n = int(rng.integers(20, 41))
         _, _, t_map = bed.study_fields(rng, n, 0.0)
-        foci, _ = reporting.report_peaks(t_map[bed.MASK_BOOL], bed.MASK_BOOL, bed.SHAPE,
-                                         bed.ZOOMS, scheme=scheme, focus=focus)
+        foci, height = reporting.report_peaks(t_map[bed.MASK_BOOL], bed.MASK_BOOL, bed.SHAPE,
+                                              bed.ZOOMS, scheme=scheme, focus=focus)
         n_foci += len(foci)
         reported += bool(foci)
         meta = {"sample_sizes": [n]}
+        # `report_peaks` returns the height it actually applied, so the estimator can be handed
+        # the real threshold instead of inferring it. Without this the scheme comparison is
+        # confounded: changing the scheme changes both the reporting *event* the theory assumes
+        # and the accuracy of `threshold="study-min"`, which overshoots a cluster-forming cut by
+        # about 1 z and is close under a voxelwise one. Both would move the bias.
+        if true_threshold and np.isfinite(height):
+            meta["reporting_threshold"] = float(height)
         points = [{"space": "MNI",
                    "coordinates": [float(v) for v in nib.affines.apply_affine(bed.AFF, ijk)],
                    "values": [{"kind": "T", "value": float(zv)}]} for ijk, zv in foci]
@@ -61,7 +68,8 @@ def one(seed, scheme, focus, selection_model="zero-inflated"):
         return None
     ss = Studyset({"id": "rs", "name": "rs", "studies": studies}, target=None, mask=bed.MASK)
     est = CBES(fwhm=10.0, mask=bed.MASK, null_method="none", use_images=False,
-               peak_bias="per-study", selection_model=selection_model)
+               peak_bias="per-study", selection_model=selection_model,
+               threshold="reporting_threshold" if true_threshold else "study-min")
     res = est.fit(ss)
     pos = int(np.ravel_multi_index(bed.READ_AT, bed.SHAPE))
     dof = (float(res.get_map("dof", return_type="array").ravel()[pos])
@@ -75,16 +83,25 @@ if __name__ == "__main__":
     print(f"truth {bed.TRUE_G:.3f}; 12 studies, coordinates only; {N} replications\n")
     print(f"{'scheme':>18s} {'foci/study':>10s} {'report':>7s} {'mean g':>7s} {'bias':>7s} "
           f"{'mean se':>8s} {'sd':>7s} {'se/sd':>6s} {'dof':>5s} {'cov(t)':>6s}")
-    for scheme, focus, selection in (
-        ("cluster", "max", "zero-inflated"),
-        ("fdr", "max", "zero-inflated"),
-        ("fwe", "max", "zero-inflated"),
-        # The control: the same cluster extraction with the censoring term switched off, so the
-        # scheme rows can be read against the size of the effect that term has at all.
-        ("cluster", "max", "none"),
-    ):
+    #: (scheme, focus, selection_model, hand the estimator the real threshold).
+    #: Each scheme appears twice, inferring the threshold and being told it, because changing the
+    #: scheme changes both the reporting event and the accuracy of the inference. Only the
+    #: told-the-truth rows isolate the reporting event, which is the hypothesis under test.
+    ARMS = (
+        ("cluster", "max", "zero-inflated", False),
+        ("cluster", "max", "zero-inflated", True),
+        ("fdr", "max", "zero-inflated", False),
+        ("fdr", "max", "zero-inflated", True),
+        ("fwe", "max", "zero-inflated", False),
+        ("fwe", "max", "zero-inflated", True),
+        # The control: cluster extraction with the censoring term switched off, so the scheme rows
+        # can be read against the size of the effect that term has at all.
+        ("cluster", "max", "none", True),
+    )
+    for scheme, focus, selection, told in ARMS:
         rows = [r for r in Parallel(n_jobs=4)(
-            delayed(one)(s, scheme, focus, selection) for s in range(N)) if r is not None]
+            delayed(one)(s, scheme, focus, selection, told) for s in range(N))
+            if r is not None]
         if not rows:
             print(f"{scheme + '/' + selection[:4]:>18s}   no usable fits"); continue
         g = np.array([r[0] for r in rows]); se = np.array([r[1] for r in rows])
@@ -95,12 +112,19 @@ if __name__ == "__main__":
                         student_t.ppf(0.975, np.maximum(dof[ok], 1.0)), 1.96)
         cov_t = np.mean((g[ok] - crit*se[ok] <= bed.TRUE_G)
                         & (bed.TRUE_G <= g[ok] + crit*se[ok]))
-        label = scheme if selection != "none" else f"{scheme} (no censor)"
+        label = scheme + (", told u" if told else ", infers u")
+        if selection == "none":
+            label = f"{scheme}, no censor"
         print(f"{label:>18s} {np.mean([r[2] for r in rows]):10.2f} "
               f"{np.mean([r[3] for r in rows]):7.2f} {g[ok].mean():7.3f} "
               f"{g[ok].mean()-bed.TRUE_G:+7.3f} {se[ok].mean():8.3f} {sd:7.3f} "
               f"{se[ok].mean()/max(sd,1e-9):6.2f} {np.nanmedian(dof):5.1f} {cov_t:6.2f}"
               f"  (n={ok.sum()})", flush=True)
-    print("\nse/sd falling toward 1 under a height scheme puts the excess in the reporting")
-    print("process. Staying near 2.4 under all three exonerates it and indicts the information.")
-    print("Compare foci/study and report across rows before believing any of it.")
+    print("\nTwo columns, two questions. se/sd falling toward 1 under a height scheme puts the")
+    print("excess WIDTH in the reporting process; staying near 2.4 everywhere indicts the")
+    print("information instead. And bias falling well below +0.255 under a height scheme, in the")
+    print("told-u rows, would mean the peak-height inflation is a consequence of assuming height")
+    print("thresholding rather than something coordinates cannot identify -- the stronger claim,")
+    print("and the one worth being wrong about. Compare foci/study and report across rows first:")
+    print("the schemes are not equally strict and an arm where two studies report is not")
+    print("comparable to one where twelve do.")
