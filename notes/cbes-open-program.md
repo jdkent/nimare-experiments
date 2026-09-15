@@ -1871,3 +1871,23 @@ setting, because every arm of the table used `peak_bias=None`. The bug had been 
 exactly the configuration gap that made the magnitude numbers describe a variant. Running the
 documented default first would have found it hours earlier, which is the second time today that
 habit would have paid.
+
+### The all-donor fix verified behaviourally
+
+The two all-donor arms now agree to every printed digit across 100 replications:
+
+```
+12 studies, 12 images, calibrated       0.782  -0.018    0.065    0.059   1.10   0.94
+12 studies, 12 images, peak_bias=None   0.782  -0.018    0.065    0.059   1.10   0.94
+```
+
+That is the check the fix needed rather than merely a plausible-looking number. With every study
+supplying an image the calibration has nothing to act on -- each donor's own peaks are dropped in
+favour of its image, so no coordinate value exists for a scale to multiply -- and the fix returns
+1.0 with `scale_source_ = "unset"`. A scale of 1.0 makes the `per-study` path arithmetically
+identical to `peak_bias=None`, so the two rows *must* coincide, and they do, exactly. If they had
+merely been close it would have meant the fallback was doing something.
+
+It also confirms the arm is still a usable reference: bias -0.018, `se/sd` 1.10, coverage 0.94
+against a nominal 0.95, which is the row that shows the pooling and the observed-information
+standard error are correct. The fix did not cost that.
