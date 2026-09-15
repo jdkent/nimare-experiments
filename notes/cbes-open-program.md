@@ -2101,7 +2101,13 @@ for every voxel of a donor, nothing else changed, paired on seeds) removes it:
 studies  variance   mean g     bias     sem   mean se      sd  cover
      12    hedges    0.774   -0.026  0.0072    0.065   0.056   0.95
      12      flat    0.798   -0.002  0.0078    0.062   0.060   0.92
+     24    hedges    0.776   -0.024  0.0051    0.045   0.039   0.98
+     24      flat    0.801   +0.001  0.0053    0.043   0.041   0.97
 ```
+
+Both draw-independent rows are unbiased to within 0.3 standard errors; both Hedges rows sit at
+-0.024 to -0.026 and are identical across study count, which is the signature of a bias in each
+weight rather than a small-sample artefact.
 
 And it reproduces with no brain, no estimator and no images -- 200,000 replications of scalar
 inverse-variance pooling, `g_i ~ N(mu, 1/n_i)` with `n_i ~ U(20,40)`:
