@@ -2454,3 +2454,22 @@ is exactly zero), the critical value (real, 36% of width, does not change which 
 the `dof` reference (real, 15-20% of width, does not change which arms cover). The interval is not
 mis-scaled. It is wide because the `se` is large, and it misses because the point estimate is
 biased, and those are the only two things left.
+
+### What the interval problems do *not* touch: the p-values
+
+Worth checking rather than assuming, because it bounds how much the `se` findings cost. `z` is
+`g / se` (effectsize.py:3107) and `p` compares `|z|` against a permutation null of `|z|`, with
+each permutation re-fitting and so getting its own `g` and its own `se` (3438-3443).
+
+A permutation p-value is valid for whatever statistic it is computed on, provided the statistic is
+computed the same way under permutation. It does not require the `se` to be calibrated. So an
+`se` that is twice the estimator's spread inflates the observed `z` and every null `z` alike, and
+the significance map is unaffected by everything in the three sections above. The docstring
+already says this and says it correctly -- "the p-values are unaffected either way, they come from
+the permutation null, not from referring `z` to any distribution".
+
+The separation is worth keeping in view when reading the rest of these notes. The uncertainty
+findings bear on the **interval on `g`**, which is wide and sometimes misses. They do not bear on
+which voxels are called significant, except through the max-statistic guard, which is a separate
+defect with its own measurements. A user who reads the thresholded map and ignores `se` is not
+affected by any of it.
