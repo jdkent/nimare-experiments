@@ -808,3 +808,32 @@ extrapolation into the t tail and is therefore very sensitive to the assumed deg
 A 27% amplification at `n = 30` means an error in the effective df propagates strongly into `g`.
 Papers do not always report the df behind a z-map, and software differs in what it puts there.
 That is a real caveat about the estimator, it is independent of my bug, and it is worth measuring.
+
+## One thing in the estimator that is independently corroborated: `peak_information`
+
+Worth recording separately, because most of this program's findings are cautions and this one is
+not.
+
+`peak_information` compares the mean reported peak height against what peaks of pure noise would
+average at the same threshold, and warns when the excess is small that "their magnitudes are
+close to uninformative about the effect size". In the corrected coverage bed -- a *favourable*
+case: peak g of 0.80, peak t around 4.4, every study reporting 3-4 clusters, statistics on the
+right convention -- the excess comes out at **+0.17 to +0.23 z** across 112 fits, which is below
+the threshold at which it warns. So it warns, on data where the effect is strong and universally
+detected.
+
+Independently, and by a route that shares nothing with it, `are_heights_decoration` destroyed the
+within-study variation in reported heights and found the map got **better** by +0.080 (paired
+p 0.006), while destroying height information entirely cost nothing measurable.
+
+Two unrelated measurements, one conclusion: the reported heights carry almost nothing, and what
+within-study variation they carry is noise the estimator weights as signal. The diagnostic is
+telling the truth, it fires in the right regime, and it fires even when conditions are good --
+which is the correct behaviour for a warning about an information channel that is closed by the
+reporting practice rather than by the collection at hand.
+
+It also sharpens section 17 rather than softening it. I had half expected the excess to look
+healthier once the statistic convention was fixed, since the convention error was inflating the
+*recovered* magnitudes. It does not: the diagnostic works on the z scale, where the convention
+error never applied, so its verdict was never affected by my bug. That is a small piece of luck
+and a reason to trust it.
