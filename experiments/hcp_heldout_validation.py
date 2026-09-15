@@ -23,6 +23,11 @@ Hedges' g on the subject-level scale.
 Prevalence is 1 here: every synthetic study draws from one population, so mu is the marginal
 and the pi/mu split is not under test. That is the regime where the corrected simulator put the
 required scale at 1.05 +- 0.02, so this is a direct real-data test of that claim.
+
+Coordinates come from :mod:`reporting`, which corrects each synthetic study's map for
+multiplicity and keeps every surviving local maximum 8 mm apart without capping the count. The
+earlier version of this script fixed an uncorrected height and took the strongest peaks, which
+is not a reporting practice and which ties the effective cut to the signal.
 """
 import os, sys, glob, warnings; warnings.simplefilter("ignore")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -36,11 +41,14 @@ from nilearn.maskers import NiftiMasker
 from nimare.meta.cbma import CBES
 from nimare.studyset import Studyset
 from nimare.transforms import t_to_z
+from reporting import report_peaks
 
 CONTRAST = sys.argv[1] if len(sys.argv) > 1 else "MOTOR_LH"
-# Thresholds to report at. An uncorrected 3.29 on a strong contrast yields ~150 peaks a study,
-# which no paper reports; a corrected map is nearer 4.5-5.5 and gives a realistic table.
-THRESHOLDS = [float(a) for a in sys.argv[2:]] or [3.2905]
+# Reporting schemes rather than bare cut-offs. Earlier runs fixed an uncorrected height and
+# then capped the table at the strongest few peaks, which is not what papers do and which lets
+# the effective cut float with the signal. :mod:`reporting` corrects for multiplicity, keeps
+# every surviving local maximum 8 mm apart, and caps nothing.
+SCHEMES = sys.argv[2:] or ["fdr", "fwe", "cluster"]
 DATA = f"/tmp/claude-0/hcp/{CONTRAST}"
 CACHE = f"/tmp/claude-0/hcp/{CONTRAST}_masked.npy"
 DESIGNS = ((20, 16), (30, 12), (40, 9))   # (subjects per study, number of studies)
@@ -80,23 +88,13 @@ def hedges(mean, sd, n):
     return correction * mean / np.maximum(sd, 1e-9)
 
 
-def peaks_of(z_masked, threshold):
-    volume = np.zeros(shape, dtype=float)
-    volume[mask_bool] = z_masked
-    magnitude = np.abs(volume)
-    is_peak = (magnitude == maximum_filter(magnitude, size=3)) & (magnitude >= threshold) \
-        & mask_bool
-    idx = np.argwhere(is_peak)
-    if not len(idx):
-        return []
-    values = volume[tuple(idx.T)]
-    return [(idx[i], float(values[i])) for i in np.argsort(-np.abs(values))]
+ZOOMS = mask_img.header.get_zooms()[:3]
 
 
 S = load_all()
 print(f"\n{CONTRAST}: {S.shape[0]} subjects, {S.shape[1]} voxels at 4mm\n", flush=True)
 
-for THRESHOLD in THRESHOLDS:
+for SCHEME in SCHEMES:
   for n_per_study, n_studies in DESIGNS:
       need = n_per_study * n_studies
       if need >= S.shape[0] - 100:
@@ -112,11 +110,11 @@ for THRESHOLD in THRESHOLDS:
           mean, sd = block.mean(axis=0), block.std(axis=0, ddof=1)
           t = mean / np.maximum(sd / np.sqrt(n_per_study), 1e-9)
           z = np.nan_to_num(t_to_z(t, dof=n_per_study - 1))
-          found = peaks_of(z, THRESHOLD)
+          found, height = report_peaks(z, mask_bool, shape, ZOOMS, scheme=SCHEME)
           if len(found) < 2:
               continue
           reported += len(found)
-          meta = {"sample_sizes": [n_per_study]}
+          meta = {"sample_sizes": [n_per_study], "reporting_threshold": float(height)}
           studies.append({"id": f"s{k}", "name": f"s{k}", "metadata": meta, "analyses": [
               {"id": f"s{k}", "name": "1", "metadata": meta,
                "points": [{"space": "MNI",
@@ -128,18 +126,22 @@ for THRESHOLD in THRESHOLDS:
           continue
 
       est = CBES(fwhm=10.0, mask=masker, peak_bias=None, null_method="none",
-                 threshold="study-min")
+                 threshold="reporting_threshold")
       result = est.fit(Studyset({"id": "hcp", "name": "hcp", "studies": studies},
                                 target=None, mask=mask_img))
       g = np.abs(result.get_map("g", return_type="array").ravel())
+      pi = (result.get_map("prevalence", return_type="array").ravel()
+            if "prevalence" in result.maps else np.ones_like(g))
+      marg = pi * g
       covered = result.get_map("n_studies", return_type="array").ravel() > 0
       truth = np.abs(truth_g)
-      inferred = float(np.median(np.abs(est._cutoffs_z_.values)))
+      used_cut = float(np.median(np.abs(est._cutoffs_z_.values)))
 
-      print(f"--- thr {THRESHOLD:.2f}: {n_per_study} subjects x {n_studies} studies "
+      print(f"--- {SCHEME}: {n_per_study} subjects x {n_studies} studies "
             f"({len(studies)} reported, {reported / max(len(studies),1):.0f} peaks each, "
-            f"{len(held)} held out, inferred cut {inferred:.2f}) ---")
-      print(f"  {'truth stratum':>18} {'vox':>7} {'truth g':>8} {'CBES g':>8} {'ratio':>7} {'r':>7}")
+            f"{len(held)} held out, height z = {used_cut:.2f}) ---")
+      print(f"  {'truth stratum':>18} {'vox':>7} {'truth g':>8} {'CBES g':>8} {'ratio':>7} "
+            f"{'pi*g':>8} {'ratio':>7} {'r':>7}")
       for lo, hi in ((0, 50), (50, 75), (75, 90), (90, 99), (99, 100)):
           band = (truth >= np.percentile(truth, lo)) & (
               truth < np.percentile(truth, hi) if hi < 100 else np.ones_like(truth, bool))
@@ -147,10 +149,15 @@ for THRESHOLD in THRESHOLDS:
           if use.sum() < 50:
               print(f"  {f'{lo}-{hi}%':>18} {int(use.sum()):>7}   too few")
               continue
-          print(f"  {f'{lo}-{hi}%':>18} {int(use.sum()):>7} {truth[use].mean():8.3f} "
-                f"{g[use].mean():8.3f} {g[use].mean()/max(truth[use].mean(),1e-9):7.3f} "
+          t = truth[use].mean()
+          print(f"  {f'{lo}-{hi}%':>18} {int(use.sum()):>7} {t:8.3f} "
+                f"{g[use].mean():8.3f} {g[use].mean()/max(t,1e-9):7.3f} "
+                f"{marg[use].mean():8.3f} {marg[use].mean()/max(t,1e-9):7.3f} "
                 f"{stats.pearsonr(g[use], truth[use])[0]:7.3f}")
       use = covered & np.isfinite(g) & (g > 0)
-      print(f"  {'all covered':>18} {int(use.sum()):>7} {truth[use].mean():8.3f} "
-            f"{g[use].mean():8.3f} {g[use].mean()/max(truth[use].mean(),1e-9):7.3f} "
-            f"{stats.pearsonr(g[use], truth[use])[0]:7.3f}\n", flush=True)
+      t = truth[use].mean()
+      print(f"  {'all covered':>18} {int(use.sum()):>7} {t:8.3f} "
+            f"{g[use].mean():8.3f} {g[use].mean()/max(t,1e-9):7.3f} "
+            f"{marg[use].mean():8.3f} {marg[use].mean()/max(t,1e-9):7.3f} "
+            f"{stats.pearsonr(g[use], truth[use])[0]:7.3f}   "
+            f"(pi*g correlates {stats.pearsonr(marg[use], truth[use])[0]:+.3f})\n", flush=True)
