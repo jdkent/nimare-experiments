@@ -388,3 +388,52 @@ pushed through a known reporting mechanism.
 One CBMR feature would actively break it: study-level covariates give each experiment a free
 multiplicative rate, and sample size is among the covariates its paper names. That absorbs the
 counts, which is the channel the effect scale rides on.
+
+## 13. The field test, and why it corrects section 11 and the smoothness result
+
+T5 recovered the effect *scale* from coordinates alone to within 1% to 5%, with the spatial shape
+known. T6 frees the shape -- 24 basis coefficients -- which is the problem that matters, and the
+result does not carry over: coordinates alone reach a shape correlation of +0.44 with the scale
+inflated 5.7-fold, and the joint fit is indistinguishable from the images by themselves, +0.689
+against +0.686.
+
+Three probes to find out why, two of which refuted their own hypothesis.
+
+*Not the optimiser.* Started at the truth the fit walks away, to a ratio of 2.79, and reaches a
+**better** negative log-likelihood than the truth has -- 2834 against 2968. The likelihood prefers
+an inflated field, so the optimiser was doing its job.
+
+*Not cluster-collapsed reporting.* With every study reporting every maximum the ratio is still
+2.43. Collapsing makes it worse, 3.43, but is not the cause.
+
+*It is the profiled intensity constant.*
+
+| intensity constant | start | r | ratio |
+| --- | --- | --- | --- |
+| profiled out | truth | +0.681 | 2.43 |
+| profiled out | flat | +0.328 | 4.25 |
+| fixed from the maxima density | truth | +0.701 | **1.76** |
+| fixed from the maxima density | flat | +0.751 | **1.77** |
+
+Setting `C = n_total / integral` makes the likelihood depend only on the *shape* of the intensity
+and throws away the absolute expected count. With a known spatial shape that costs nothing, since
+a single amplitude cannot hide. With a free field it is fatal: the coefficients reproduce any
+intensity shape at any amplitude. Fixing the constant cuts the inflation to 1.76 and, unexpectedly,
+makes the fit start-independent -- the profiled version reached entirely different optima from a
+flat and a truth start, so it was badly conditioned as well as unidentified.
+
+**This withdraws the smoothness result in section 10's follow-up.** I concluded the model needs no
+smoothness estimate because the maxima density cancels against the profiled constant. That
+cancellation is real and it *is* the loss of level identification. The two are one knob:
+
+  * profile the constant -- smoothness does not matter, the effect level is unidentified;
+  * fix it from an estimated density -- the level is identified, a smoothness estimate is required.
+
+T7 looked benign only because it fitted one amplitude with a known shape, where the level could
+not hide. On a free field the trade-off bites, and the requirement to estimate smoothness comes
+back. In the two-or-more-images scope that is answerable from the images, which is one more thing
+the scope buys.
+
+A residual inflation of 1.76 remains with the constant fixed. Candidates not yet separated: the
+basis represents the truth only to r = 0.679, the ridge penalty is arbitrary, and the rate
+function is still an approximation at the cluster-reporting studies.
