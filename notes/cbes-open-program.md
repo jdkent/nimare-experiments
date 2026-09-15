@@ -3148,3 +3148,50 @@ Two honest readings, and they are not exclusive:
 
 Next: does the gap close as the image count rises? If CBES needs 5+ images to match SDM's
 pattern, the honest recommendation is narrower than the docstring currently implies.
+
+## Retraction: "SDM beats the redesign on pattern, and this is a design problem"
+
+jdkent caught the reference. It is wrong, and wrong in SDM's favour.
+
+CBES got 19 *coordinate tables*, and those tables were extracted from **the same 19 images that
+formed the reference**. So "the 19 images CBES never saw" was false -- it saw thresholded
+summaries of exactly those studies. SDM got 21 tables, including all 19 reference studies, and
+builds its entire pattern by imputing effect mass at their peaks -- which sit at the reference's
+own high-|g| voxels. So a large part of r = +0.689 is SDM recovering the reference's noise, while
+CBES's magnitude came from 2 non-reference images and its tables entered only as weak indicators.
+Not symmetric flattery. The comparison cannot be salvaged without re-running SDM on a subsample,
+and there is no subset of studies the existing SDM run did not see.
+
+One sub-conclusion survives, because it does not involve SDM: images-only (+0.407) was the single
+arm with a clean reference and it still beat CBES g (+0.358).
+
+### The design question, answered on a reference with no confound
+
+`validate_redesign.py` already does it right: the work half supplies both the coordinates *and*
+the images, the held-out half supplies the reference, and the two halves are disjoint studies.
+21-study pain, 8 paired splits.
+
+| estimate | r | rank r | AUC | bias | err at top | rmse |
+|---|---|---|---|---|---|---|
+| images only (pooled) | +0.621 | +0.484 | 0.893 | +0.136 | +0.137 | 0.269 |
+| CBES, silence off | +0.633 | +0.499 | 0.899 | +0.142 | +0.155 | 0.272 |
+| **shipped CBES g** | +0.579 | +0.486 | 0.889 | **+0.075** | **-0.065** | **0.210** |
+| shipped CBES g_marginal | +0.536 | +0.458 | 0.861 | -0.004 | -0.226 | 0.191 |
+
+**The coordinate channel buys a large improvement in level for a small loss in pattern.** rmse
+-23% and bias -47% against silence-off, with the +0.155 overestimate at the strongest voxels
+becoming -0.065. The cost is Pearson r (-0.054, paired p = 0.0026) and essentially nothing on the
+scale-invariant metrics: rank r -0.013 (p = 0.03), AUC -0.010 (p = 0.05).
+
+So "the redesign threw away the coordinate channel's spatial information" was reading a confound.
+On a clean reference the pattern cost is small and the level gain is large. That is a defensible
+trade and it is what the design was chosen for.
+
+**Still open, and now correctly scoped:** whether a method that uses peak *locations* to build a
+pattern (SDM) beats CBES on pattern when both are held to the same disjoint split. Needs SDM run
+per split. Split-half rather than leave-one-out: one study's map is too noisy a reference to test
+the magnitude claim, which is where CBES wins, and 8 SDM runs beat 21.
+
+Blocker: `sdm_parse pp` works; `sdm_parse mean` exits 0 without producing `analysis_MyMean`, and
+`MyMean=mean` exits 2. No pdftotext for the tutorial, and the argument names are not in the
+binary's strings. The 50-imputation coefficient from the earlier full-collection run is intact.
