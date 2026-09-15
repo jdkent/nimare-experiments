@@ -226,10 +226,16 @@ if __name__ == "__main__":
         print(f"  split {split + 1}: {peaks} peaks over {N_STUDIES} tables "
               f"({peaks / N_STUDIES:.1f} each), {len(held)} subjects held out", flush=True)
 
+        collection = Studyset({"id": "hcp", "name": "hcp", "studies": studies},
+                              target=None, mask=mask_img)
+        # A plain Tobit fixes the prevalence at 1, which is the truth here by construction.
+        # Whether that helps is the question: it removes the "no effect" escape, so every
+        # silence must be explained by a small mu instead.
+        tobit = np.abs(CBES(mask=masker, null_method="none", selection_model="tobit",
+                            threshold="reporting_threshold").fit(collection)
+                       .get_map("g", return_type="array").ravel())
         result = CBES(mask=masker, null_method="none",
-                      threshold="reporting_threshold").fit(
-            Studyset({"id": "hcp", "name": "hcp", "studies": studies},
-                     target=None, mask=mask_img))
+                      threshold="reporting_threshold").fit(collection)
         cbes_g = np.abs(result.get_map("g", return_type="array").ravel())
         covered = result.get_map("n_studies", return_type="array").ravel() > 0
         cbes_m = (np.abs(result.get_map("g_marginal", return_type="array").ravel())
@@ -253,7 +259,8 @@ if __name__ == "__main__":
         use = covered & np.isfinite(truth) & np.isfinite(cbes_g)
         if sdm is not None:
             use = use & np.isfinite(sdm) & (sdm != 0)
-        arms = [("images only", images_only), ("CBES g", cbes_g)]
+        arms = [("images only", images_only), ("CBES g", cbes_g),
+                ("CBES g, tobit", tobit)]
         if cbes_m is not None:
             arms.append(("CBES g_marginal", cbes_m))
         if sdm is not None:
@@ -266,7 +273,8 @@ if __name__ == "__main__":
 
     print(f"\n{'estimate':>18} {'r':>7} {'rank r':>7} {'AUC':>6} {'mag ratio':>10} "
           f"{'|est| top':>10} {'|ref| top':>10}")
-    for name in ("SDM-PSI coeff", "images only", "CBES g", "CBES g_marginal"):
+    for name in ("SDM-PSI coeff", "images only", "CBES g", "CBES g, tobit",
+                 "CBES g_marginal"):
         if name not in rows:
             continue
         r, rho, auc, ratio, top_est, top_ref = np.nanmean(np.array(rows[name]), axis=0)

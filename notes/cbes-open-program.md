@@ -3279,3 +3279,31 @@ Note this is a stronger statement than the docstring's existing prevalence cavea
 `prevalence` is compressed and should be read ordinally. This says the compression **propagates
 into the magnitude** and can make `g` worse than doing nothing, in a regime that is not exotic:
 any collection of similar studies of the same effect.
+
+### Correction to the HCP diagnosis: the prevalence is the symptom, not the cause
+
+I wrote that the silences "push mu down through the censoring term *and* pi down through the
+mixture, so g_marginal is shrunk twice". Tested it by adding a plain-Tobit option (prevalence
+pinned at 1, which is the truth on this bed) -- the machinery was already there, since
+`_fit_chunk` sets `pi = 1` whenever the model is not zero-inflated, and only the option list
+forbade it.
+
+**It makes the magnitude worse, not better:** 0.60 of the HCP reference against the
+zero-inflated 0.63, and 0.411 against 0.422 for a true 0.5 on the field simulator. Removing the
+"this study has no effect" escape forces every silence to be explained by a small mu, so mu falls
+further.
+
+So the censoring term **over-shrinks mu whatever the prevalence does**, and a fitted pi below 1 is
+the model partly *absorbing* that over-shrinkage rather than compounding it. Which makes the HCP
+failure the same defect as the overstated `P(report)` (#66), from another direction: too high a
+reporting probability against an under-observed count drags mu down, and on a prevalence-1 bed
+there is no genuine absence for pi to absorb it into.
+
+Option reverted rather than shipped -- it is never the right choice, and "pin the prevalence"
+is the obvious-looking fix that someone else would otherwise reach for. The measurement is in the
+docstring so it does not get re-tried.
+
+**This consolidates the open problems.** What looked like three separate defects -- the 18%
+deficit at the 0.4 focus, the se/sd of 1.55 to 3.74, and the HCP magnitude at 0.63 -- all point at
+one thing: `P(report | mu) = P(|g| >= c | mu)` is too high because a paper reports a local
+maximum, not any exceedance. Fixing that is now the single highest-value change to the estimator.
