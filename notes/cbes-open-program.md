@@ -1157,3 +1157,40 @@ that improves on every accuracy metric while the inference gets worse.
 0.94. 24 of 24: -0.022, 1.11, 0.97. Both against nominal 0.95. The pooling, the observed-
 information standard error and the read-out path are correct; every failure in this table is in
 the coordinate channel.
+
+### The naive-count comparison, re-run on the correct convention (confirmed)
+
+Same collections, both estimators, studies now reporting a genuine noncentral t thresholded at
+p < 0.001 on each study's own t scale (direct height thresholding, so `study-min` infers the cut
+correctly here and the threshold finding does not apply):
+
+```
+effect 0.8    estimate at 0.25/0.50/0.75/1.00    mean|bias|   RMSE    rho    exact
+  CBES prevalence     0.295 0.620 0.834 0.951         0.075  0.190  +0.804    40%
+  naive, 15 mm        0.193 0.402 0.569 0.744         0.148  0.179  +0.957    82%
+
+effect 0.5
+  CBES prevalence     0.271 0.381 0.510 0.586         0.199  0.326  +0.523    18%
+  naive, 15 mm        0.083 0.116 0.191 0.202         0.477  0.483  +0.646    35%
+
+effect 0.4
+  CBES prevalence     0.199 0.315 0.317 0.419         0.312  0.422  +0.259    12%
+  naive, 15 mm        0.048 0.070 0.098 0.109         0.544  0.547  +0.445    25%
+```
+
+Unchanged and sharper. CBES wins on bias in every regime by a factor of two to two and a half
+(0.075 against 0.148; 0.199 against 0.477; 0.312 against 0.544). The naive count wins on ordering
+in every regime by roughly a factor of two (82% against 40%; 35% against 18%; 25% against 12%).
+
+Two things this settles.
+
+**The ordering gap is not a threshold problem and cannot be fixed by supplying one.** Ordering is
+threshold-independent (a change of cutoff applies a roughly common inflation, preserving ranks),
+and this bed's inference is already correct because the reporting is voxelwise. So the gap is
+intrinsic: it is section 22's mechanism, a well-ordered count multiplied by a noisy correction.
+
+**CBES's level is genuinely good where the effect is strong** -- mean absolute bias 0.075 on
+prevalences spanning 0.25 to 1.00. That is a number worth standing behind, and it makes the
+"read it ordinally, not as a fraction" instruction the weaker of the two available positions
+rather than the safer one. The honest framing is the reverse of the current one: trust the level
+in the strong-effect regime, and use a count if what you want is to rank regions.
