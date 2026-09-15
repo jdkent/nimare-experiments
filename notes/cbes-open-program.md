@@ -477,3 +477,61 @@ count is small -- which is where that measurement was taken.
 If instead the ratio is flat across sites in every arm, the coordinates-only bias is one
 multiplicative constant, `g` is a legitimate relative map, and the "read it relatively" defence
 in the PR stands as written. Either answer is worth having; they imply different documentation.
+
+### The complete coverage table, and the weight-share fit on all of it
+
+All twelve arms, 100 replications each, truth 0.800 at the read-out voxel, prevalence 1.
+
+```
+arm                              mean g    bias  mean se  sd of g  se/sd  cover  half/truth  report
+12 studies,  0 images, tau 0.0    1.306  +0.506    0.179    0.104   1.72   0.10       0.44    1.00
+12 studies,  0 images, per-study  1.314  +0.514    0.193    0.133   1.45   0.16       0.47    1.00
+12 studies,  2 images, tau 0.0    1.048  +0.248    0.162    0.101   1.61   0.67       0.40    1.00
+12 studies,  6 images, tau 0.0    0.879  +0.079    0.092    0.082   1.12   0.85       0.23    1.00
+12 studies, 12 images, tau 0.0    0.810  +0.010    0.056    0.056   1.00   0.96       0.14    1.00
+12 studies,  0 images, tau 0.3    1.486  +0.686    0.413    0.355   1.16   0.58       1.01    0.87
+12 studies,  6 images, tau 0.3    0.890  +0.090    0.164    0.127   1.29   0.91       0.40    0.87
+12 studies, 12 images, tau 0.3    0.817  +0.017    0.113    0.091   1.24   0.97       0.28    0.87
+24 studies,  0 images, tau 0.0    1.289  +0.489    0.116    0.086   1.34   0.00       0.28    1.00
+24 studies,  0 images, per-study  1.296  +0.496    0.133    0.108   1.24   0.01       0.33    1.00
+24 studies,  6 images, tau 0.0    0.976  +0.176    0.093    0.073   1.27   0.56       0.23    1.00
+24 studies, 24 images, tau 0.0    0.807  +0.007    0.039    0.036   1.07   0.94       0.10    1.00
+```
+
+Weight-share fit over all six `tau = 0` arms, two of them at `f = 1` from different study counts:
+
+```
+  f=0.00  measured  0.506  model  0.506
+  f=0.17  measured  0.248  model  0.243
+  f=0.25  measured  0.176  model  0.181
+  f=0.50  measured  0.079  model  0.079
+  f=1.00  measured  0.010  model  0.000     (12 studies)
+  f=1.00  measured  0.007  model  0.000     (24 studies)
+```
+
+`b0 = 0.506`, `r = 5.40`, max residual 0.010. The two `f = 1` rows come from 12 and 24 studies
+and give 0.010 and 0.007 -- an independent check that the study *count* does not enter, only the
+share, which is what the model asserts and what the 6-of-12 versus 6-of-24 contrast first showed.
+
+Projected onto shares real collections actually have:
+
+```
+  2 images of 20 studies (f=0.10)  bias 0.317  = 40% of a 0.80 effect
+  3 images of 20 studies (f=0.15)  bias 0.259  = 32%
+  2 images of 10 studies (f=0.20)  bias 0.215  = 27%
+  5 images of 20 studies (f=0.25)  bias 0.181  = 23%
+```
+
+That is the number the "at least 2 images" scoping needs to be read against. It buys the
+*calibration machinery* -- without a donor there is no scale at all -- but on these projections it
+leaves the magnitude 25-40% high, and the interval will not cover.
+
+Two further readings of the table.
+
+**The two `per-study` rows are a matched pair and both say the same thing.** +0.506 -> +0.514 at
+12 studies and +0.489 -> +0.496 at 24. The correction is not marginal, it is null, twice.
+
+**Heterogeneity buys coverage by width in exactly the way the metrics-that-lie note warns.** At 12
+coordinate-only studies, tau 0.3 raises coverage from 0.10 to 0.58 while raising `half/truth` from
+0.44 to 1.01. The interval becomes as wide as the effect. Anyone reading coverage alone would
+record heterogeneity as an improvement.
