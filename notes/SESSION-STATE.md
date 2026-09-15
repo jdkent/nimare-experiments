@@ -164,6 +164,36 @@ per unit of true g at a 3.29 cut, 5–9% of the variance at a focus's own locati
 
 The protocol caught this: it mandates confirming on real data, and that is what reversed it.
 
+## The kernel width, which turned out to matter more than anything else measured
+
+Task #38 asked whether CBES localises better than ALE/MKDA against a held-out image reference.
+The answer went through three versions, and the third is the one to keep.
+
+| | brain covered | truth's top decile covered | AUC on covered | AUC whole mask |
+| --- | --- | --- | --- | --- |
+| fwhm 6 mm | 0.013 | 0.060 | 0.677 | 0.527 |
+| **fwhm 10 mm (default)** | 0.090 | 0.336 | 0.757 | 0.642 |
+| fwhm 16 mm | 0.263 | 0.636 | **0.798** | 0.745 |
+| fwhm 24 mm | 0.608 | 0.879 | 0.780 | **0.782** |
+| MKDA density | 1.000 | 1.000 | — | 0.667 |
+| ALE | 1.000 | 1.000 | — | 0.753 |
+
+At the default kernel CBES estimates 9% of the brain, captures a third of the truth's strongest
+voxels, and **loses** to MKDA over the whole brain. At 16 mm it beats MKDA; at 24 mm it beats ALE.
+And it is not a trade — the AUC on the *already-covered* voxels improves too (0.757 → 0.798), so a
+wider kernel makes the estimate better where it existed and also extends it.
+
+So the "CBES is the worst arm over the whole brain" finding I reported was a default-parameter
+artefact. The qualification that survives: the optimum depends on how extensive the pooled effects
+are, and this reference is a smooth field, so a wide kernel is rewarded for matching its extent.
+10 mm is too narrow against an IBMA-like reference; whether 16 mm is right in general isn't
+settled by one collection. Task #56.
+
+Along the way I swept the wrong knob first — `coverage_radius`, which governs which studies count
+as *silent*, not where estimates exist. The tell was a covered-share of 0.089 identical at every
+radius from 8 to 45 mm while the AUC column moved. Rule added to `PROTOCOL.md`: confirm a
+parameter moved the thing you're attributing to it before reading the sweep.
+
 ## Theory that held up
 
 A coordinate observation is an **occupancy record with imperfect detection**: study *k* reports
@@ -222,6 +252,8 @@ CI green on every push. 101 tests pass.
 
 - **#53** Should `threshold="study-min"` stop being the default? It costs 0.20 of prevalence
   accuracy on cluster-extent tables where a fixed constant costs 0.008.
+- **#56** Should the default `fwhm` move off 10 mm? It costs both accuracy and the comparison
+  against convergence estimators on the one collection that can be measured.
 - **#51** The naive count vs fitted prevalence: stand behind the level, or emit both?
 - **#47** The images-only refusal is inconsistent with the all-donor path, and its stated reason
   ("no foci to permute") is now false since `_permute_image_values` exists. Allow both, or refuse
