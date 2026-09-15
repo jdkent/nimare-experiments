@@ -401,3 +401,34 @@ Both forms of the assumption are ruled out.
 Seven independent changes, no movement. That points at the input rather than the model, which
 `information_ceiling.py` tests directly by comparing the reported magnitudes against the
 held-out truth at the same locations, with no estimator in between.
+
+### The ceiling is the coordinates, not the estimator
+
+`information_ceiling.py` bypasses the fit entirely. For every focus a paper would print it takes
+the effect size the table reports -- the only magnitude the estimator ever receives about that
+location -- and the held-out truth at the same voxel, from studies that played no part in
+producing the focus.
+
+| scheme / focus | reported g at the focus | held-out truth there | r | regression of truth on reported |
+| --- | --- | --- | --- | --- |
+| cluster / max | 1.965 (sd 0.593) | 0.519 (sd 0.312) | +0.222 | 0.117 x reported + 0.289 |
+| cluster / centre of mass | 1.257 (sd 0.366) | 0.556 (sd 0.302) | +0.102 | 0.084 x reported + 0.450 |
+| FDR / max | 0.954 (sd 0.343) | 0.235 (sd 0.198) | +0.307 | 0.178 x reported + 0.066 |
+
+A whole unit of reported Hedges' g buys 0.08 to 0.18 units of real effect, and the intercept
+carries most of the value. One tabulated coordinate explains 5% to 9% of the variance in the
+true effect at its own location.
+
+CBES *beats* that ceiling: +0.277 against the per-focus +0.222 under cluster/max, +0.331 against
++0.307 under FDR/max. Pooling across studies already extracts more than any individual
+coordinate carries. The estimator is not underperforming its input -- the magnitude is not in a
+coordinate table, and no change to the likelihood can put it there.
+
+(The +1.000 correlation with the reporting study's own map at the focus is the sanity check that
+the extraction and the conversion agree, since the reported value *is* that map's value there.)
+
+### Landed
+
+`nimare/meta/cbma/effectsize.py` now states the compression, the dependence on reporting
+convention, the per-coordinate ceiling, and the list of remedies measured and rejected, so the
+warning is no longer only about an unidentified constant.
