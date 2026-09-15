@@ -2473,3 +2473,39 @@ findings bear on the **interval on `g`**, which is wide and sometimes misses. Th
 which voxels are called significant, except through the max-statistic guard, which is a separate
 defect with its own measurements. A user who reads the thresholded map and ignores `se` is not
 affected by any of it.
+
+### A prediction to be wrong about: the reporting-scheme test may explain the *bias*, not just the width
+
+`is_it_the_reporting_scheme.py` was written to ask whether the excess interval width is
+misspecification of the reporting process. It also prints the bias per scheme, and on reflection
+that column may be the more important one. Writing the prediction down first.
+
+`peak_bias="per-study"` computes each study's `rho_k` from the random-field peak-height
+distribution at that study's own threshold and sample size. That is an *absolute* correction, not
+a relative one -- so on the face of it the scale should already be pinned, and the docstring's
+claim that the common scale is unidentified needs a reason. Measured, `per-study` moves the bias
+from +0.259 to +0.255: it does essentially nothing.
+
+The reason, I think, is that a reported focus is not the object the theory describes. The theory
+is about a local maximum of a smooth statistic field exceeding a **height** threshold. What the
+bed reports -- and what papers report -- is the maximum within a *cluster* that survived a
+forming cut and an extent criterion, in a field whose smoothness the estimator does not know. So
+`rho_k` is wrong by a factor that is common across studies because it depends on the things not
+modelled (the smoothness, the cluster criterion), which is exactly the signature of "an
+unidentified common scale".
+
+If that is right, then under **voxelwise FDR or Bonferroni** -- where a reported peak really is a
+local maximum clearing a height threshold -- the theoretical `rho_k` should be close to correct
+and the coordinates-only bias should fall well below +0.255, without any image donor. And the
+consequence would be large: the peak-height inflation would not be irreducible, it would be a
+consequence of assuming height thresholding when papers report clusters, and the fix would be to
+model cluster reporting rather than to require images.
+
+If instead the bias stays near +0.255 under every scheme, the inflation is not about the reporting
+event and the unidentified scale is genuinely unidentified from coordinates -- which is what the
+docstring currently claims and what four measured-and-rejected remedies already support.
+
+Stating it in advance because the last three predictions recorded this way -- the weight-share
+model transferring, coverage eroding with collection size, `tau2` truncation explaining the
+width -- came out two right and one wrong, and the wrong one was worth more than either of the
+others.
