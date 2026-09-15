@@ -2091,3 +2091,49 @@ images among ten coordinate tables hold about 29% of the weight; the same two am
 hold 15%. **Adding coordinate-only studies to a mixed collection makes the magnitude estimate
 worse**, not better -- it dilutes the only thing correcting the peak-height inflation -- while
 simultaneously narrowing the interval. Both effects push coverage the same way.
+
+### The all-image floor is inverse-variance weighting, and it is not CBES's to fix
+
+The floor is the `g^2` term in Hedges' variance. Substituting a draw-independent variance (`1/n`
+for every voxel of a donor, nothing else changed, paired on seeds) removes it:
+
+```
+studies  variance   mean g     bias     sem   mean se      sd  cover
+     12    hedges    0.774   -0.026  0.0072    0.065   0.056   0.95
+     12      flat    0.798   -0.002  0.0078    0.062   0.060   0.92
+```
+
+And it reproduces with no brain, no estimator and no images -- 200,000 replications of scalar
+inverse-variance pooling, `g_i ~ N(mu, 1/n_i)` with `n_i ~ U(20,40)`:
+
+```
+12 studies, mu 0.4:  Hedges weights -0.0111  (-2.8%)   draw-independent -0.0002
+12 studies, mu 0.8:  Hedges weights -0.0183  (-2.3%)   draw-independent -0.0000
+12 studies, mu 1.2:  Hedges weights -0.0214  (-1.8%)   draw-independent -0.0000
+24 studies, mu 0.8:  Hedges weights -0.0190  (-2.4%)   draw-independent +0.0001
+```
+
+The mechanism is textbook: `var(g) = 1/n + g^2 / (2(n-1))` is computed from the *observed* effect,
+so a study that drew high gets a larger variance, less weight, and the pooled estimate is pulled
+toward zero. It is a bias in each weight rather than a small-sample artefact, so it does **not**
+shrink with more studies -- -0.0183 at twelve and -0.0190 at twenty-four.
+
+`_accumulate` weights every contribution by `a = weights / var_g`, so this is not confined to the
+image channel: `peak_stat_to_hedges_g` computes `var_g = bias^2 * ((n1+n2)/(n1 n2) + d^2/(2(n1+n2)))`
+from the observed peak statistic too. For coordinates the variance is not merely a weight -- it is
+the sigma^2 the censored likelihood is written against -- so the same substitution is not available
+there without a two-step scheme, and reported peaks have a hugely inflated observed `d`, which
+makes the size of the distortion in that channel a separate question rather than the same one.
+
+**CBES cannot correct this, and that is the useful conclusion.** A donor's `g_var` map is an
+opaque input. A map produced by converting a t map carries the `g^2` term; a map produced by a
+proper mixed model at each voxel does not. The estimator has no way to tell which it was handed,
+so substituting a pooled estimate into a variance formula it only assumes would be wrong as often
+as right. The fix belongs where `g_var` is created, or in the user's knowledge of what they
+supplied.
+
+Practical consequence, and the reason this is worth recording rather than filing: about 2-3% of
+the all-image arm's downward bias is this, not CBES. It also means the -0.032 residual attributed
+above to the calibrated coordinate channel is measured against a floor that has a known and
+separable cause, so the corrected channel's own residual is nearer -0.01 than -0.032 once the
+weighting bias is removed from both sides.
