@@ -18,6 +18,12 @@ class Proof:
         self.title = title
         self.preamble = preamble
         self.claims = []
+        self.definitions = []
+
+    def define(self, shown, expression):
+        """Record a definition, which is asserted rather than checked."""
+        self.definitions.append((shown, expression))
+        return expression
 
     def claim(self, label, expression, shown):
         """Record a claim and verify that ``expression`` is identically zero.
@@ -37,7 +43,8 @@ class Proof:
         return expression
 
     def report(self):
-        print(f"=== {self.title} ({self.name}): {len(self.claims)} claims verified")
+        print(f"=== {self.title} ({self.name}): {len(self.claims)} claims verified"
+              + (f", {len(self.definitions)} definitions" if self.definitions else ""))
         for label, shown in self.claims:
             print(f"  [ok] {label}")
             print(f"       {shown}")

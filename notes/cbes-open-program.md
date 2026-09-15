@@ -4214,3 +4214,56 @@ error -0.067 (p = 0.0001), error at top -0.132 (p = 0.0001), rank r -0.004 (p = 
 The docstring now carries both rows and says the published one is the one to quote. This is the
 first time the central real-data claim has rested on coordinates a human transcribed from a
 paper rather than on my own proxy for them.
+
+## The implemented derivatives check out: 23 symbolic claims, none failing
+
+jdkent's second example verifies the *implementation's* closed forms against sympy rather than
+properties of the model, which is the higher-value kind. CBES has three such hand-derived forms
+and none had ever been checked. `proofs/censored_information.py` does it:
+
+  * `_censoring_terms`' `first` and `second` are `dS/dmu` and `d2S/dmu2`. Worth checking rather
+    than trusting: `second = -(u phi(u) - l phi(l))/sigma^2` is not the chain rule applied to
+    `first` on its face, and works only through `d(phi)/dx = -x phi`.
+  * the `sign` generalisation really is the complement's derivative. One sign factor has to
+    serve *both* derivatives of `1 - S`, which is true because `1 - S` differentiates to `-S'`
+    and `-S''` alike -- asserted in the code, proved here, for both limbs.
+  * `d2_over_prob - score**2` is `d2/dmu2 log p`, i.e. the code's curvature term really is
+    `p''/p - (p'/p)^2` with the sign carried correctly through the reported limb.
+  * an image pair's `(g - mu) * precision` and `-precision`.
+  * **all three observed-information blocks.** `i_mu = -w(r h + r(1-r) s^2)`,
+    `cross = -w s r(1-r)/(pi(1-pi))` and `i_pi = w(r/pi - (1-r)/(1-pi))^2` each equal minus the
+    corresponding second derivative of `w log(pi a + (1-pi) b)`, with `a` left as an abstract
+    function of `mu` so the check is not about a particular density. Anti-vacuity asserts that
+    none of the three collapses to zero for a concrete `a`.
+
+All 11 pass, alongside the 12 in `censoring.py`. So the estimator's algebra is right; what was
+wrong this session was a *limit* taken outside these formulas (the `1 - r` over `1 - pi`
+business) and the harness around them, not the derivatives themselves. That is worth knowing
+precisely, because it says the remaining problems are specification and measurement rather than
+calculus.
+
+### What is left that algebra could still settle
+
+Ordered by whether it would change what gets built:
+
+1. **The reported limb's probability is wrong and the algebra can say by how much.** The model
+   uses `P(|g| >= c)`; a paper reports a voxel only if it cleared `c` *and* was a local maximum.
+   The correction is the survival function of a suprathreshold local maximum, which for a smooth
+   field is an Euler-characteristic density -- expressible in closed form given a smoothness.
+   This is the one specification error now localised (measured over-statement 1.00, 1.78, 1.08,
+   1.13 at true g of 0.2 to 0.8; non-monotone, so no constant reweighting absorbs it) and the
+   #74 result says it, not identifiability, is what limits the magnitude.
+2. **The identifiability condition properly stated.** I have the two-configuration case. What
+   would be useful is the rank of the Jacobian of `k` distinct `(sigma, c)` pairs in
+   `(pi, mu)` -- i.e. how many genuinely distinct study configurations are needed, and how the
+   condition number degrades as the configurations cluster. That turns "spread helps" into a
+   number a user could compute from their own collection before running anything.
+3. **The EM's fixed point versus the profile maximum.** The profile interval revealed the
+   estimate is stabilised by the start point and `max_iter` rather than by the data. Whether the
+   EM's fixed point coincides with the profile maximiser where the likelihood is flat is a
+   question about the map's contraction, and it decides whether `g` is an estimator or a
+   regularised summary.
+4. **`Var(pi mu)` and the determinant.** Two lines, explains #70 mechanically, worth having
+   written down next to the delta-method code.
+
+Items 1 and 3 are the ones that would change the estimator.
