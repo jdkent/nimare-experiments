@@ -93,14 +93,19 @@ if __name__ == "__main__":
           f"{TRUTH[SIGNAL].max():.3f} ({TRUTH[SIGNAL].max() / TRUTH[SIGNAL].min():.1f}-fold), "
           f"{int(SIGNAL.sum())} voxels\n")
     print(f"{'estimate':>16} {'slope':>7} {'intercept':>10}    " +
-          "  ".join(f"{'g@' + str(e):>8}" for e in EFFECTS))
+          "  ".join(f"{'g@' + str(e):>18}" for e in EFFECTS))
     for label, maps in arms.items():
         slopes, intercepts = zip(*[fit_line(m) for m in maps])
-        peaks = np.array([peak_values(m) for m in maps]).mean(axis=0)
+        peaks = np.array([peak_values(m) for m in maps])
+        cells = []
+        for j, e in enumerate(EFFECTS):
+            mean, sem = peaks[:, j].mean(), peaks[:, j].std(ddof=1) / np.sqrt(len(peaks))
+            cells.append(f"{mean:.3f}+-{sem:.3f} ({100 * (mean - e) / e:+.0f}%)")
         print(f"{label:>16} {np.mean(slopes):7.3f} {np.mean(intercepts):+10.3f}    " +
-              "  ".join(f"{v:8.3f}" for v in peaks))
-    print("\nrecovered range at the four foci (ratio of strongest to weakest):")
+              "  ".join(f"{c:>18}" for c in cells))
+    print("\nrecovered range at the four foci, and mean |relative error|:")
     for label, maps in arms.items():
         peaks = np.array([peak_values(m) for m in maps]).mean(axis=0)
-        print(f"  {label:>16} {peaks[-1] / max(peaks[0], 1e-9):.2f}-fold  "
-              f"(truth {EFFECTS[-1] / EFFECTS[0]:.0f}-fold)")
+        err = np.mean(np.abs(100 * (peaks - np.array(EFFECTS)) / np.array(EFFECTS)))
+        print(f"  {label:>16} {peaks[-1] / max(peaks[0], 1e-9):5.2f}-fold "
+              f"(truth {EFFECTS[-1] / EFFECTS[0]:.0f}-fold)   mean |err| {err:5.1f}%")

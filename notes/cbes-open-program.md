@@ -3009,3 +3009,53 @@ it only when comparing against an image-based reference", where it is the matchi
 
 Third correction this session from reading absolute rather than relative error. Worth a habit:
 for a quantity spanning a range, report relative error per stratum, never a pooled absolute one.
+
+### Second correction, with an n this time: 24 seeds and standard errors
+
+The per-focus table moved twice because I shipped it off 6 and 8 seeds, where the SE on a value
+of 0.2 to 0.8 is 0.02 to 0.03 -- about 10% relative, which is the size of the effects I was
+reporting. At 24 seeds:
+
+| estimate | slope | @0.2 | @0.4 | @0.6 | @0.8 | range | mean \|err\| |
+|---|---|---|---|---|---|---|---|
+| images only | 0.911 | 0.230+-.025 (+15%) | 0.419+-.029 (+5%) | 0.635+-.027 (+6%) | 0.792+-.025 (-1%) | 3.44x | **6.7%** |
+| **CBES g** | 0.759 | 0.194+-.019 (-3%) | **0.329+-.022 (-18%)** | 0.634+-.016 (+6%) | 0.825+-.017 (+3%) | **4.26x** | 7.5% |
+| g_marginal | 0.769 | 0.151+-.018 (-25%) | 0.267+-.024 (-33%) | 0.576+-.015 (-4%) | 0.780+-.019 (-3%) | 5.18x | 16.1% |
+
+**What survives:** the range. 4.26-fold for a true 4-fold against 3.44-fold for the images alone.
+The compression that was the old design's headline failure is genuinely gone.
+
+**What does not:** "5.2% against 9.8%". Mean absolute relative error is 7.5% for `g` against
+**6.7%** for the images -- a wash, slightly the wrong way. The arms trade errors focus by focus
+rather than one dominating, so a single averaged number was never going to be the summary.
+
+**The one clear defect: -18% at the 0.4 focus, about 3 SE, where the images are +5%.** That is the
+middle of the detection window (1 of 17 studies reported), so exactly where the likelihood is most
+sensitive to the reporting model. Replicated at 24 seeds. Unexplained.
+
+### The alpha probe, re-run in the regime the first one could not reach
+
+The first sweep's middle stratum was *exactly* invariant to alpha (0.0737 at every value) -- a dead
+test, not a null result: in a single-focus bed that stratum is the blob skirt, where nothing is
+reported, so there were no `sign = -1` pairs to act on. Re-run on the four-foci bed, which does
+span the window (0/18, 1/16, 4/12, 12/6 reported/silent at truths 0.2/0.4/0.6/0.8):
+
+| alpha | g@0.2 | g@0.4 | g@0.6 | g@0.8 |
+|---|---|---|---|---|
+| **1.0** | 0.153 (-23%) | **0.357 (-11%)** | **0.606 (+1%)** | **0.803 (+0%)** |
+| 0.7 | 0.153 (-23%) | 0.336 (-16%) | 0.585 (-3%) | 0.745 (-7%) |
+| 0.5 | 0.153 (-23%) | 0.324 (-19%) | 0.596 (-1%) | 0.708 (-11%) |
+| 0.3 | 0.153 (-23%) | 0.312 (-22%) | 0.554 (-8%) | 0.660 (-18%) |
+
+alpha = 1 is best at every focus where the limb is live, so #66 is now closed on a live test rather
+than a dead one. And `g@0.2` is exactly invariant at 0.153 -- which is the structural fact worth
+keeping: **below the detection window the report limb does not exist**, nothing is reported and
+silence is nearly flat in mu, so `g` there is the image estimate and nothing the coordinate
+channel does can change it.
+
+### Habit to keep
+
+Three corrections this session came from a measurement, not a model: absolute error where relative
+was wanted, a bin that mixed two behaviours, and an n too small for the effect being claimed. All
+three produced confident wrong statements that survived until re-measured. Report n and SE beside
+any number that goes into a docstring.
