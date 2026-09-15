@@ -1200,3 +1200,49 @@ prevalences spanning 0.25 to 1.00. That is a number worth standing behind, and i
 "read it ordinally, not as a fraction" instruction the weaker of the two available positions
 rather than the safer one. The honest framing is the reverse of the current one: trust the level
 in the strong-effect regime, and use a count if what you want is to rank regions.
+
+## Is coordinates-only `g` one scale error? (corrected answer, and a falsification reversed)
+
+Rerun with a genuine t on `n - 1` degrees of freedom, donor images derived from the same t through
+the estimator's own conversion, and the reporting threshold supplied. Five sites at true g
+0.800 / 0.700 / 0.600 / 0.500 / 0.400, 12 studies, 40 replications.
+
+```
+                   g / true g at the five sites            spread  within-map rho   exact
+coordinates only   1.326 1.314 1.372 1.411 1.210            1.17x   +0.760 (0.338)   22%
+2 of 12 imaged     1.130 1.108 1.044 0.905 0.828            1.36x   +0.942 (0.070)   52%
+12 of 12 imaged    0.967 0.962 0.965 0.943 0.959            1.03x   +0.952 (0.071)   62%
+```
+
+Compare the uncorrected run, which read 1.65x / 1.28x / 1.06x and monotone.
+
+**Coordinates-only `g` really is close to one scale error.** A spread of 1.17x across a
+twofold range of true effect, with ratios between 1.21 and 1.41, means a single multiplicative
+constant would repair most of the map. That is materially better than the 1.65x the buggy
+convention suggested, and it is the strongest support the PR's "read `g_relative`, not `g`"
+framing has had. The weakest site is no longer an outlier (1.21 against 1.33 at the strongest),
+so the earlier caveat that the relative reading breaks at the bottom of the range does not
+survive the correction either.
+
+**And the U-shape I predicted and then recorded as falsified is real.** 1.17x with no images,
+**1.36x with two**, 1.03x with all twelve -- non-monotone, worst in the middle, which is what I
+wrote down in advance and then retracted on the strength of the uncorrected run. The mechanism
+proposed then also holds: an image contributes at every voxel while a coordinate study
+contributes only near its own foci, so the coordinate channel's *local* weight share is highest
+where most studies reported -- at the strong sites. Those keep more of the coordinate bias, and
+the ratio falls monotonically with the truth (1.13 at 0.80 down to 0.83 at 0.40).
+
+**But the distortion coexists with better ordering, which is why I could not see it.** Exact
+ordering goes 22% to 52% to 62% and rank correlation +0.76 to +0.94 to +0.95 -- monotone
+improvement, right through the arm with the worst ratio spread. The tilt is monotone in the truth
+and in the direction that *stretches* the map rather than compressing it, so it increases contrast
+between strong and weak sites while making each ratio individually less accurate. A pattern
+metric and a calibration metric therefore disagree about the 2-image arm, and I had only been
+looking at one of them.
+
+Two lessons, of different kinds. The scientific one: adding a couple of images buys a large gain
+in ranking and a small loss in proportionality, and which matters depends on the reading. The
+methodological one: a prediction "falsified" by a measurement that later turns out to have been
+mis-instrumented is not falsified, and the retraction needs revisiting when the instrument is
+fixed -- I had not gone back over the earlier falsifications after finding the convention bug, and
+should have.
