@@ -1019,3 +1019,50 @@ What this implies for earlier results, all of which were measured at the default
 - The window-of-detectability mechanism (section 20) is unaffected -- it is about where the truth
   sits relative to the *real* threshold, and it is what explains why a mis-set threshold does so
   much damage.
+
+### Re-measured on the correct convention, and the threshold finding is narrower than it looked
+
+`prevalence_within_map` rerun with a genuine noncentral t, and with both threshold settings:
+
+```
+effect 0.8                        0.25    0.50    0.75    1.00   within-map rho   exact
+  fraction reporting             0.180   0.383   0.573   0.729
+  fitted, study-min              0.279   0.641   0.869   0.955   +0.762 (0.190)    19%
+  fitted, fixed 3.2905           0.306   0.684   0.890   0.961   +0.762 (0.190)    19%
+
+effect 0.4                        0.25    0.50    0.75    1.00
+  fraction reporting             0.021   0.047   0.083   0.081
+  fitted, study-min              0.191   0.342   0.396   0.464   +0.328 (0.602)     6%
+  fitted, fixed 3.2905           0.224   0.402   0.468   0.540   +0.328 (0.602)     6%
+```
+
+Three corrections to what I said an hour ago.
+
+**1. The ordering is worse than I shipped, not better.** On the correct convention the four-site
+ranking is exactly right in **19%** of maps at a strong effect and **6%** at a weak one, against
+the 50% and 12% I measured with the buggy statistic and put into the docstring. Rank correlation
++0.762 and +0.328 against +0.862 and +0.586. So the docstring caveat I shipped is right in
+direction and too generous in degree; it needs the corrected numbers.
+
+**2. The threshold setting does not touch the ordering at all.** +0.762 and 19% under both
+settings, identical to three decimals. That is not a coincidence: changing the assumed cutoff
+applies a roughly common inflation across sites, and a monotone transform preserves ranks. So the
+threshold choice moves the *level* and leaves the *order* exactly where it was. Whatever is
+wrong with the ordering is not the threshold.
+
+**3. The threshold finding is narrower than the headline suggested.** In the cluster-extent bed
+supplying the true cut brought prevalence to within 0.05 of the truth at every site. Here, with
+*direct height* thresholding, `study-min` infers the cut correctly -- the smallest reported value
+really is near the threshold when there are no clusters -- and a residual inflation remains
+anyway: 0.684 against a true 0.50 with the fixed threshold. So:
+
+> Threshold inference is badly wrong **under cluster-extent reporting**, where the smallest
+> reported value is a cluster maximum, and fixing it largely fixes calibration in that regime.
+> Under direct height thresholding the inference is already fine and the inflation that remains
+> is the censored likelihood's own.
+
+The two beds also differ in how much silence there is to explain -- reporting fractions of
+0.18-0.73 here against much higher ones in the field bed -- and the inflation tracks that, which
+is the section 22 mechanism again: more unexplained silence, more for the censoring term to
+attribute, more inflation. That is the variable to isolate next, rather than declaring either bed
+the representative one.

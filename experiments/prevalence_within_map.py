@@ -29,7 +29,11 @@ SITES = [(-32.0, 0.0, 0.0), (-10.0, 0.0, 0.0), (12.0, 0.0, 0.0), (34.0, 0.0, 0.0
 SITE_PREVALENCE = [0.25, 0.50, 0.75, 1.00]
 N_SIMS = 16
 N_STUDIES = 24
-U = 3.2905                 # reporting threshold on the z scale
+#: Reporting threshold as a two-sided p, so each study's cut sits on its own t scale. A fixed
+#: number on the z scale would hand the estimator a statistic whose convention it does not
+#: assume -- it reads a reported value as a t on n - 1 degrees of freedom -- and that inflates
+#: every recovered magnitude by about a third. See PROTOCOL.md.
+REPORTING_P = 2.0 * stats.norm.sf(3.2905)
 LOCALISATION_SD = 4.0      # mm of jitter between the true site and the reported focus
 N_NOISE = 1
 
@@ -42,21 +46,23 @@ def build_mask():
     return nib.Nifti1Image(np.ones(shape, dtype=np.int32), affine)
 
 
-def one(seed, effect):
+def one(seed, effect, threshold="study-min"):
     rng = np.random.default_rng(seed)
     mask = build_mask()
     studies, reported = [], np.zeros(len(SITES))
     for k in range(N_STUDIES):
         n = int(rng.integers(20, 41))
+        cut = float(stats.t.isf(REPORTING_P / 2.0, n - 1))
         meta = {"sample_sizes": [n]}
         points = []
         for s, (site, prevalence) in enumerate(zip(SITES, SITE_PREVALENCE)):
             if rng.random() >= prevalence:
                 continue                      # this study has no effect at this site
-            var = 1.0 / n + effect**2 / (2.0 * n)
-            observed = rng.normal(effect, np.sqrt(var))
-            z = observed * np.sqrt(n)
-            if abs(z) < U:
+            # A genuine noncentral t: the effect is the noncentrality and the denominator
+            # carries its own n - 1 degrees of freedom, which is the statistic the estimator
+            # assumes a reported value to be.
+            z = float(stats.nct.rvs(df=n - 1, nc=effect * np.sqrt(n), random_state=rng))
+            if abs(z) < cut:
                 continue                      # had the effect, failed to clear the threshold
             reported[s] += 1
             loc = np.asarray(site) + rng.normal(0, LOCALISATION_SD, 3)
@@ -64,16 +70,17 @@ def one(seed, effect):
         for _ in range(N_NOISE):
             loc = rng.uniform(-44, 44, 3)
             # A noise peak just clears the cut, with the exponential overshoot of a smooth field.
-            points.append((loc, (U + rng.exponential(1.0 / U)) * rng.choice([-1.0, 1.0])))
+            points.append((loc, (cut + rng.exponential(1.0 / cut)) * rng.choice([-1.0, 1.0])))
         if len(points) < 1:
             continue
         studies.append({"id": f"s{k}", "name": f"s{k}", "metadata": meta, "analyses": [
             {"id": f"s{k}", "name": "1", "metadata": meta, "points": [
                 {"space": "MNI", "coordinates": [float(c) for c in loc],
-                 "values": [{"kind": "Z", "value": float(z)}]} for loc, z in points]}]})
+                 "values": [{"kind": "T", "value": float(z)}]} for loc, z in points]}]})
     if len(studies) < 8:
         return None
-    est = CBES(fwhm=10.0, mask=mask, peak_bias=None, null_method="none")
+    est = CBES(fwhm=10.0, mask=mask, peak_bias=None, null_method="none",
+               threshold=threshold)
     result = est.fit(Studyset({"id": "w", "name": "w", "studies": studies},
                               target=None, mask=mask))
     pi_map = result.get_map("prevalence", return_type="array").ravel()
@@ -84,15 +91,18 @@ def one(seed, effect):
     return out + list(reported / max(len(studies), 1))
 
 
-for effect in (0.8, 0.4):
-    rows = [r for r in Parallel(n_jobs=4)(
-        delayed(one)(seed, effect) for seed in range(N_SIMS)) if r is not None]
+for effect, threshold, label in ((0.8, "study-min", "study-min"),
+                                 (0.8, 3.2905267314919255, "fixed 3.2905"),
+                                 (0.4, "study-min", "study-min"),
+                                 (0.4, 3.2905267314919255, "fixed 3.2905")):
+    rows = [r for r in Parallel(n_jobs=6)(
+        delayed(one)(seed, effect, threshold) for seed in range(N_SIMS)) if r is not None]
     if not rows:
         print(f"effect {effect}: no usable simulation\n", flush=True)
         continue
     block = np.array(rows, dtype=float)
     fitted, reporting = block[:, :len(SITES)], block[:, len(SITES):]
-    print(f"effect {effect}, {len(rows)} simulations, {N_STUDIES} studies")
+    print(f"effect {effect}, threshold={label}, {len(rows)} sims, {N_STUDIES} studies")
     print(f"  {'site prevalence':>18} " + " ".join(f"{p:8.2f}" for p in SITE_PREVALENCE))
     print(f"  {'fraction reporting':>18} " + " ".join(f"{v:8.3f}" for v in reporting.mean(0)))
     print(f"  {'fitted prevalence':>18} " + " ".join(f"{v:8.3f}" for v in fitted.mean(0)))
