@@ -352,3 +352,39 @@ autocorrelation *shape* is identical by construction, so what is shown is invari
 of smoothness and not to the shape of the spectrum. A genuinely different spectral shape --
 non-Gaussian smoothing, unsmoothed data -- would still matter. That is a far weaker requirement
 than knowing each study's FWHM, and far more stable across a literature.
+
+## 12. How this differs from CBMR, stated correctly after being stated wrongly
+
+CBMR's predictor, read from `nimare/meta/cbmr/predictor.py`, is separable:
+`log_intensity_by_pattern` returns a spatial log-intensity and `moderator_effect` returns "the
+scalar linear predictor contributed per experiment", combined as
+`lambda_k(x) = exp(spline(x)) * w_k`. One spatial shape, scaled per study.
+
+My first statement of the difference was that non-separability -- each study having a *different*
+intensity shape, because `u_k` and `sqrt(N_k)` enter inside the nonlinearity -- is what identifies
+the effect scale, the way varying detection across observers identifies the Gutenberg-Richter law.
+T8 tests that by removing the variation.
+
+| collection | recovered scale | error | curvature of the profile |
+| --- | --- | --- | --- |
+| homogeneous, one threshold and one sample size | 0.762 | −0.038 | 368 |
+| varying sample size only | 0.775 | −0.025 | 491 |
+| varying sample size and threshold | 0.817 | +0.017 | 565 |
+
+**The homogeneous collection still identifies the scale.** Variation is not necessary. It helps --
+the profile is 54% sharper and the bias flips from −0.038 to +0.017 -- but the mechanism is
+something simpler: with a *known* threshold and sample size, the expected count above that
+threshold is already a monotone function of the effect, so counting identifies it even when every
+study is identical. Cross-study variation buys precision, not identifiability.
+
+The difference from CBMR survives, restated. It is not separability as such; it is that CBMR's
+link contains no threshold and no sample size, so the effect field is not a parameter of the model
+at all and there is nothing to invert back to. That is deliberate: CBMR answers where foci occur
+and whether that depends on a covariate, and answers it well. The proposal keeps its likelihood
+family, its spline bases, its negative binomial and clustered negative binomial handling of
+over-dispersion and its inference, and replaces a free log-intensity spline with an effect field
+pushed through a known reporting mechanism.
+
+One CBMR feature would actively break it: study-level covariates give each experiment a free
+multiplicative rate, and sample size is among the covariates its paper names. That absorbs the
+counts, which is the channel the effect scale rides on.

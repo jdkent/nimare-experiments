@@ -629,7 +629,83 @@ def smoothness_sensitivity():
           f"\n  detail; errors tracking the factor mean it needs its own estimator.\n")
 
 
+def separability():
+    """Is the *variation* of intensity shape across studies what identifies the effect scale?
+
+    CBMR's predictor is separable: one spatial log-intensity times a scalar per experiment, so
+    every study shares a spatial shape and differs only in overall rate. The model proposed here
+    is not separable -- the threshold and sample size enter inside the nonlinearity, so a small
+    study with a lenient cut has a broad intensity while a large one with a strict cut has an
+    intensity concentrated on the peaks of the same field.
+
+    The claim is that this shape variation is the mechanism: it is what pins the effect scale,
+    the way varying detection across observers pins the Gutenberg-Richter law. If so, removing the
+    variation should destroy identification even though the model and the data-generating process
+    are otherwise unchanged.
+
+    Three collections, all with the same true field and the same number of studies. In the
+    homogeneous ones every study shares one threshold and one sample size, so the intensity shape
+    is identical across studies and the model is effectively separable. In the heterogeneous one
+    they vary as a literature does.
+    """
+    print("T8: does intensity-shape variation across studies identify the scale?")
+    heights, rho_max = peak_height_law()
+    shape_field = truth_field()
+    shape_field = shape_field / shape_field.max()
+    a_true, n_studies = 0.8, 24
+
+    def collect(kind, seed):
+        local = np.random.default_rng(seed)
+        tables = []
+        for j in range(n_studies):
+            if kind == "homogeneous":
+                n_subj, cut, per_cluster = 25, 3.0, False
+            elif kind == "varying N only":
+                n_subj, cut, per_cluster = int(local.integers(12, 60)), 3.0, False
+            else:
+                n_subj = int(local.integers(12, 60))
+                cut, per_cluster = ((2.5, False), (4.5, False), (3.0, True))[j % 3]
+            z = a_true * shape_field * np.sqrt(n_subj) + noise()[0]
+            idx = report(z, cut, per_cluster)
+            if idx.size:
+                tables.append((idx, cut, n_subj))
+        return tables
+
+    def fit(tables):
+        def neg(a):
+            rates = []
+            for idx, u, n_subj in tables:
+                m = a * shape_field * np.sqrt(n_subj)
+                rates.append(rho_max * (survival(heights, u - m) + survival(heights, u + m)))
+            integral = sum(float(r.sum()) for r in rates)
+            n_total = sum(idx.size for idx, _, _ in tables)
+            c_hat = n_total / max(integral, 1e-12)
+            total = 0.0
+            for (idx, _, _), r in zip(tables, rates):
+                total -= np.log(c_hat * r[idx] + 1e-300).sum()
+            return total + c_hat * integral
+        # Curvature of the profile at the optimum: how sharply the scale is pinned.
+        a = optimize.minimize_scalar(neg, bounds=(0.1, 2.0), method="bounded").x
+        step = 0.05
+        curvature = (neg(a + step) - 2 * neg(a) + neg(a - step)) / step ** 2
+        return a, curvature
+
+    print(f"  {'collection':>22} {'scale':>7} {'error':>7} {'curvature':>11} {'spread':>8}")
+    for kind in ("homogeneous", "varying N only", "varying N and threshold"):
+        scales, curves = [], []
+        for seed in range(8):
+            tables = collect(kind, seed)
+            a, curvature = fit(tables)
+            scales.append(a)
+            curves.append(curvature)
+        print(f"  {kind:>22} {np.mean(scales):7.3f} {np.mean(scales) - a_true:+7.3f} "
+              f"{np.mean(curves):11.0f} {np.std(scales):8.3f}")
+    print(f"\n  true scale {a_true}. Higher curvature is a more sharply identified scale. If the"
+          f"\n  homogeneous collection is flat and the varying one is not, shape variation across"
+          f"\n  studies is the mechanism, and a separable model cannot have it.\n")
+
+
 if __name__ == "__main__":
-    which = sys.argv[1:] or ["calibration", "channel_sweep", "identifiability", "detection_curve", "joint_model", "joint_field", "smoothness_sensitivity"]
+    which = sys.argv[1:] or ["calibration", "channel_sweep", "identifiability", "detection_curve", "joint_model", "joint_field", "smoothness_sensitivity", "separability"]
     for name in which:
         globals()[name]()
