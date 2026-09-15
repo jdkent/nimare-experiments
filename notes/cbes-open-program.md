@@ -1768,3 +1768,45 @@ a whole session in a configuration its own documentation warns against, having r
 earlier in the session and written it into the notes. The habit is not "read the docs" -- I had --
 it is: **make the documented default the first arm of every comparison, and label any other
 setting as the variant it is.**
+
+### The complete calibrated-versus-dilution comparison
+
+```
+truth 0.800, 12 studies, 40 replications      mean g    bias  mean se  cover
+2 of 12: peak_bias=None                        0.904  +0.104    0.141   0.93
+2 of 12: per-study, scale read off the images   0.753  -0.047    0.109   1.00
+6 of 12: peak_bias=None                        0.811  +0.011    0.092   1.00
+6 of 12: per-study, scale read off the images   0.759  -0.041    0.084   1.00
+```
+
+The full picture is better than the one I drew from the 2-image rows alone, and better for the
+estimator.
+
+**The calibration pins the scale to about -5% of the truth, independent of the donor count.**
+-0.047 at two donors and -0.041 at six: a small, stable over-correction that does not care how
+many images there are. That is the property that matters for a real collection, where the image
+share is whatever the literature happened to provide and is usually small.
+
+**Dilution's accuracy depends entirely on the share, so it wins only where you scarcely need the
+coordinates.** +0.104 at two images against +0.011 at six. At six of twelve it is the more
+accurate of the two -- but a collection with half its studies imaged is one where an IBMA on the
+images is available anyway.
+
+So the two settings are not ranked; they have different failure modes, and the recommended one
+has the better-behaved failure. Stated for the docstring rather than for me:
+
+> With the scale read off image donors, the magnitude comes back within about 5% of the truth
+> whether two studies or six supply images, erring slightly low. With `peak_bias=None` it depends
+> on the share of studies imaged -- 13% high at two of twelve, 1% high at six -- so the
+> configuration that needs fewest images is also the one that is insensitive to how many there
+> are.
+
+Coverage is 1.00 in three of the four cells and 0.93 in the fourth, all against a nominal 0.95,
+so the intervals are conservative throughout -- and at these biases they are conservative for the
+right reason rather than by being wide enough to hide an error, which is what the coordinates-only
+arms were doing.
+
+Correction to my own retraction, written an hour ago: I said the calibrated setting "more than
+halves the bias", which is true at two donors and false at six, where it is worse. The accurate
+statement is that it removes the *dependence on the donor count* at the cost of a small constant
+over-correction.
