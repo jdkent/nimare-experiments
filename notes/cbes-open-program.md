@@ -3911,3 +3911,93 @@ One thing to follow up separately: arm I under-covers at the weakest focus even 
 (0.86 at `g=0.2`, se/sd 0.99, bias -0.047 on a spread of 0.37). Conservative at low heterogeneity
 and anti-conservative at high, at the same voxel -- which is a different failure from the one this
 section is about.
+
+## The algebra was available the whole time, and it corrects two results I simulated
+
+jdkent asks whether some of this can be done algebraically, pointing at a proofs repo. The answer
+is yes, and this session is the argument for it: two of its results were reached by staring at
+numeric tables, and a third was simply wrong in a way one line of algebra would have prevented.
+
+### 1. The profile interval's asymptote -- derivable, and sharper than the simulation
+
+Write each observation's mixture density as `f_i(mu, pi) = pi a_i(mu) + (1 - pi) b_i`, with `b_i`
+the density or probability under an effect of exactly zero. As `|mu| -> infinity`:
+
+  * an image value has `a_i(mu) = phi((g_i - mu)/sigma)/sigma -> 0`;
+  * a *silence* has `a_i(mu) = P(|g| < c | mu) -> 0`;
+  * a *report* has `a_i(mu) = P(|g| >= c | mu) -> 1`.
+
+So the log-likelihood tends to a limit free of `mu`,
+
+    l_inf = max_pi [ sum_{i not reported} log((1 - pi) b_i)
+                     + sum_{i reported}   log(pi + (1 - pi) b_i) ],
+
+a horizontal asymptote. The profile interval on `mu` is bounded exactly when
+`2 (l_hat - l_inf)` clears the critical value, and at a voxel where nobody reported -- where the
+max is at `pi -> 0` -- that is precisely the likelihood-ratio test of `pi = 0`. This is *sharper*
+than what I concluded from the grid: I wrote "bounded iff the data reject pi = 0", which is only
+exactly true where no study reported at the voxel. The report limb keeps `pi` in the limit. The
+docstring now carries the general form.
+
+Note what the derivation also gives for free: **no reparametrisation escapes it.** `pi*mu` has
+the same asymptote, approached along `pi -> 0, mu -> infinity`. I could have known that before
+building anything.
+
+### 2. The ridge invariant -- I guessed `pi*mu` and the algebra says otherwise
+
+A silent pair's likelihood depends on `(pi, mu)` only through the probability of the event
+observed,
+
+    P_silent(pi, mu) = pi S(mu) + (1 - pi) S(0),     S(mu) = P(|g| < c | mu),
+
+one equation in two unknowns. So the silence channel's indifference curve is the level set of
+`P_silent` -- not of `pi*mu`. Checked against the actual profile ridge at a quiet voxel (15
+silent pairs, 0 reported):
+
+| mu | pi | pi*mu | P_silent |
+|---|---|---|---|
+| -0.1420 | 0.5754 | -0.0817 | 0.99814 |
+| +0.0182 | 0.4730 | +0.0086 | 0.99959 |
+| +0.1784 | 0.2362 | +0.0421 | 0.99843 |
+| +0.4988 | 0.0208 | +0.0104 | 0.99529 |
+| +1.2998 | 0.0001 | +0.0001 | 0.99950 |
+
+`P_silent` is constant to 0.4%; `pi*mu` moves by a factor of several hundred and changes sign.
+**So the #70 entry above is right about the measurement and wrong about the mechanism.** The
+product is *not* the invariant, and the reason `g_marginal` is the steadier estimate is not that
+it lies along the ridge. That entry should be read as: measured, the product is steadier and its
+delta-method interval is worse; the ridge explanation offered for it does not hold.
+
+### 3. The one the algebra would have caught before the test did
+
+Holding `pi` at 1, I claimed the cross block "vanishes through the existing algebra" because the
+responsibility goes to 1 and `r(1 - r) -> 0`. With `pi` clamped at `1 - eps`:
+
+    1 - r = eps b_i / ((1 - eps) a_i + eps b_i) ~ eps b_i / a_i,
+    so (1 - r)/(1 - pi) -> b_i / a_i,    and  r(1-r)/(pi(1-pi)) -> b_i / a_i,
+
+both order one, not zero. The Schur complement would have kept subtracting a term no parameter
+earned. A unit test caught it at 7e-5 relative; two lines of limits would have caught it first.
+
+### What is worth proving, in rough order of what it would buy
+
+1. **Identifiability.** The above, stated properly: from silences alone the likelihood depends on
+   `(pi, mu)` through one scalar per distinct `(sigma, c)` pair, so `k` distinct study
+   configurations give `k` equations. This predicts *when* the ridge collapses -- heterogeneous
+   sample sizes and thresholds should identify both parameters -- and that is a testable
+   prediction I have never made, only stumbled toward with `coordinate_share`.
+2. **The asymptote and the boundedness criterion.** Done above; belongs written up.
+3. **The downward pull of Hedges' variance.** `v(g) = 1/n + g^2/(2n)` is increasing in `|g|`, so
+   inverse-variance weights are anticorrelated with the observed magnitude and the pooled mean
+   is biased toward zero. This explains the -0.02 to -0.09 bias at the foci that shows up in
+   *every* arm table including the textbook one, which I have been reporting for weeks without
+   deriving.
+4. **`Var(pi mu)` under a near-singular information matrix.** The delta method divides by
+   `det = I_mm I_pp - I_mp^2`; the ridge drives `det -> 0`. That is #70's real mechanism and it
+   is two lines.
+5. **Concavity in `pi` at fixed `mu`**, which the profile's inner solve relies on: `log` of an
+   affine function of `pi`, summed. One line, and it licenses the fixed-point iteration I am
+   already using as if it were a global maximiser.
+
+Items 1 and 3 are the ones that would change what gets built, rather than explain what already
+was.
