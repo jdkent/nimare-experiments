@@ -210,3 +210,60 @@ study has an effect here" is not observable independently of the effect's size. 
 has per-subject maps for 787 subjects across 23 contrasts, so synthetic studies can be built
 from one set of subjects and the truth measured on a disjoint set.
 (`hcp_index.py`, `hcp_heldout_validation.py`)
+
+## The magnitude map reads the reporting threshold, not the effect (four corpora)
+
+`peak_selection_event.py` settles what the abandoned truncation patch got wrong. Conditioning a
+reported value on `|g| > c` is a *single-draw* selection event, and the values in a coordinate
+table are not single draws -- they are local maxima of a smooth field, which clear a cut because
+they are the largest thing in their neighbourhood. Applying the truncated-normal correction to
+peaks drawn from a field with a true mean of 0.5 returns 0.257; at a true mean of 2.0 it returns
+3.6. The 0.259 the simulator fixture produced under that patch was the model speaking, not a bug,
+so the patch was reverted rather than tuned.
+
+`peak_height_curve.py` measures what is left to work with. Mean `|peak|` against the true field
+mean, smoothed white noise at unit variance:
+
+| cut | floor at true mean 0 | slope 0 to 1 | slope 1 to 3 |
+| --- | --- | --- | --- |
+| 2.50 | 3.09 | 0.208 | 0.752 |
+| 3.29 | 3.84 | 0.055 | 0.481 |
+| 4.00 | 4.53 | 0.028 | 0.249 |
+| 5.00 | 5.52 | 0.044 | 0.052 |
+
+At a cut of 3.29 a whole unit of true effect moves the reported height by 0.055. The height is
+the cut plus an overshoot that has forgotten the signal, which is what the estimator's own
+`peak_bias` warning has been saying.
+
+`cross_dataset_floor.py` asks whether this shows up outside the held-out HCP design, which is
+the only question that decides anything. Studies are split in half: one half becomes thresholded
+peak coordinates for CBES, the other half is pooled by inverse variance for the truth, so the
+reference is never conditioned on the noise that produced the peaks.
+
+| corpus | what the studies share | r(g, truth) | r(pi*g, truth) | ratio in the top stratum |
+| --- | --- | --- | --- | --- |
+| HCP held-out subjects | one task, one population (pi = 1) | +0.50 to +0.69 | -- | 1.37 to 1.57 |
+| NIDM pain, 21 studies | one construct, different labs | +0.14 to +0.22 | +0.34 to +0.39 | 1.9 for g, 1.2 for pi*g |
+| passive viewing, 12 collections | a cogatlas label | -0.078 | +0.057 | 3.7 |
+| go/no-go, 12 collections | a cogatlas label | +0.097 | +0.028 | 3.1 |
+| emotional regulation, 10 collections | a cogatlas label | -0.098 | +0.014 | 3.0 |
+
+On pain the truth spans 11x across its strata (0.084 to 0.961) while `g` spans 1.2x (1.50 to
+1.82); on two of the three NeuroVault groups `g` *falls* as the truth rises. Subtracting the
+floor does not repair it: `g - u/sqrt(N)` is +0.78 against a truth of 0.41 on pain and +0.75
+against 0.07 on passive viewing.
+
+Read the NeuroVault rows with their caveat. Those groups share a paradigm *label*, not a
+contrast, so the held-out reference is itself nearly flat -- its top stratum is only 0.24 to
+0.35 -- and a near-zero correlation there is partly an absent common effect rather than purely
+the estimator's failure. What they do establish is that no magnitude claim can be supported on
+that kind of corpus.
+
+The ordering across the three is the informative part: the magnitude map degrades exactly as
+spatial agreement between the studies degrades. That is expected of any coordinate-based
+estimator. What does not survive is the absolute scale, in every corpus including the one where
+prevalence is 1 by construction.
+
+`pi * mu` -- the `g_marginal` map that was removed -- is uniformly the better estimate of the
+held-out truth on pain: correlation +0.34 against +0.22 for `g`, and a top-stratum ratio of 1.21
+against 1.89. It does not rescue the NeuroVault groups, where nothing does.

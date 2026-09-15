@@ -92,14 +92,18 @@ def run_cbes(maps, sizes, cut, selection):
                      affine, np.asarray(ijk, dtype=float))],
                  "values": [{"kind": "Z", "value": value}]} for ijk, value in found]}]})
     if kept < MIN_HALF:
-        return None, None, kept
+        return None, None, kept, None
     est = CBES(fwhm=10.0, mask=masker, peak_bias=None, null_method="none",
                threshold="study-min", selection_model=selection)
     result = est.fit(Studyset({"id": "x", "name": "x", "studies": studies},
                               target=None, mask=mask_img))
     g = np.abs(result.get_map("g", return_type="array").ravel())
     covered = result.get_map("n_studies", return_type="array").ravel() > 0
-    return g, covered, kept
+    if "prevalence" in result.maps:
+        pi = result.get_map("prevalence", return_type="array").ravel()
+    else:
+        pi = np.ones_like(g)
+    return g, covered, kept, pi
 
 
 def report(label, maps, sizes, rng):
@@ -109,16 +113,18 @@ def report(label, maps, sizes, rng):
         print(f"{label}: {n} studies, too few to split\n", flush=True)
         return
     for cut in THRESHOLDS:
-        rows = {name: [] for name in ("truth", "cbes", "none")}
+        rows = {name: [] for name in
+                ("truth", "cbes", "none", "marginal", "r_g", "r_pi", "r_marg")}
         strata, kept_all = [], []
         for _ in range(N_SPLITS):
             order = rng.permutation(n)
             lo, hi = order[: n // 2], order[n // 2:]
             truth = np.abs(pooled_truth([maps[i] for i in hi], sizes[hi]))
-            g, covered, kept = run_cbes([maps[i] for i in lo], sizes[lo], cut, "zero-inflated")
+            g, covered, kept, pi = run_cbes(
+                [maps[i] for i in lo], sizes[lo], cut, "zero-inflated")
             if g is None:
                 continue
-            g0, _, _ = run_cbes([maps[i] for i in lo], sizes[lo], cut, "none")
+            g0, _, _, _ = run_cbes([maps[i] for i in lo], sizes[lo], cut, "none")
             kept_all.append(kept)
             use = covered & np.isfinite(g) & (g > 0)
             if use.sum() < 100:
@@ -126,13 +132,21 @@ def report(label, maps, sizes, rng):
             rows["truth"].append(truth[use].mean())
             rows["cbes"].append(g[use].mean())
             rows["none"].append(g0[use].mean() if g0 is not None else np.nan)
+            rows["marginal"].append((pi[use] * g[use]).mean())
+            rows["r_g"].append(stats.pearsonr(g[use], truth[use])[0])
+            rows["r_pi"].append(stats.pearsonr(pi[use], truth[use])[0])
+            rows["r_marg"].append(stats.pearsonr(pi[use] * g[use], truth[use])[0])
             cells = []
             for a, b in ((0, 50), (50, 75), (75, 90), (90, 99), (99, 100)):
                 band = (truth >= np.percentile(truth, a)) & (
                     truth < np.percentile(truth, b) if b < 100 else np.ones_like(truth, bool))
                 pick = use & band
-                cells.append((pick.sum(), truth[pick].mean() if pick.sum() >= 30 else np.nan,
-                              g[pick].mean() if pick.sum() >= 30 else np.nan))
+                ok = pick.sum() >= 30
+                cells.append((pick.sum(),
+                              truth[pick].mean() if ok else np.nan,
+                              g[pick].mean() if ok else np.nan,
+                              pi[pick].mean() if ok else np.nan,
+                              (pi[pick] * g[pick]).mean() if ok else np.nan))
             strata.append(cells)
         if not rows["truth"]:
             print(f"{label} @ {cut:.2f}: no usable split\n", flush=True)
@@ -142,68 +156,76 @@ def report(label, maps, sizes, rng):
         print(f"--- {label} @ threshold {cut:.2f} "
               f"({n} studies, {np.mean(kept_all):.0f} reported per half, "
               f"mean N {mean_n:.0f}, floor u/sqrt(N) = {floor:.3f}) ---")
-        print(f"  {'truth stratum':>16} {'truth g':>9} {'CBES g':>9} {'ratio':>7}")
+        print(f"  {'truth stratum':>16} {'truth g':>9} {'CBES g':>9} {'ratio':>7}"
+              f" {'prevalence':>11} {'pi*g':>8} {'ratio':>7}")
         block = np.array([[c[1:] for c in cells] for cells in strata], dtype=float)
         for j, name in enumerate(("0-50%", "50-75%", "75-90%", "90-99%", "99-100%")):
             t_bar, g_bar = np.nanmean(block[:, j, 0]), np.nanmean(block[:, j, 1])
-            print(f"  {name:>16} {t_bar:9.3f} {g_bar:9.3f} {g_bar / max(t_bar, 1e-9):7.2f}")
+            p_bar, m_bar = np.nanmean(block[:, j, 2]), np.nanmean(block[:, j, 3])
+            print(f"  {name:>16} {t_bar:9.3f} {g_bar:9.3f} {g_bar / max(t_bar, 1e-9):7.2f}"
+                  f" {p_bar:11.3f} {m_bar:8.3f} {m_bar / max(t_bar, 1e-9):7.2f}")
         t_bar, g_bar = np.mean(rows["truth"]), np.mean(rows["cbes"])
+        m_bar = np.mean(rows["marginal"])
         print(f"  {'all covered':>16} {t_bar:9.3f} {g_bar:9.3f} {g_bar / max(t_bar, 1e-9):7.2f}"
+              f" {'':>11} {m_bar:8.3f} {m_bar / max(t_bar, 1e-9):7.2f}")
+        print(f"  correlation with the truth: g {np.mean(rows['r_g']):+.3f}, "
+              f"prevalence {np.mean(rows['r_pi']):+.3f}, pi*g {np.mean(rows['r_marg']):+.3f}"
               f"   (selection_model='none' gives {np.nanmean(rows['none']):.3f};"
-              f" g - floor = {g_bar - floor:+.3f} against truth {t_bar:.3f})\n", flush=True)
+              f" g - floor = {g_bar - floor:+.3f})\n", flush=True)
 
 
-rng = np.random.default_rng(0)
+if __name__ == "__main__":
+    rng = np.random.default_rng(0)
 
-ss = ImageTransformer(target="z").transform(load_pain())
-pain_maps, pain_sizes = [], []
-for row, n in zip(ss.images.itertuples(), ss.sample_sizes()):
-    path = getattr(row, "z", None)
-    if path is None or not os.path.isfile(str(path)) or not np.isfinite(float(n)):
-        continue
-    img = resample_to_img(nib.load(str(path)), mask_img, interpolation="continuous",
-                          force_resample=True, copy_header=True)
-    pain_maps.append(np.nan_to_num(masker.transform(img).ravel().astype(float)))
-    pain_sizes.append(float(n))
-report("NIDM pain", pain_maps, pain_sizes, rng)
-
-EXCLUDE = ("none", "other", "null", "rest eyes open", "rest eyes closed", "none / other",
-           "resting state")
-entries = json.load(open("/tmp/claude-0/paradigms/maps.json"))
-by = {}
-for m in entries:
-    if (m["paradigm"] or "").strip().lower() in EXCLUDE:
-        continue
-    by.setdefault(m["paradigm"], {}).setdefault(m["collection"], m)
-groups = sorted(((p, list(c.values())) for p, c in by.items()), key=lambda kv: -len(kv[1]))
-
-
-def fetch(url, path):
-    if os.path.exists(path) and os.path.getsize(path) > 2000:
-        return True
-    subprocess.run(["curl", "-sL", "--max-time", "120", "-o", path, url], capture_output=True)
-    return os.path.exists(path) and os.path.getsize(path) > 2000
-
-
-os.makedirs(CACHE, exist_ok=True)
-for paradigm, members in groups[:5]:
-    maps, sizes = [], []
-    for entry in members:
-        path = os.path.join(CACHE, f"{entry['image']}.nii.gz")
-        if not entry.get("url") or not fetch(entry["url"], path):
+    ss = ImageTransformer(target="z").transform(load_pain())
+    pain_maps, pain_sizes = [], []
+    for row, n in zip(ss.images.itertuples(), ss.sample_sizes()):
+        path = getattr(row, "z", None)
+        if path is None or not os.path.isfile(str(path)) or not np.isfinite(float(n)):
             continue
-        try:
-            img = nib.load(path)
-            if img.ndim > 3:
-                img = nib.Nifti1Image(np.asarray(img.dataobj)[..., 0], img.affine, img.header)
-            img = resample_to_img(img, mask_img, interpolation="continuous",
-                                  force_resample=True, copy_header=True)
-            data = np.nan_to_num(masker.transform(img).ravel().astype(float))
-        except Exception:
+        img = resample_to_img(nib.load(str(path)), mask_img, interpolation="continuous",
+                              force_resample=True, copy_header=True)
+        pain_maps.append(np.nan_to_num(masker.transform(img).ravel().astype(float)))
+        pain_sizes.append(float(n))
+    report("NIDM pain", pain_maps, pain_sizes, rng)
+
+    EXCLUDE = ("none", "other", "null", "rest eyes open", "rest eyes closed", "none / other",
+               "resting state")
+    entries = json.load(open("/tmp/claude-0/paradigms/maps.json"))
+    by = {}
+    for m in entries:
+        if (m["paradigm"] or "").strip().lower() in EXCLUDE:
             continue
-        if not np.isfinite(data).any() or np.allclose(data, 0):
-            continue
-        n = float(entry["n"])
-        maps.append(t_to_z(data, dof=n - 1) if entry["map_type"] == "t" else data)
-        sizes.append(n)
-    report(paradigm[:40], maps, sizes, rng)
+        by.setdefault(m["paradigm"], {}).setdefault(m["collection"], m)
+    groups = sorted(((p, list(c.values())) for p, c in by.items()), key=lambda kv: -len(kv[1]))
+
+
+    def fetch(url, path):
+        if os.path.exists(path) and os.path.getsize(path) > 2000:
+            return True
+        subprocess.run(["curl", "-sL", "--max-time", "120", "-o", path, url], capture_output=True)
+        return os.path.exists(path) and os.path.getsize(path) > 2000
+
+
+    os.makedirs(CACHE, exist_ok=True)
+    for paradigm, members in groups[:5]:
+        maps, sizes = [], []
+        for entry in members:
+            path = os.path.join(CACHE, f"{entry['image']}.nii.gz")
+            if not entry.get("url") or not fetch(entry["url"], path):
+                continue
+            try:
+                img = nib.load(path)
+                if img.ndim > 3:
+                    img = nib.Nifti1Image(np.asarray(img.dataobj)[..., 0], img.affine, img.header)
+                img = resample_to_img(img, mask_img, interpolation="continuous",
+                                      force_resample=True, copy_header=True)
+                data = np.nan_to_num(masker.transform(img).ravel().astype(float))
+            except Exception:
+                continue
+            if not np.isfinite(data).any() or np.allclose(data, 0):
+                continue
+            n = float(entry["n"])
+            maps.append(t_to_z(data, dof=n - 1) if entry["map_type"] == "t" else data)
+            sizes.append(n)
+        report(paradigm[:40], maps, sizes, rng)
