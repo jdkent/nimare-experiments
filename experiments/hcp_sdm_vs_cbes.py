@@ -22,13 +22,17 @@ Three arms on the same studies:
                 writes each study's `_lower`/`_upper` effect-size bounds: SDM derives exactly the
                 bounds CBES's censored likelihood uses, then imputes *within* them where CBES
                 integrates *over* them.
+  SDM, parity   the same `n_images` studies supplied as t maps instead of peak files -- ES-SDM
+                takes a mixture by design -- so neither method is handed more studies-as-maps
+                than the other.
   CBES          `n_images` studies contribute their g/g_var maps, the rest their coordinate
                 tables. The redesign requires at least one image.
   images only   those same `n_images` maps pooled by inverse variance, i.e. what a user would do
                 instead of running CBES at all.
 
-The inputs differ between SDM and CBES by exactly as much as the two methods require, which is
-the real choice a user faces and is reported rather than engineered away.
+With the images given to both, the only remaining asymmetry is the form each reads them in --
+t maps for SDM, g/g_var for CBES -- which is each method's own native input for the same
+underlying data.
 """
 import os, sys, glob, subprocess, warnings; warnings.simplefilter("ignore")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -117,18 +121,43 @@ def hedges(mean, sd, n):
     return correction * mean / np.maximum(sd, 1e-9)
 
 
-def run_sdm(tables, workdir):
+def write_sdm_t_map(t_values, n, path):
+    """Write a study's t map where SDM will accept it as a supplied image.
+
+    ES-SDM was built for exactly this mixture -- its title is "combines reported peak
+    coordinates and statistical parametric maps" -- and `sdm_parse` looks for `<study>.nii.gz`
+    beside the peak files. It is strict about the header, and refuses the study outright rather
+    than warning: the NIfTI intent must say "t test" and carry the degrees of freedom, and the
+    xform codes must be flagged MNI or Talairach (a fresh header defaults to 'aligned').
+    """
+    template = nib.load(f"{SDM_HOME}/share/sdm_template.nii.gz")
+    img = resample_to_img(masker.inverse_transform(t_values), template,
+                          interpolation="continuous", force_resample=True, copy_header=True)
+    out = nib.Nifti1Image(np.nan_to_num(np.asarray(img.dataobj, dtype=np.float32)),
+                          template.affine)
+    out.header.set_intent("t test", (float(n) - 1.0,), name="")
+    out.header.set_sform(template.affine, code=4)
+    out.header.set_qform(template.affine, code=2)
+    nib.save(out, path)
+
+
+def run_sdm(tables, workdir, images=()):
     """Write SDM's inputs, run pp then mi, and return its coefficient in masker space.
 
-    `tables` is [(name, n, height_z, [(ijk, z), ...]), ...]. SDM's threshold column and peak
-    statistics are t on n - 1 df -- it infers a one-sample design from the absent n2 column --
-    so both are mapped back from z, which is what NiMARE carries.
+    `tables` is [(name, n, height_z, t_map, [(ijk, z), ...]), ...]; `images` names the studies
+    to supply as t maps instead of peak files, so SDM gets exactly the parity CBES gets. Its
+    threshold column and peak statistics are t on n - 1 df -- it infers a one-sample design
+    from the absent n2 column -- so both are mapped back from z, which is what NiMARE carries.
     """
     os.makedirs(workdir, exist_ok=True)
+    images = set(images)
     rows = []
-    for name, n, height, found in tables:
+    for name, n, height, t_map, found in tables:
         dof = n - 1
         rows.append((name, n, float(z_to_t(np.array([height]), dof)[0])))
+        if name in images:
+            write_sdm_t_map(t_map, n, f"{workdir}/{name}.nii.gz")
+            continue
         if not found:
             open(f"{workdir}/{name}.no_peaks.txt", "w").close()
             continue
@@ -193,7 +222,7 @@ if __name__ == "__main__":
             t = mean / np.maximum(sd / np.sqrt(N_PER_STUDY), 1e-9)
             z = np.nan_to_num(t_to_z(t, dof=N_PER_STUDY - 1))
             found, height = report_peaks(z, mask_bool, shape, ZOOMS, scheme=SCHEME, focus=FOCUS)
-            tables.append((f"s{k:02d}", N_PER_STUDY, float(height), found))
+            tables.append((f"s{k:02d}", N_PER_STUDY, float(height), t, found))
 
             meta = {"sample_sizes": [N_PER_STUDY], "reporting_threshold": float(height)}
             analysis = {"id": f"s{k}", "name": "1", "metadata": meta,
@@ -203,8 +232,11 @@ if __name__ == "__main__":
                 var = 1.0 / N_PER_STUDY + g**2 / (2.0 * N_PER_STUDY)
                 donor_g.append(g)
                 donor_v.append(var)
-                os.makedirs(work, exist_ok=True)
-                gp, vp = f"{work}/s{k}_g.nii.gz", f"{work}/s{k}_v.nii.gz"
+                # A directory of its own: `sdm_parse pp` scans its working directory for
+                # `<study>.nii.gz` and would otherwise see CBES's donor maps beside its own.
+                os.makedirs(f"{work}/cbes", exist_ok=True)
+                gp = f"{work}/cbes/s{k}_g.nii.gz"
+                vp = f"{work}/cbes/s{k}_v.nii.gz"
                 nib.save(masker.inverse_transform(g), gp)
                 nib.save(masker.inverse_transform(var), vp)
                 analysis["images"] = [
@@ -222,7 +254,7 @@ if __name__ == "__main__":
             studies.append({"id": f"s{k}", "name": f"s{k}", "metadata": meta,
                             "analyses": [analysis]})
 
-        peaks = sum(len(f) for _, _, _, f in tables)
+        peaks = sum(len(f) for _, _, _, _, f in tables)
         print(f"  split {split + 1}: {peaks} peaks over {N_STUDIES} tables "
               f"({peaks / N_STUDIES:.1f} each), {len(held)} subjects held out", flush=True)
 
@@ -261,7 +293,10 @@ if __name__ == "__main__":
                 force_resample=True, copy_header=True)).ravel())
             print(f"    reusing {reuse}", flush=True)
         else:
-            sdm = None if os.environ.get("SKIP_SDM") else run_sdm(tables, work)
+            # Parity: SDM gets the same studies as maps that CBES does, as t maps rather than
+            # g maps, which is each method's native input for the same information.
+            sdm = None if os.environ.get("SKIP_SDM") else run_sdm(
+                tables, work, images=[f"s{k:02d}" for k in range(N_IMAGES)])
         use = covered & np.isfinite(truth) & np.isfinite(cbes_g)
         if sdm is not None:
             use = use & np.isfinite(sdm) & (sdm != 0)

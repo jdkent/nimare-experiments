@@ -3364,3 +3364,43 @@ run preprocessing". The file is 50 lines and the only dataset-specific field is 
 Also: arguments are **not** space-separated positionals -- `sdm_parse pp gray_matter 1 gray_matter 2`
 joins them into a template name and looks for `cor_gray_matter_1_gray_matter_2_2mm.nii.gz`. Bare
 `pp` defaults correctly, which is what to use.
+
+### With parity -- SDM given the same two images -- it closes half the gap, and the conclusion sharpens
+
+jdkent's point. ES-SDM takes a mixture by design ("combines reported peak coordinates and
+statistical parametric maps"), so the earlier arm was unfair: SDM had 16 thresholded tables while
+CBES had 2 unthresholded maps plus 14 tables. Supplying the same two studies to SDM as t maps
+(`<study>.nii.gz`; it is strict about the header -- intent must be "t test" with dof, and the
+xform codes must be flagged MNI, or it refuses the study silently):
+
+| estimate | r | rank r | AUC | mag ratio | \|est\| top |
+|---|---|---|---|---|---|
+| SDM-PSI, 16 tables (unfair) | +0.563 | +0.454 | 0.845 | 0.21 | 0.096 |
+| **SDM-PSI, 2 img + 14 tab** | **+0.722** | **+0.558** | **0.927** | **0.43** | 0.210 |
+| images only, 2 img | **+0.845** | **+0.576** | **0.973** | **0.85** | 0.394 |
+| CBES g, 2 img + 14 tab | +0.830 | +0.575 | 0.967 | 0.63 | 0.290 |
+| CBES g_marginal | +0.785 | +0.564 | 0.943 | 0.54 | 0.259 |
+
+**Giving SDM the maps closed about half its gap** -- r +0.563 to +0.722, magnitude 0.21 to 0.43 --
+so a large part of the earlier difference was input asymmetry rather than method.
+
+Two conclusions, and the second matters more:
+
+1. **On identical inputs CBES beats SDM-PSI on every metric**, pattern and magnitude: r +0.830
+   against +0.722, AUC 0.967 against 0.927, magnitude 0.63 against 0.43. (rank r +0.575 against
+   +0.558 is inside single-split noise; the r and magnitude gaps are not.)
+
+2. **Both are beaten by pooling the two maps and ignoring all 14 coordinate tables.** Two
+   independent methods, given the same data, both do worse with the tables than without them.
+   That is much stronger evidence for the prevalence-1 finding than CBES alone could be: it is
+   not a quirk of this estimator's censoring term, it is that thresholded coordinate tables carry
+   little that unthresholded maps of the same studies do not already carry -- and both methods
+   pay for reading them.
+
+Caveat: one split. The r and magnitude differences are large enough to trust; the rank
+correlations are not separated.
+
+Contamination checked rather than assumed: CBES's donor g/g_var maps were being written into the
+same directory `sdm_parse pp` scans for `<study>.nii.gz`. Moved to a `cbes/` subdirectory, and the
+SDM input directory verified to hold exactly `s00.nii.gz`, `s01.nii.gz` and `pp`'s own
+`sdm_mask.nii.gz` before the number was believed.
