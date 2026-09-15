@@ -1981,3 +1981,57 @@ square of a noisy quantity. `experiments/image_floor.py` substitutes a draw-inde
 (`1/n` everywhere) and changes nothing else. If that removes the floor the mechanism is not a
 property of this bed: real `g_var` maps carry the g^2 term, so any image pooling that uses them
 inherits it.
+
+### The weight-share model transfers out of sample, and says an image is worth three to five studies
+
+The dilution model `bias(f) = b0 (1-f) / ((1-f) + r f)` was fitted on the twelve-study rows and
+then evaluated at the twenty-four-study image fractions, which the fit never saw. Both channels
+are measured against the all-image arm, since that floor is what an image-only fit lands on.
+
+```
+peak_bias=None   b0 = +0.273 (measured from the coordinates-only arm, not fitted), r = 4.57
+   2 of 12  (fitted)   f=0.167   measured +0.127   predicted +0.125   err +0.002
+   6 of 12  (fitted)   f=0.500   measured +0.027   predicted +0.031   err -0.004
+  12 of 12  (fitted)   f=1.000   measured -0.018   predicted -0.018   err +0.000
+   2 of 24  (HELD OUT) f=0.083   measured +0.163   predicted +0.171   err -0.008
+   6 of 24  (HELD OUT) f=0.250   measured +0.073   predicted +0.086   err -0.013
+
+calibrated       b0 = -0.032 (fitted; no coordinates-only arm exists), r = 3.00
+   2 of 24  (HELD OUT) f=0.083   measured -0.064   predicted -0.047   err -0.017
+   6 of 24  (HELD OUT) f=0.250   measured -0.049   predicted -0.038   err -0.011
+  24 of 24  (HELD OUT) f=1.000   measured -0.022   predicted -0.022   err +0.000
+```
+
+Two things worth keeping.
+
+**`r` is between 3 and 4.6, and it is the same across study count.** One study that shares its
+map carries three to five studies' worth of pooling weight. That is the number to quote when
+someone asks what an image is worth in a mixed collection, and it is far more useful than an
+image *fraction*, because it converts: two images among twenty-two coordinate tables carry about
+as much weight as nine coordinate tables, which is why 2 of 24 still moves the estimate a long
+way.
+
+**The calibrated channel's own residual is `b0 = -0.032`, against +0.273 uncorrected.** So
+reading the scale off the images removes about 88% of the coordinate channel's bias and
+overshoots slightly. That is the honest one-line summary of what `peak_bias_scale="images"`
+buys, and it is a statement about the *correction* rather than about dilution.
+
+I first read the held-out misses as the calibrated configuration behaving qualitatively
+differently, and wrote a task saying it overshoots "nearly twice" what dilution predicts, blaming
+the voxel set the scale is read over. Holding the image fraction fixed instead shows most of it
+is not image-related at all:
+
+```
+                             12 studies  24 studies   shift
+coordinates only, fwhm 10        +0.255      +0.246  -0.009
+coordinates only, fwhm 16        +0.248      +0.243  -0.005
+coordinates only, fwhm 24        +0.249      +0.244  -0.005
+all images, calibrated           -0.018      -0.022  -0.004
+```
+
+About -0.005 of uniform downward drift on doubling the studies, with no images and no
+calibration in play. After crediting dilution and that drift, roughly -0.008 is left that is
+specific to the calibration -- real, but a few standard errors at 100 replications, not a
+different regime. The lesson is narrow and repeatable: when a model misses out of sample, check
+whether the misses are specific to the mechanism you are about to blame, by finding a row where
+that mechanism is switched off.
