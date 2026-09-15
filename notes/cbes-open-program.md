@@ -3307,3 +3307,60 @@ docstring so it does not get re-tried.
 deficit at the 0.4 focus, the se/sd of 1.55 to 3.74, and the HCP magnitude at 0.63 -- all point at
 one thing: `P(report | mu) = P(|g| >= c | mu)` is too high because a paper reports a local
 maximum, not any exceedance. Fixing that is now the single highest-value change to the estimator.
+
+## SDM-PSI vs CBES on HCP, refereed by subjects neither saw: the pain result reverses completely
+
+MOTOR_LH. 480 subjects cut into 16 synthetic studies of 30; coordinates extracted the way papers
+produce them (14.4 peaks per table); **306 subjects used to make no coordinate at all** give the
+truth. SDM gets all 16 tables (config + `pp` + `mi`, 87 s of MLE); CBES gets 2 of the studies as
+g/g_var images and the other 14 as tables; `images only` is those 2 maps pooled.
+
+| estimate | r | rank r | AUC | mag ratio | \|est\| top | \|ref\| top |
+|---|---|---|---|---|---|---|
+| SDM-PSI coeff (16 tables) | +0.563 | +0.454 | 0.845 | **0.21** | 0.096 | 0.446 |
+| images only (2 images) | **+0.845** | **+0.576** | **0.973** | **0.85** | 0.394 | 0.446 |
+| CBES g (2 img + 14 tab) | +0.830 | +0.575 | 0.967 | 0.63 | 0.290 | 0.446 |
+| CBES g_marginal | +0.785 | +0.564 | 0.943 | 0.54 | 0.259 | 0.446 |
+
+**The confounded pain comparison had SDM at r +0.689 against CBES's +0.358. On a clean reference
+it is +0.563 against +0.830 -- reversed.** So the retraction was right, and the clean number is
+more favourable to CBES on pattern than I had allowed for. SDM's magnitude is 4.8x low (0.21);
+CBES's 1.6x (0.63).
+
+### But the honest reading is not "CBES beats SDM"
+
+The inputs differ by what each method requires. CBES has **two unthresholded maps of 30 subjects
+each**; SDM has sixteen thresholded coordinate tables. And `images only` -- those same two maps,
+no coordinates at all -- beats both on every metric. So what this bed shows is:
+
+  * two shared maps carry essentially everything,
+  * sixteen coordinate tables through SDM are far behind two shared maps,
+  * and the coordinate channel adds nothing to the pattern on top of the maps while costing
+    magnitude (0.63 against 0.85).
+
+The last point is the HCP prevalence-1 regime already recorded above, not a new fact.
+
+### What would make this a fair method comparison
+
+Give SDM and CBES the same number of *studies* and let each use them as its model requires, with
+the image count swept: at 1, 2, 5, 10 images CBES's advantage should shrink toward SDM's as the
+maps thin out, and the crossing point is the practically useful number. One SDM run per
+configuration is ~2-3 minutes of `mi` plus `pp` on this bed, so a sweep is affordable now that
+the CLI works.
+
+### The SDM CLI recipe, since it cost hours to find
+
+`pp` does **not** write the configuration `mi` needs -- the GUI writes `sdmpsi_params.xml`, and
+without it `mi` aborts with "Couldn't load configuration file. Please check that you've already
+run preprocessing". The file is 50 lines and the only dataset-specific field is `nStudies`
+(`nImputs` and `VoxelsMask` may be left at 0). So:
+
+  1. write `sdm_table.txt` (study, n1, t_thr) plus `<study>.spm_mni.txt` of `x,y,z,t`, or
+     `<study>.no_peaks.txt` for a study that reported nothing
+  2. write `sdmpsi_params.xml`
+  3. `sdm_parse pp`   (~15 min on 21 studies at 2 mm; faster here)
+  4. `sdm_parse mi`   -> `analysis_MyMean/mi/coeff.nii.gz`, `tau2.nii.gz`, `mle_report.txt`
+
+Also: arguments are **not** space-separated positionals -- `sdm_parse pp gray_matter 1 gray_matter 2`
+joins them into a template name and looks for `cor_gray_matter_1_gray_matter_2_2mm.nii.gz`. Bare
+`pp` defaults correctly, which is what to use.

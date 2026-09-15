@@ -228,12 +228,9 @@ if __name__ == "__main__":
 
         collection = Studyset({"id": "hcp", "name": "hcp", "studies": studies},
                               target=None, mask=mask_img)
-        # A plain Tobit fixes the prevalence at 1, which is the truth here by construction.
-        # Whether that helps is the question: it removes the "no effect" escape, so every
-        # silence must be explained by a small mu instead.
-        tobit = np.abs(CBES(mask=masker, null_method="none", selection_model="tobit",
-                            threshold="reporting_threshold").fit(collection)
-                       .get_map("g", return_type="array").ravel())
+        # The plain-Tobit arm (prevalence pinned at 1) was measured here and was *worse* --
+        # 0.60 against 0.63 -- so the option was reverted from the estimator rather than
+        # shipped. See notes: the censoring term over-shrinks mu whatever the prevalence does.
         result = CBES(mask=masker, null_method="none",
                       threshold="reporting_threshold").fit(collection)
         cbes_g = np.abs(result.get_map("g", return_type="array").ravel())
@@ -255,12 +252,20 @@ if __name__ == "__main__":
 
         # SDM is ~15 min of pp plus the imputations per split, so the rest of the pipeline is
         # debuggable without it.
-        sdm = None if os.environ.get("SKIP_SDM") else run_sdm(tables, work)
+        # A coefficient already computed for this split can be reused: an SDM run is minutes
+        # of pp plus the imputations, and the split is reproducible from the seed.
+        reuse = os.environ.get("REUSE_SDM")
+        if reuse and os.path.exists(reuse):
+            sdm = np.abs(masker.transform(resample_to_img(
+                nib.load(reuse), mask_img, interpolation="continuous",
+                force_resample=True, copy_header=True)).ravel())
+            print(f"    reusing {reuse}", flush=True)
+        else:
+            sdm = None if os.environ.get("SKIP_SDM") else run_sdm(tables, work)
         use = covered & np.isfinite(truth) & np.isfinite(cbes_g)
         if sdm is not None:
             use = use & np.isfinite(sdm) & (sdm != 0)
-        arms = [("images only", images_only), ("CBES g", cbes_g),
-                ("CBES g, tobit", tobit)]
+        arms = [("images only", images_only), ("CBES g", cbes_g)]
         if cbes_m is not None:
             arms.append(("CBES g_marginal", cbes_m))
         if sdm is not None:
@@ -273,8 +278,7 @@ if __name__ == "__main__":
 
     print(f"\n{'estimate':>18} {'r':>7} {'rank r':>7} {'AUC':>6} {'mag ratio':>10} "
           f"{'|est| top':>10} {'|ref| top':>10}")
-    for name in ("SDM-PSI coeff", "images only", "CBES g", "CBES g, tobit",
-                 "CBES g_marginal"):
+    for name in ("SDM-PSI coeff", "images only", "CBES g", "CBES g_marginal"):
         if name not in rows:
             continue
         r, rho, auc, ratio, top_est, top_ref = np.nanmean(np.array(rows[name]), axis=0)
