@@ -2737,3 +2737,82 @@ assuming they did would have silently mis-scaled every silence in the model.
 
 Both designs now match the old path to 0.000e+00. The habit that caught it is the one already in
 `PROTOCOL.md`: name the check that would show the change is wrong, and run it before moving on.
+
+## The redesign around the coordinate channel's silence -- and the limb that was missing
+
+Shipped. `nimare/meta/cbma/effectsize.py` 3784 -> ~2600 lines. Removed: `fwhm`, the spatial
+kernel, `peak_bias`, `peak_bias_scale`, `stat_column`, `kernel_min_weight`, `use_images`,
+`g_relative`, `g_absolute`, `scale_interval_`, `peak_information_`, threshold inference
+(`study-min`/`pooled-min`), `permute-magnitudes`, and ~20 helper functions. Images are now
+**required**; a coordinates-only collection is refused rather than returned as zeros.
+
+### Two defects found by measuring rather than by reading
+
+**1. The cutoff was left on the z scale, which took the whole channel inert.** The z->g
+conversion of each study's reporting threshold lived inside `_apply_peak_bias`, which the
+surgery deleted. A z of 3.29 is about 18 sampling standard deviations at N = 30, so
+`prob_silent_null` saturated at 1 and the censoring term said nothing at any `mu`. Caught
+because a test asserting `threshold=2.5` differs from `threshold=5.0` returned values
+identical to eight decimals. Reinstated as `reporting_cutoff_to_g`, whose docstring carries
+the assumed-dof sensitivity table (3.30 -> 0.653 at df=29 against 0.604 at df=1000).
+
+**2. Dropping the *report* limb of the indicator biases `mu` down past the threshold.** The
+silent pairs were the only evidence about the reporting indicator, so the model read the
+observed silence fraction against a denominator excluding every study that reported.
+
+The three arms, field simulator, truth known exactly, 6 seeds, true g = 0.5 at the focus,
+study cutoffs ~0.6 g, stratified because 9204 of 9261 voxels have truth < 0.05:
+
+| arm | rmse truth<0.05 | rmse 0.05-0.25 | rmse truth>=0.25 | bias truth>=0.25 | g at focus |
+|---|---|---|---|---|---|
+| images only            | 0.120 | 0.095 | 0.112 | +0.038 | 0.544 |
+| silence only           | 0.108 | 0.076 | 0.091 | -0.060 | 0.352 |
+| **+ report at the named voxel** | 0.114 | 0.076 | **0.074** | **-0.042** | **0.444** |
+| + report over the 20 mm sphere | 0.457 | 0.343 | 0.119 | +0.097 | 0.457 |
+
+**The asymmetry is the finding.** A silence is a statement about a neighbourhood -- nothing
+within the radius cleared the cut. A report is a statement about *one voxel*, because a
+reported peak is a local maximum selected for being large and displaced from where the effect
+is. Asserting it across the sphere is catastrophic (rmse 0.457). Asserting it at the named
+voxel only is the design.
+
+**A non-spatial testbed cannot see this.** A one-voxel grid-search likelihood said "restore
+the limb" unconditionally -- mean mu 0.351 -> 0.524 for a true 0.500, rmse 0.192 -> 0.129 --
+and has no radius to get wrong. Logged against the calibration rule in CLAUDE.md: the 0-D bed
+cannot speak to anything that turns on the extent over which an event is asserted.
+
+### Real data, NIDM pain, 21 studies, 8 paired splits, held-out half as truth
+
+Coordinates extracted the way papers produce them (cluster-forming cut, whole clusters,
+one focus per cluster).
+
+| estimate | r | rank r | AUC | bias | at top | rmse |
+|---|---|---|---|---|---|---|
+| images only, pooled     | +0.621 | +0.484 | 0.893 | +0.136 | +0.137 | 0.269 |
+| CBES, silence off       | +0.633 | +0.499 | 0.899 | +0.142 | +0.155 | 0.272 |
+| **CBES `g`**            | +0.579 | +0.486 | 0.889 | **+0.075** | **-0.065** | **0.210** |
+| CBES `g_marginal`       | +0.536 | +0.458 | 0.861 | -0.004 | -0.226 | 0.191 |
+
+rmse -22% (paired p = 0.0003), bias -45% (p < 0.0001), and the +0.137 overestimate at the
+strongest voxels becomes a slight under. rank r +0.002 (p = 0.90) and AUC -0.004 (p = 0.32)
+are unmoved; Pearson r costs 0.042 (p = 0.017). **The channel corrects the level and leaves
+the ordering alone.** That is the same split as before -- images win the pattern, the
+censoring wins the level -- but the level is now much better rather than slightly worse.
+
+### jdkent's design point, confirmed
+
+"The shrinkage shouldn't be to 0, but underneath the estimated threshold." Correct, and it is
+what the model does once the cutoff is on the right scale: `mu` is pushed down only as far as
+the silences carry it, toward the cut rather than toward nothing. The pull toward zero comes
+through `pi` -- `g_marginal` is the better map where nothing was reported (bias +0.056 against
++0.095 for the images alone) and the worse one where an effect exists (-0.096).
+
+### Also shipped
+
+`create_effect_size_coordinate_studyset(n_image_studies=k, image_dir=...)`. Without it there
+is no way to simulate a valid CBES input at all, since images are now required. Writes
+`g`/`g_var` for the first k studies from the same field draw that produced their peaks, so the
+two channels are consistent. Requires `simulate_field=True`.
+
+Test file rewritten from scratch: 105 tests -> 64, all passing, organised around what each
+channel does rather than around the deleted parameters.
