@@ -1145,3 +1145,34 @@ without asking what in the harness could produce it. The one-minute check here w
 `study-min` infer when every value is identical", and it is the same class of check that the
 statistic-convention bug needed. Twice in one session, the input path was the problem and I
 looked at the model.
+
+### 23b. The real-data check at full strength
+
+NIDM pain, 21 studies, cluster-extent reporting with one max-statistic focus per cluster, 10
+splits, one half supplying coordinates and the other half the inverse-variance-pooled reference:
+
+```
+height input        r(g,truth)   rank r  AUC top  g/truth  r(pi,truth)
+as reported              0.230    0.216    0.653     4.50        0.201
+study-flattened          0.023    0.033    0.491     4.52        0.338
+all-flattened            0.044    0.012    0.483     4.82        0.254
+
+  study-flattened   r changes -0.2067  (sd 0.0759, paired p 0.000)
+  all-flattened     r changes -0.1860  (sd 0.1095, paired p 0.000)
+```
+
+Unambiguous. Flattening the reported heights takes the map from a modest but real signal to
+nothing: correlation 0.230 to 0.04, and the AUC for the truth's top decile from 0.653 to 0.48 --
+chance, or a shade under it. Both at paired p < 0.001 over ten splits.
+
+So the reported magnitudes are carrying essentially all of this fit's ability to localise on real
+data. That is the opposite of what section 23 concluded from simulation, and it is the stronger
+evidence: real reporting, a held-out reference, the real threshold handed in.
+
+One thing to notice rather than pass over: `r(prevalence, truth)` *rises* when the heights are
+flattened, 0.201 to 0.338. Prevalence is the count-driven output, and removing the height
+information seems to stop it competing with the magnitude for the same variation. That is a small
+hint that the two outputs want different treatment of the same input, and it is consistent with
+the threshold trade-off found separately -- but it is one number on one collection and I am
+recording it as a lead, not a finding, having just been burned by exactly this kind of
+single-source result.

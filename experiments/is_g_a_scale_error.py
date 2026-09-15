@@ -24,6 +24,7 @@ import nibabel as nib
 from scipy import ndimage, stats
 from joblib import Parallel, delayed
 from nimare.meta.cbma import CBES
+from nimare.meta.cbma.effectsize import peak_stat_to_hedges_g
 from nimare.studyset import Studyset
 import reporting
 
@@ -51,28 +52,33 @@ TRUTH = truth_field()
 TRUE_AT = np.array([TRUTH[s] for s in SITE_IJK])
 
 
-def one(seed, n_image):
+def one(seed, n_image, threshold=3.2905267314919255):
     rng = np.random.default_rng(seed)
     studies, reported = [], 0
     for k in range(N_STUDIES):
         n = int(rng.integers(20, 41))
-        noise = ndimage.gaussian_filter(rng.standard_normal(SHAPE), SMOOTH_VOX)
-        noise *= 1.0 / (noise.std() + 1e-12)
-        gmap = TRUTH + noise / np.sqrt(n)
-        foci, _ = reporting.report_peaks((gmap * np.sqrt(n))[MASK_BOOL], MASK_BOOL, SHAPE,
+        # A genuine t on n - 1 degrees of freedom, which is what the estimator's conversion
+        # assumes a reported statistic to be; the donor image is the effect-size map that same
+        # t implies, through the estimator's own conversion, so both arms share one convention.
+        t_map = reporting.study_t_field(TRUTH, n, SMOOTH_VOX, rng, shape=SHAPE)
+        flat = t_map.ravel()
+        g_flat, var_flat = peak_stat_to_hedges_g(
+            flat, np.full(flat.size, float(n)), stat_type="t", design="one-sample")
+        gmap, varmap = g_flat.reshape(SHAPE), var_flat.reshape(SHAPE)
+        foci, _ = reporting.report_peaks(t_map[MASK_BOOL], MASK_BOOL, SHAPE,
                                          ZOOMS, "cluster", "max")
         reported += bool(foci)
         meta = {"sample_sizes": [n]}
         analysis = {"id": f"s{k}-1", "name": "1", "metadata": meta, "points": [
             {"space": "MNI",
              "coordinates": [float(v) for v in nib.affines.apply_affine(AFF, ijk)],
-             "values": [{"kind": "Z", "value": float(zv)}]} for ijk, zv in foci]}
+             "values": [{"kind": "T", "value": float(zv)}]} for ijk, zv in foci]}
         if k < n_image:
             tag = f"g{seed}_{n_image}_{k}"
             gp = f"/tmp/claude-0/cov_imgs/{tag}_g.nii.gz"
             vp = f"/tmp/claude-0/cov_imgs/{tag}_v.nii.gz"
             nib.save(nib.Nifti1Image(gmap.astype(np.float32), AFF), gp)
-            nib.save(nib.Nifti1Image(np.full(SHAPE, 1.0 / n, np.float32), AFF), vp)
+            nib.save(nib.Nifti1Image(varmap.astype(np.float32), AFF), vp)
             analysis["images"] = [
                 {"url": gp, "filename": "g.nii.gz", "space": "MNI", "value_type": "g"},
                 {"url": vp, "filename": "v.nii.gz", "space": "MNI", "value_type": "g_var"}]
@@ -80,14 +86,19 @@ def one(seed, n_image):
                         "analyses": [analysis]})
     if reported < 2:
         return None
-    est = CBES(fwhm=10.0, mask=MASK, null_method="none", use_images=n_image > 0, peak_bias=None)
+    est = CBES(fwhm=10.0, mask=MASK, null_method="none", use_images=n_image > 0,
+               peak_bias=None, threshold=threshold)
     res = est.fit(Studyset({"id": "w", "name": "w", "studies": studies}, target=None, mask=MASK))
     g = res.get_map("g", return_type="array").ravel()
     return np.array([g[int(np.ravel_multi_index(s, SHAPE))] for s in SITE_IJK])
 
 
 if __name__ == "__main__":
-    print(f"{N_STUDIES} studies, {N_SIMS} replications, five sites")
+    reporting.assert_statistic_convention(
+        reporting.study_t_field(np.zeros(SHAPE), 30, SMOOTH_VOX,
+                                np.random.default_rng(11), shape=SHAPE), 30, "T")
+    print("statistic convention check passed: studies report a t on n - 1 degrees of freedom")
+    print(f"{N_STUDIES} studies, {N_SIMS} replications, five sites, threshold supplied")
     print("true g at the sites:", " ".join(f"{v:.3f}" for v in TRUE_AT), "\n")
     for n_image in (0, 2, 12):
         rows = [r for r in Parallel(n_jobs=8)(delayed(one)(s, n_image) for s in range(N_SIMS))
