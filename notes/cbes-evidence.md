@@ -1019,3 +1019,83 @@ def _censoring_terms(mu, cutoff_scaled, twice_cutoff_scaled, inv_sigma, inv_sigm
         reported, and over-shrinks. Where the truth is largest that cost 0.091 of rmse against
         0.074 and -0.060 of bias against -0.042.
 ```
+
+
+---
+
+## `_hartung_knapp_se`, removed
+
+Reachable only with `selection_model="none"`, which makes the coordinate tables inert -- so it only ever corrected the standard error of a plain image-based random-effects fit, a correction `nimare.meta.ibma` already offers as `small_sample_correction='knapp-hartung'`. Kept here in case the derivation is wanted again.
+
+```python
+def _hartung_knapp_se(*, g_hat, sum_a, sum_a_g2, n_eff, covered, fallback):
+    r"""Hartung-Knapp-Sidik-Jonkman standard error of a kernel-weighted pooled estimate.
+
+    The model-based SE treats :math:`\hat{\tau}^2` as if it were the true heterogeneity, so its
+    intervals are too short exactly when heterogeneity is large and the studies are few. HKSJ
+    replaces it with the weighted spread of the studies about the pooled value,
+
+    .. math::
+
+        \mathrm{SE}^2 = \frac{\sum_k a_k (g_k - \hat{g})^2}{(k_{\mathrm{eff}} - 1)\sum_k a_k},
+        \qquad a_k = \frac{w_k}{s^2_k + \tau^2},
+
+    on :math:`k_{\mathrm{eff}} - 1` degrees of freedom, which gives much better interval
+    coverage than the model SE when heterogeneity is large and the studies are few.
+
+    :math:`k_{\mathrm{eff}}` is Kish's :math:`(\sum w)^2 / \sum w^2` -- the ``n_eff`` map --
+    and not :math:`\sum w`. The two agree when every weight is one, but only Kish's form is
+    invariant to rescaling the weights: at a voxel reached only by distant foci the weights sum
+    to less than one, and using that as a study count sends the degrees of freedom to zero.
+    Voxels with no effective spread to measure keep the model-based value.
+    """
+    se = np.array(fallback, dtype=float, copy=True)
+    usable = covered & (n_eff > 1.0) & (sum_a > 0)
+    if not np.any(usable):
+        return se
+    # sum a (g - ghat)^2, from the identity noted at the call site. Clipped at zero: the two
+    # terms are close where the studies agree, so rounding can make the difference negative.
+    residual = np.clip(sum_a_g2[usable] - g_hat[usable] ** 2 * sum_a[usable], 0.0, None)
+    se[usable] = np.sqrt(residual / ((n_eff[usable] - 1.0) * sum_a[usable]))
+    return se
+```
+
+
+---
+
+## `_hartung_knapp_se`, removed
+
+Reachable only with `selection_model="none"`, which makes the coordinate tables inert -- so it only ever corrected the standard error of a plain image-based random-effects fit, a correction `nimare.meta.ibma` already offers as `small_sample_correction='knapp-hartung'`.
+
+```python
+def _hartung_knapp_se(*, g_hat, sum_a, sum_a_g2, n_eff, covered, fallback):
+    r"""Hartung-Knapp-Sidik-Jonkman standard error of a kernel-weighted pooled estimate.
+
+    The model-based SE treats :math:`\hat{\tau}^2` as if it were the true heterogeneity, so its
+    intervals are too short exactly when heterogeneity is large and the studies are few. HKSJ
+    replaces it with the weighted spread of the studies about the pooled value,
+
+    .. math::
+
+        \mathrm{SE}^2 = \frac{\sum_k a_k (g_k - \hat{g})^2}{(k_{\mathrm{eff}} - 1)\sum_k a_k},
+        \qquad a_k = \frac{w_k}{s^2_k + \tau^2},
+
+    on :math:`k_{\mathrm{eff}} - 1` degrees of freedom, which gives much better interval
+    coverage than the model SE when heterogeneity is large and the studies are few.
+
+    :math:`k_{\mathrm{eff}}` is Kish's :math:`(\sum w)^2 / \sum w^2` -- the ``n_eff`` map --
+    and not :math:`\sum w`. The two agree when every weight is one, but only Kish's form is
+    invariant to rescaling the weights: at a voxel reached only by distant foci the weights sum
+    to less than one, and using that as a study count sends the degrees of freedom to zero.
+    Voxels with no effective spread to measure keep the model-based value.
+    """
+    se = np.array(fallback, dtype=float, copy=True)
+    usable = covered & (n_eff > 1.0) & (sum_a > 0)
+    if not np.any(usable):
+        return se
+    # sum a (g - ghat)^2, from the identity noted at the call site. Clipped at zero: the two
+    # terms are close where the studies agree, so rounding can make the difference negative.
+    residual = np.clip(sum_a_g2[usable] - g_hat[usable] ** 2 * sum_a[usable], 0.0, None)
+    se[usable] = np.sqrt(residual / ((n_eff[usable] - 1.0) * sum_a[usable]))
+    return se
+```
