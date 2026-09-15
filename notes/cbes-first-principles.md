@@ -126,3 +126,44 @@ of foci has to be modelled too.
 
 None of these is a reason not to try. They are the things a validation plan has to cover, and
 Part B of the requirements document already covers most of them.
+
+---
+
+## 9. Testing section 2, and finding it half wrong
+
+`intensity_vs_height.py` builds three signals from the *same* coordinate tables and scores each
+against held-out HCP subjects: the kernel-weighted mean of the reported effect sizes, which is
+what `g` is built from; the number of distinct studies with a focus within a radius, which is the
+intensity and what `prevalence` approximates; and the raw foci count.
+
+| design | scheme | signal | r, covered | r, top decile |
+| --- | --- | --- | --- | --- |
+| 20 x 16 | cluster | height | +0.226 | +0.540 |
+| 20 x 16 | cluster | study count, 10 mm | **+0.604** | +0.552 |
+| 30 x 12 | cluster | height | +0.305 | +0.504 |
+| 30 x 12 | cluster | study count, 10 mm | **+0.544** | +0.520 |
+| 20 x 16 | FDR | height | **+0.625** | +0.749 |
+| 20 x 16 | FDR | study count, 10 mm | +0.422 | +0.024 |
+| 30 x 12 | FDR | height | **+0.647** | +0.707 |
+| 30 x 12 | FDR | study count, 10 mm | −0.011 | +0.114 |
+
+**Section 2's claim is regime-dependent, not general.** Under cluster-extent reporting, about six
+foci per study, the count beats the height by roughly 2.5-fold, as claimed. Under FDR, two to
+three hundred foci per study at a cut near 2.7, the height wins decisively and the count collapses
+to zero or below.
+
+The mechanism is saturation. Sparse, selective reporting places a focus only where the effect is
+strong, so location carries the signal while the heights sit near the peak of whatever cluster
+they came from and carry almost nothing. Permissive reporting places foci nearly everywhere, so
+the count stops discriminating effect from region size, while the heights now span a real range.
+
+The corrected statement is not "the information is in the intensity" but **which channel carries
+the information is set by the detection function**. That is the quantity Ogata and Katsura
+estimate rather than assume, and it is the argument for fitting a detection curve instead of
+choosing a channel: the curve says how to weight the two.
+
+A second result needs following up. Under cluster reporting a plain count of studies reporting
+within 10 mm reaches +0.604, against +0.427 for CBES's `g` and +0.542 for `pi * g` on the same
+design. The splits differ, so this is approximate, but the gap is large enough that a matched
+comparison is owed -- and if it holds, the magnitude map is being beaten by a convergence map on
+the very quantity it exists to estimate.
