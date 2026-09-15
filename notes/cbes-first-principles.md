@@ -972,3 +972,61 @@ existing magnitude caveats, and allow an explicit per-study df in the metadata s
 knows it is not forced to let the sample size stand in. A study reporting a *t* is unaffected --
 the conversion from t is direct -- which is a small argument for preferring `stat_column="t_stat"`
 where a collection offers both.
+
+## 22. What `prevalence` actually computes: the reporting fraction, inflated by explicable silence
+
+Measured directly on the estimator's own EM at a single voxel, with 6 studies reporting and 6
+covered-but-silent, so the naive reporting fraction is exactly 0.500. Only the *height* of the
+reported values moves, against a fixed cutoff of 0.55 on the g scale:
+
+```
+reported g   fitted mu   fitted pi   pi - 0.500
+      0.60       0.489       1.000       +0.500
+      0.70       0.559       0.964       +0.464
+      0.90       0.885       0.518       +0.018
+      1.10       1.099       0.501       +0.001
+      1.50       1.500       0.500       +0.000
+```
+
+So `prevalence` is one quantity with one deformation:
+
+> **`prevalence` is the fraction of covering studies that reported, inflated by however much of
+> the silence the censoring term can explain** -- and how much it can explain is governed entirely
+> by where the fitted magnitude sits relative to the reporting threshold.
+
+When the fitted effect sits just above the cut, a study that had it could plausibly have missed
+it, so all the silence is attributed to censoring and the prevalence goes to 1. When the effect
+is far above the cut, silence cannot be explained that way, the censoring term has nothing to do,
+and the prevalence collapses exactly onto the naive fraction. There is no third behaviour.
+
+This single mechanism unifies results that were recorded separately as four puzzles:
+
+1. **`prevalence` near 1 at strongly reported sites.** 0.994 in the coverage bed at a site with
+   peak z 4.4; 0.996-1.000 in the marginal-cancellation bed at its dense site. Those are the
+   *far above the cut* row -- except that there nearly every study reports, so the naive fraction
+   is itself near 1 and the two coincide. At a strong site the prevalence is not measuring
+   prevalence; it is reporting that everybody reported.
+2. **The floor at weak effects and the non-monotonicity in between.** Weak effects put the fitted
+   magnitude near the cut, which is the *inflate everything to 1* row, while the naive fraction
+   it starts from is tiny. The fitted value is a product of a small fraction and a large,
+   unstable inflation factor, and a product like that is not monotone in anything.
+3. **Why the censored likelihood beats the naive count on bias but loses on order.** It *is* the
+   naive count times a correction. The correction is right on average -- hence the threefold
+   improvement in bias -- and it is estimated from where the magnitude sits relative to the cut,
+   which is the weakest thing in the model. So it adds a noisy multiplicative factor to a
+   well-ordered quantity, which is precisely the way to preserve the mean and destroy the
+   ranking. 42% exact ordering against the count's 80% is not a mystery; it is arithmetic.
+4. **Why `g_marginal` works, at last stated correctly.** Far above the cut, `pi` equals the
+   reporting fraction, so `g_marginal = g * (fraction of studies that reported here)`. It is an
+   inflated magnitude shrunk by the observed reporting rate. That is neither "two biases
+   cancelling" nor "averaging over studies without the effect" -- it is magnitude times an
+   empirical reporting probability, which puts it in the same family as the reporting probability
+   proposed in section 19, and explains why it is the best-behaved magnitude map here: the
+   product of a badly identified factor and a well-measured one is carried by the well-measured
+   one.
+
+The practical consequence is a diagnostic rather than a fix. The quantity a user needs alongside
+`prevalence` is `(mu_hat - cutoff) / sigma` -- how far the fitted effect sits above the reporting
+threshold in that study's own units. Large means "this is the reporting fraction, read it as
+one"; near zero means "this is the reporting fraction times an inflation the data barely
+constrain". Both are computable from what the fit already holds.
