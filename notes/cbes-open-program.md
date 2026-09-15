@@ -4418,3 +4418,57 @@ simulation run is in flight.
 **The PR description now says this is in progress rather than carrying the stale figures**, which
 is the part that mattered: a reviewer reading them would have been assessing an estimator that no
 longer exists.
+
+## SDM has never run on NeuroVault, and on the cached collection it cannot
+
+jdkent asked whether a NeuroVault-based studyset had been included in the SDM-PSI comparison. It
+had not: SDM had been run on HCP (2 images) and on NIDM pain (1 image, published tables) only.
+Writing `animal_sdm_vs_cbes.py` to close that produced a more useful answer than the comparison
+would have.
+
+**All six splits were skipped for want of studies.** Diagnosing it rather than tuning around it:
+
+```
+11 animal studies; peaks per study by scheme
+   study  max|z|  cluster    fdr    fwe
+    8836    3.89        0      0      0
+    8838    0.70        0      0      0
+    ...
+   TOTAL                0      0      0
+```
+
+**Zero peaks, every scheme, every study.** Seven of eleven have a whole-map maximum below 2.
+
+Suspecting the harness first, the derived z maps were checked against NeuroVault's own raw t maps
+for the same collections: 5.23 -> 4.23, 4.63 -> 3.80, 1.73 -> 1.61, the shrinkage being the t-to-z
+map at df ~ 19. The conversion is sound. **The collection is genuinely weak** -- no study in it
+would have printed a single focus in a paper -- so it cannot support *any* coordinate-based
+method, and the absence of an SDM arm there is a property of the data.
+
+### Which reopens #31, the NeuroVault validation recorded as complete
+
+`convergence_second_collection.py` extracts with the same `report_peaks` call, so it should
+produce nothing now. Run: **zero splits for every arm** -- `CBES g`, `g_marginal`, `prevalence`,
+ALE, MKDA density and KDA all blank. It then prints its concluding paragraph about the pain
+ordering underneath, which is exactly how an empty result gets read as a finding.
+
+The reason the validation ever produced numbers is in the older script it grew from.
+`second_collection.py` thresholds with `ImagesToCoordinates(z_threshold=U)` at `U = 3.2905` --
+**a bare uncorrected height, no multiplicity correction and no extent test**, which the standing
+protocol forbids in as many words. Under that rule exactly 3 of 11 studies report at all, one of
+them a single voxel:
+
+```
+study 8836: 74 suprathreshold voxels (max |z| 4.23)
+study 8893:  1 suprathreshold voxel  (max |z| 3.44)
+study 8962: 31 suprathreshold voxels (max |z| 3.80)
+```
+
+So the one NeuroVault real-data validation in this program **rests on an extraction the protocol
+forbids, on three studies, and cannot be redone compliantly on this collection.** #31 should not
+be counted as a NeuroVault validation. What remains is pain -- the only bed with transcribed
+tables -- and HCP, whose tables are extracted but whose signal is strong enough to survive
+correction.
+
+To get a real NeuroVault arm would need a different collection: studies whose maps actually clear
+a corrected threshold. That is a fetch over the network and a new selection step, not a rerun.
