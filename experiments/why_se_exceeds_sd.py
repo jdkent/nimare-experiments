@@ -71,21 +71,31 @@ def one(seed, n_studies, n_image, tau, tau2_method):
 
 
 if __name__ == "__main__":
-    print(f"truth {bed.TRUE_G:.3f}; {N} replications; 12 studies, 6 image donors")
-    print(f"{'true tau':>9s} {'tau2 est':>9s} {'fitted tau2':>12s} {'mean se':>8s} {'sd':>7s} "
-          f"{'se/sd':>6s} {'bias':>8s} {'cover':>6s}")
-    for tau in (0.0, 0.3):
-        for method in ("dl", "none"):
-            rows = [r for r in Parallel(n_jobs=4)(
-                delayed(one)(s, 12, 6, tau, method) for s in range(N)) if r is not None]
-            g = np.array([r[0] for r in rows]); se = np.array([r[1] for r in rows])
-            t2 = np.array([r[2] for r in rows], dtype=float)
-            ok = np.isfinite(g) & np.isfinite(se) & (se > 0)
-            sd = g[ok].std(ddof=1)
-            cover = np.mean((g[ok] - 1.96*se[ok] <= bed.TRUE_G)
-                            & (bed.TRUE_G <= g[ok] + 1.96*se[ok]))
-            print(f"{tau:9.2f} {method:>9s} {np.nanmean(t2):12.4f} {se[ok].mean():8.3f} "
-                  f"{sd:7.3f} {se[ok].mean()/sd:6.2f} {g[ok].mean()-bed.TRUE_G:+8.3f} "
-                  f"{cover:6.2f}  (n={ok.sum()}, true tau2 {tau**2:.4f})", flush=True)
-    print("\nThe prediction is a positive fitted tau2 at true tau = 0 large enough to account for")
-    print("the excess width, and se/sd near 1 in the tau2_method='none' row at tau = 0.")
+    print(f"truth {bed.TRUE_G:.3f}; {N} replications; 12 studies")
+    # The coordinates-only arm is included because that is where the excess width is largest --
+    # se/sd 2.14 against 1.26 with six donors -- so it is where a wrong variance model shows
+    # most clearly. An earlier version of this script measured only the six-donor arm.
+    print(f"{'donors':>7s} {'true tau':>9s} {'tau2 est':>9s} {'fitted tau2':>12s} "
+          f"{'mean se':>8s} {'sd':>7s} {'se/sd':>6s} {'bias':>8s} {'cover':>6s}")
+    for n_image in (0, 6):
+        for tau in (0.0, 0.3):
+            for method in ("dl", "none"):
+                rows = [r for r in Parallel(n_jobs=4)(
+                    delayed(one)(s, 12, n_image, tau, method) for s in range(N))
+                    if r is not None]
+                g = np.array([r[0] for r in rows]); se = np.array([r[1] for r in rows])
+                t2 = np.array([r[2] for r in rows], dtype=float)
+                ok = np.isfinite(g) & np.isfinite(se) & (se > 0)
+                sd = g[ok].std(ddof=1)
+                cover = np.mean((g[ok] - 1.96*se[ok] <= bed.TRUE_G)
+                                & (bed.TRUE_G <= g[ok] + 1.96*se[ok]))
+                print(f"{n_image:7d} {tau:9.2f} {method:>9s} {np.nanmean(t2):12.4f} "
+                      f"{se[ok].mean():8.3f} {sd:7.3f} {se[ok].mean()/sd:6.2f} "
+                      f"{g[ok].mean()-bed.TRUE_G:+8.3f} "
+                      f"{cover:6.2f}  (n={ok.sum()}, true tau2 {tau**2:.4f})", flush=True)
+    print("\nThe prediction has a number attached. Coordinates-only, se is 0.171 against an")
+    print("actual spread of 0.080, so the reported variance is 0.0292 against 0.0064 -- an excess")
+    print("of 0.0228. Heterogeneity enters the mean's variance as roughly tau2 / k_eff with")
+    print("k_eff about 5.5, so truncation explains the whole gap only if fitted tau2 comes out")
+    print("near 0.12 when the truth is 0. Much smaller than that and something else carries most")
+    print("of the excess, and tau2_method='none' will not bring se/sd to 1.")
