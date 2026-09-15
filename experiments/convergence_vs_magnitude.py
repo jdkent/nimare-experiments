@@ -113,7 +113,8 @@ if __name__ == "__main__":
     print("Scored on localisation only: a convergence statistic has no effect-size scale.\n")
 
     names = ("CBES g", "CBES g_marginal", "CBES prevalence", "ALE", "MKDA density", "KDA")
-    rows = {k: [] for k in names}
+    SETS = ("CBES coverage", "whole mask")
+    rows = {(s_, k): [] for s_ in SETS for k in names}
     rng = np.random.default_rng(0)
     for _ in range(N_SPLITS):
         order = rng.permutation(total)
@@ -139,36 +140,44 @@ if __name__ == "__main__":
             out = cls(null_method="approximate", mask=masker).fit(studyset)
             estimates[label] = out.get_map("stat", return_type="array").ravel()
 
-        use = covered & np.isfinite(truth)
-        for label in names:
-            if label not in estimates:
-                continue
-            rho, auc = localisation(estimates[label], truth, use)
-            if np.isfinite(rho):
-                rows[label].append((rho, auc))
+        # Two voxel sets, because the first is chosen by one of the estimators. CBES's own
+        # coverage could in principle exclude voxels where the convergence maps do well, which
+        # would flatter it; the whole mask is nobody's choice and settles that.
+        for set_name, use in (("CBES coverage", covered & np.isfinite(truth)),
+                              ("whole mask", np.isfinite(truth))):
+            for label in names:
+                if label not in estimates:
+                    continue
+                rho, auc = localisation(estimates[label], truth, use)
+                if np.isfinite(rho):
+                    rows[(set_name, label)].append((rho, auc))
 
-    print(f"{'estimate':20s} {'rank r':>8s} {'(sd)':>7s} {'AUC':>8s} {'(sd)':>7s} {'splits':>7s}")
-    for label in names:
-        a = np.array(rows[label])
-        if not a.size:
-            print(f"{label:20s} {'--':>8s} {'--':>7s} {'--':>8s} {'--':>7s} {0:7d}")
-            continue
-        print(f"{label:20s} {a[:,0].mean():8.3f} {a[:,0].std(ddof=1):7.3f} "
-              f"{a[:,1].mean():8.3f} {a[:,1].std(ddof=1):7.3f} {len(a):7d}")
+    for set_name in SETS:
+        print(f"\n--- voxel set: {set_name} ---")
+        print(f"{'estimate':20s} {'rank r':>8s} {'(sd)':>7s} {'AUC':>8s} {'(sd)':>7s} "
+              f"{'splits':>7s}")
+        for label in names:
+            a = np.array(rows[(set_name, label)])
+            if not a.size:
+                print(f"{label:20s} {'--':>8s} {'--':>7s} {'--':>8s} {'--':>7s} {0:7d}")
+                continue
+            print(f"{label:20s} {a[:,0].mean():8.3f} {a[:,0].std(ddof=1):7.3f} "
+                  f"{a[:,1].mean():8.3f} {a[:,1].std(ddof=1):7.3f} {len(a):7d}")
 
     # The splits share studies, so the arms are paired and a paired test is the right one --
     # the between-split variance is common to all of them and would swamp an unpaired
     # comparison. The reference for the comparison is the best convergence statistic.
-    print("\nPaired against MKDA density, the strongest convergence arm, across splits:")
-    base = np.array(rows["MKDA density"])
-    for label in ("CBES g", "CBES g_marginal", "CBES prevalence", "ALE"):
-        a = np.array(rows[label])
-        if a.shape != base.shape or not a.size:
-            continue
-        for j, what in ((0, "rank r"), (1, "AUC   ")):
-            d = a[:, j] - base[:, j]
-            t = stats.ttest_rel(a[:, j], base[:, j])
-            print(f"  {label:18s} {what}  {d.mean():+.3f}  (sd {d.std(ddof=1):.3f}, "
-                  f"paired p {t.pvalue:.3f})")
+    for set_name in SETS:
+        print(f"\nPaired against MKDA density on the {set_name} voxels:")
+        base = np.array(rows[(set_name, "MKDA density")])
+        for label in ("CBES g", "CBES g_marginal", "CBES prevalence", "ALE"):
+            a = np.array(rows[(set_name, label)])
+            if a.shape != base.shape or not a.size:
+                continue
+            for j, what in ((0, "rank r"), (1, "AUC   ")):
+                d = a[:, j] - base[:, j]
+                t = stats.ttest_rel(a[:, j], base[:, j])
+                print(f"  {label:18s} {what}  {d.mean():+.3f}  (sd {d.std(ddof=1):.3f}, "
+                      f"paired p {t.pvalue:.3f})")
     print("\nIf a convergence statistic localises as well as the magnitude map, the censored")
     print("likelihood is not earning its complexity on the use a reader puts the map to.")

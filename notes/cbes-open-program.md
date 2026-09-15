@@ -1459,3 +1459,59 @@ So the answer to #38, with the pre-committed caveat attached: the product earns 
 neither factor does, on a reference that is itself the product. That is three independent routes
 to the same conclusion -- estimand, mechanism, and now localisation -- and it is the strongest
 case in this program for treating `g_marginal` as the deliverable and `g` as a diagnostic.
+
+### The voxel set reverses it, and the pre-committed worry was the right one
+
+```
+                    AUC on CBES's coverage    AUC on the whole mask
+CBES g_marginal              0.763                    0.644
+CBES prevalence              0.667                    0.641
+CBES g                       0.653                    0.641
+MKDA density / KDA           0.652                    0.669
+ALE                          0.643                    0.753
+
+paired against MKDA, whole mask:
+  CBES g           AUC  -0.028  (sd 0.005, p 0.000)
+  CBES g_marginal  AUC  -0.025  (sd 0.005, p 0.000)
+  ALE              AUC  +0.084  (sd 0.015, p 0.000)
+```
+
+Complete reversal. On CBES's own support `g_marginal` wins by +0.111; over the whole brain
+**ALE is the best arm and all three CBES maps are the worst**, every difference at p < 0.001.
+The concern I wrote down before the numbers -- that scoring on CBES's coverage could flatter it --
+is exactly what happened.
+
+**The decisive number, which separates artefact from limitation.** CBES assigns exactly 0 outside
+its coverage, and a tie block takes mid-ranks and contributes nothing to an AUC, so the whole-mask
+penalty could have been pure scoring artefact. Measured over the same ten splits:
+
+```
+  share of the brain CBES covers at all:         0.092
+  share of the truth's top decile CBES covers:   0.341
+  enrichment of the top decile in covered voxels: 3.70x
+```
+
+So it is not an artefact. CBES's coverage is genuinely aimed at signal -- a 3.7x enrichment is
+substantial -- but **two-thirds of the truth's strongest voxels lie where CBES returns zero.** It
+is not declining to rank noise; it is declining to estimate most of where the effect is.
+
+Part of that is a genuine mismatch of objects rather than a fault: an inverse-variance pooling of
+z maps is a smooth, spatially extensive field, while a coordinate table is a few dozen points, and
+a 20 mm sphere around each covers 9% of the brain. A reader wanting the extent of an effect will
+not get it from coordinates at any threshold. But the consequence for the comparison is
+unavoidable: ALE's kernel assigns a decaying value everywhere and so ranks the uncovered
+two-thirds, badly but better than a tie.
+
+**Corrected answer to #38**, replacing what I wrote an hour ago:
+
+> Within the region CBES estimates, `g_marginal` localises a held-out image reference
+> significantly better than any convergence statistic (+0.111 AUC, p 0.001) and `g` is
+> indistinguishable from MKDA (+0.001, p 0.980). But CBES estimates only 9% of the brain and
+> 34% of the truth's top decile, and over the whole brain ALE is the best arm while every CBES map
+> is the worst. So whether the machinery earns its keep depends on whether one counts the
+> two-thirds of the signal CBES declines to estimate -- and for a reader who wants to know the
+> extent of an effect rather than its peaks, that two-thirds is the answer they came for.
+
+`coverage_radius` is the lever this identifies. It is currently `2 * fwhm`; a wider radius would
+cover more of the truth at the cost of claiming estimates further from any evidence. The
+trade-off is now measurable, which it was not before, and it deserves a sweep.
