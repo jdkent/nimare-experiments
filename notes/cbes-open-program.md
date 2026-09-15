@@ -4087,3 +4087,41 @@ The remaining structural difference between the two collections that has never b
 the one in #37: pain's tables were *transcribed from papers* while HCP's are extracted by
 `reporting.py` from maps. Different peak-selection processes, not different statistics -- and it
 is the last candidate standing.
+
+## Correction: the pain tables were never the published ones either
+
+I wrote, twice, that the last structural difference between the pain and HCP beds is that
+"pain's tables were transcribed from papers while HCP's are extracted by `reporting.py` from
+maps". That is false, and reading `validate_redesign.py` shows it plainly:
+
+    for i in coord_members:
+        foci, height = report_peaks(maps[i], mask_bool, shape, zooms, scheme=SCHEME, focus=FOCUS)
+
+**Both beds extract from images with the same function.** The pain collection's own 267
+transcribed coordinate rows -- present, across all 21 studies -- were loaded and then ignored.
+So #37's premise was wrong and the "last candidate standing" was not a candidate at all.
+
+What it opens instead is better, and is the assumption under *every* real-data result in this
+program. The standing instruction is to extract coordinates "the way papers produce them", and
+`reporting.py` is that instruction's implementation -- multiplicity correction, whole clusters,
+8 mm separation, no cap. It has never once been checked against coordinates a paper actually
+printed. Pain supplies both for the same 21 studies, so the check is available:
+
+  * **as published** -- pain's transcribed tables, with `clamp_threshold` supplying the height
+    bound from the smallest reported statistic, since a paper's own cut is not recorded;
+  * **re-extracted** -- `report_peaks` on the same studies' z maps, which is what every result
+    here used.
+
+Descriptively the two differ before any estimator runs: the transcribed tables have a median of
+12 peaks per study (range 4 to 24) over 21 studies. The extracted ones are whatever survives
+each scheme, which the runs above put nearer 14 per table on HCP. Worth measuring directly:
+peaks per study, and the distance from each published peak to the nearest extracted one.
+
+If extraction is faithful, every real-data result stands as measured. If it is not, the
+`reporting.py` proxy is doing work nobody has audited, and the pain-versus-HCP disagreement has
+a candidate again -- this time a real one.
+
+Also note what pain's sample sizes are: 9, 9, 9, 12, 12, 12, 12, 12, 12, 13, 14, 14, 16, 16, 16,
+20, 20, 24, 25, 25, 32. A 3.5-fold spread, all small. Under the identifiability result that is a
+*partially* identified regime, which is consistent with HCP (uniform 30) sitting at 0.97 bounded
+while the synthetic 0.2-to-0.8 bed sat at 0.42 -- pain has not been measured on that axis at all.
