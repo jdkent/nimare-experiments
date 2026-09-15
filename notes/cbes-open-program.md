@@ -4246,13 +4246,17 @@ calculus.
 
 Ordered by whether it would change what gets built:
 
-1. **The reported limb's probability is wrong and the algebra can say by how much.** The model
-   uses `P(|g| >= c)`; a paper reports a voxel only if it cleared `c` *and* was a local maximum.
-   The correction is the survival function of a suprathreshold local maximum, which for a smooth
-   field is an Euler-characteristic density -- expressible in closed form given a smoothness.
-   This is the one specification error now localised (measured over-statement 1.00, 1.78, 1.08,
-   1.13 at true g of 0.2 to 0.8; non-monotone, so no constant reweighting absorbs it) and the
-   #74 result says it, not identifiability, is what limits the magnitude.
+1. **Why the local-maximum correction comes out with the sign backwards.** The model uses
+   `P(|g| >= c)` for a report; a paper reports a voxel only if it cleared `c` *and* was a local
+   maximum. That is the one specification error now localised -- over-statement 1.00, 1.78,
+   1.08, 1.13 at true g of 0.2 to 0.8, non-monotone so no constant reweighting absorbs it -- and
+   #74 says it, not identifiability, is what limits the magnitude. **But the obvious fix is
+   already rejected empirically:** the RFT expected-maxima route was tried and its density has
+   the sign backwards at a signal peak (#63), and no constant `q` helps (8.9 to 12.2% error as
+   `q` falls from 1.00 to 0.56). So the algebraic question is not "write down the correction" --
+   it is *why* the smooth-field density points the wrong way here, which would either rescue the
+   route or close it for good. Doing it symbolically is the only way left to tell those apart,
+   since the numerics have already said "no" without saying why.
 2. **The identifiability condition properly stated.** I have the two-configuration case. What
    would be useful is the rank of the Jacobian of `k` distinct `(sigma, c)` pairs in
    `(pi, mu)` -- i.e. how many genuinely distinct study configurations are needed, and how the
