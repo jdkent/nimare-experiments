@@ -537,3 +537,56 @@ What this does *not* score is what the coordinate pathway uniquely provides -- l
 inference under the within-analysis null, whose error rates are valid, and `prevalence`. Neither
 depends on the magnitude scale, so the finding bears on where `g` should come from, not on
 whether coordinates belong in the estimator.
+
+### Why the earlier mixed-collection result said the opposite
+
+`compare_mixed.py` and `mixed_weight.py` concluded that coordinates *improve* the magnitude when
+images are present:
+
+```
+                     procedure    r all    r top      mag
+                5 images alone    0.756    0.756     0.76
+        CBES, coordinates only    0.788    0.804     2.04
+       CBES, 5 images + coords    0.896    0.908     0.98
+```
+
+Four assumptions were wrong. One is fatal.
+
+**The reference contained the studies being scored.** Both scripts state it in their own output:
+`truth from all 21 images`. The five image studies are part of that truth, and the sixteen
+coordinate studies' peaks were extracted from maps that are also in it. "Adding sixteen
+coordinate studies improves prediction" therefore means, for the most part, that telling the
+estimator about sixteen studies helps it predict a reference built from those sixteen studies.
+It is close to tautological, and it is precondition B0.3 of the requirements.
+
+**Scoring was restricted to the top quartile of the truth.** `mag = 0.98` is a median ratio over
+the strongest 25% of voxels. That is the one stratum where the ratio really is near 1 -- measured
+later at 1.15 to 1.23 -- while the bottom half runs four to ten times the truth. Restricting to
+the top quartile makes the compression invisible by construction.
+
+**One realisation.** A single fixed assignment of pain_01 to pain_05 as the images, no splits and
+no error bars, against eight random splits in the current design.
+
+**`r all` was taken over every voxel with a nonzero truth**, where spatial smoothness alone
+generates correlation, and the arm carrying twenty-one studies' spatial information gains more
+from that than the arm carrying five.
+
+The old experiment already contained its own refutation. Its weight sweep:
+
+```
+              5 images alone    0.756    0.756     0.76
+         + coords, weight x1    0.896    0.908     0.98
+         + coords, weight x5    0.849    0.858     1.45
+        + coords, weight x29    0.790    0.802     2.05
+```
+
+As coordinate influence grows the correlation falls monotonically and the scale inflates toward
+the coordinate-only value of 2.04. That is the dilution signature. It was read as "coordinates
+are not being swamped, so the measured mis-weighting has no practical consequence" -- the
+question the script was built to answer -- rather than as evidence that coordinate influence
+degrades the estimate.
+
+One difference between the two designs is not yet accounted for and should not be claimed as
+settled: the old extraction took every local maximum above a fixed threshold, the current one
+takes one focus per surviving cluster, about six per study. The current coordinate arm carries
+less information, and some of the gap may be that rather than the reference. Testable, untested.
