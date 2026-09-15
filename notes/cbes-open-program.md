@@ -1697,3 +1697,29 @@ for both settings.
 Either way this is a gap in how I set the bed up, not a discovery: the recommended configuration
 was documented and I did not use it. The habit it argues for is to run the configuration the
 docstring recommends *first*, and treat anything else as the variant.
+
+## Note for a future session: the `benchmark` check is noisy
+
+`benchmark` failed on commit 546b48a with:
+
+```
+| +  | 53.3±10ms  | 66.5±0.5ms | 1.25 | bench_cbma.TimeCBMA.time_mkdachi2_studyset |
+PERFORMANCE DECREASED.
+```
+
+It was noise and a single re-run came back green. Three things made that the right diagnosis
+rather than a guess, and they are the checks to repeat rather than re-derive:
+
+1. **The benchmark is of `MKDAChi2`, which the PR cannot reach.** The only shared file the branch
+   touches is `nimare/meta/utils.py`, and that diff is purely additive -- four new functions and
+   one import reformatted across lines, with no existing function modified. `MKDAChi2` imports
+   from `cbma.base`, `cbma.utils` and `meta.kernel`, none of whose used functions changed.
+2. **The base measurement's own error bar spans the difference.** 53.3 ± 10 ms is a 19%
+   coefficient of variation; 53.3 + 10 = 63.3 against an "after" of 66.5 ± 0.5. The PR-side
+   measurement is the tight one.
+3. **No other benchmark moved**, across about 96 of them.
+
+Also worth knowing: the suite contains no CBES benchmark, so the PR's own new code is not timed
+at all. Adding one would be a genuine improvement and is deliberately not being done here -- it
+widens the PR beyond what was asked -- but it is the reason a benchmark failure on this PR is
+*a priori* unlikely to be about the PR.
