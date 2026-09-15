@@ -42,6 +42,23 @@ N_STUDIES = int(os.environ.get("NSTUDIES", 16))
 N_IMAGES = int(os.environ.get("NIMAGES", 2))
 N_SPLITS = int(os.environ.get("NSPLITS", 4))
 PREVALENCES = [float(x) for x in os.environ.get("PREV", "1.0,0.75,0.5,0.25").split(",")]
+# Between-study heterogeneity, as a relative sd on each effect-study's magnitude. The one
+# remaining difference between the pain bed (real studies, real tau2) and this one that can be
+# added directly: prevalence and the choice of statistic were both tested and neither explains
+# why the correction helps on pain and not here.
+TAU_REL = float(os.environ.get("TAU", 0.0))
+# How the reference is built from the held-out subjects, which is the last difference between
+# this bed and the pain one that has not been tested.
+#
+#   "pooled"   one Hedges' g over all held-out subjects. Nearly noiseless, and unbiased.
+#   "studies"  the held-out subjects cut into synthetic reference studies whose g maps are
+#              pooled by inverse variance -- what the pain bed did with its 19 held-out
+#              studies. That reference carries the *same* downward pull CBES has, because
+#              Hedges' variance is a function of the observed effect, so a study that drew
+#              high gets less weight. If an estimator biased low scores better against a
+#              reference biased low, the pain "win" was never about the silence channel.
+REFERENCE = os.environ.get("REFERENCE", "pooled")
+REF_STUDY_N = int(os.environ.get("REFN", 30))
 
 mask_img = load_mni152_brain_mask(resolution=4)
 masker = NiftiMasker(mask_img).fit()
@@ -98,7 +115,8 @@ def ratio_at_top(est, truth, use):
 if __name__ == "__main__":
     print(f"MOTOR_LH studies carry the effect, EMOTION_FACES studies do not.")
     print(f"{N_PER_STUDY} subjects x {N_STUDIES} studies, {N_IMAGES} random donors, "
-          f"{N_SPLITS} splits per prevalence\n")
+          f"{N_SPLITS} splits per prevalence, between-study tau = {TAU_REL:.2f} "
+          f"(relative), reference = {REFERENCE}\n")
     print(f"{'true pi':>8} {'reported pi':>11}   " +
           "  ".join(f"{n:>14}" for n in ("g / mu", "g_marg / pi*mu", "images / pi*mu")))
 
@@ -115,8 +133,20 @@ if __name__ == "__main__":
             if len(held) < 100:
                 print(f"{prevalence:8.2f}  not enough held-out subjects, skipped")
                 break
-            mu_truth = np.abs(hedges(EFFECT[held]))
+            if REFERENCE == "studies":
+                num = den = 0.0
+                for j in range(len(held) // REF_STUDY_N):
+                    ref_block = EFFECT[held[j * REF_STUDY_N:(j + 1) * REF_STUDY_N]]
+                    gj = hedges(ref_block)
+                    vj = 1.0 / REF_STUDY_N + gj**2 / (2.0 * REF_STUDY_N)
+                    w = 1.0 / np.maximum(vj, 1e-9)
+                    num, den = num + w * gj, den + w
+                mu_truth = np.abs(num / np.maximum(den, 1e-12))
+            else:
+                mu_truth = np.abs(hedges(EFFECT[held]))
             marginal_truth = prevalence * mu_truth
+
+            deltas = rng.normal(0.0, TAU_REL, size=N_STUDIES) if TAU_REL else np.zeros(N_STUDIES)
 
             donors = set(rng.choice(N_STUDIES, size=N_IMAGES, replace=False).tolist())
             work = f"/tmp/claude-0/prev_{os.getpid()}_{split}"
@@ -124,6 +154,16 @@ if __name__ == "__main__":
             for k in range(N_STUDIES):
                 if k < n_effect:
                     block = EFFECT[used_eff[k * N_PER_STUDY:(k + 1) * N_PER_STUDY]]
+                    if TAU_REL:
+                        # Heterogeneity in the magnitude only, in the study's *own* units: its
+                        # mean becomes (1 + delta_k) times itself while its subject-level sd is
+                        # untouched, so its Hedges' g scales by exactly (1 + delta_k) and tau is
+                        # between-study spread in the effect and nothing else.
+                        #
+                        # Not a multiple of a pooled mean: scaling a 480-subject mean by a
+                        # 30-subject sd is an unbounded ratio at voxels where the latter is
+                        # tiny, which produced g of order 1e7 before this was fixed.
+                        block = block + deltas[k] * block.mean(0)
                 else:
                     j = k - n_effect
                     block = NULL[null_order[j * N_PER_STUDY:(j + 1) * N_PER_STUDY]]

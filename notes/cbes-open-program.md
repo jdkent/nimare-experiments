@@ -3443,3 +3443,40 @@ real data it reads 0.918, 0.714, 0.590, 0.540 for true 1.00, 0.75, 0.50, 0.25 --
 down to about 0.5 and then floors near 0.54. That is better than the simulator's compression
 (a true 0.25 read 0.49 to 0.60 there) and is now the number in the docstring, since a designed
 prevalence on real subjects beats a simulator for this purpose.
+
+## Four candidate explanations tested. Only the *reference construction* moves it the right way.
+
+Why does the correction help on the 21-study pain collection (rmse 0.210 against 0.269) and not on
+HCP with held-out subjects? Dials built and measured, all on the MOTOR/EMOTION prevalence bed:
+
+| dial | result | verdict |
+|---|---|---|
+| prevalence 1.00 / 0.75 / 0.50 / 0.25 | g/mu 0.68, 0.63, 0.56, 0.53 | **rejected** -- degrades monotonically as pi falls |
+| statistic (whole-map rmse vs top-quartile ratio) | rmse 0.130 vs img 0.129 at pi=1; 0.281 vs 0.241 at 0.5 | **rejected** -- ties or loses on the pain statistic too |
+| between-study tau = 0.0 / 0.3 / 0.6 | rmse g 0.126/0.135/0.159, img 0.126/0.123/0.140 | **rejected** -- no crossing at any tau |
+| reference: pooled subjects vs study-level | rmse g 0.126 vs img 0.126, then **0.122 vs 0.125** | **moves it** |
+
+**The mechanism, and it is a caution about the pain number.** The pain reference was an
+inverse-variance mean of 19 study-level g maps. Hedges' variance `1/n + g^2/(2n)` is a function of
+the *observed* effect, so a study that drew high gets less weight and the pooled reference is
+itself pulled **down**. CBES is also biased down. An estimator biased low scores better against a
+reference biased low. Reconstructing the HCP reference the same way -- held-out subjects cut into
+synthetic reference studies whose g maps are pooled by inverse variance -- takes CBES from tied
+(0.126 vs 0.126) to winning (0.122 vs 0.125), and shifts every ratio up (g/mu 0.69 to 0.71,
+images 0.92 to 0.95).
+
+**But it accounts for only about 2 points of the pain gap's 22.** So the direction of the
+artefact is demonstrated and the magnitude is not: most of the pain result is still unexplained.
+The remaining untested difference is real studies against synthetic ones -- different scanners,
+paradigms, preprocessing, sample sizes from 14 to 43 -- which cannot be dialled on this bed.
+
+### Two bugs in the bed, both mine, both caught by the numbers
+
+* `shape = EFFECT[used_eff].mean(0)` shadowed the module-level mask `shape` that `report_peaks`
+  reads, giving "maximum supported dimension for an ndarray is currently 64, found 29398".
+* Adding `delta_k * pooled_mean` to a study's subjects divides a 480-subject mean by a
+  30-subject sd -- an unbounded ratio where the latter is tiny, which produced `g/mu` of 4.4e7
+  and a "reported prevalence" of 0.094. Fixed by scaling the study's *own* mean, so its g scales
+  by exactly `(1 + delta_k)` and tau is between-study spread in the magnitude and nothing else.
+
+Fourth and fifth times this session that a confident-looking number was a defect in the harness.
