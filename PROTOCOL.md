@@ -172,3 +172,26 @@ Two conclusions, both duller and more useful than "be careful":
 - A rule written in a document does not fire at the moment of writing code. The thing that would
   have fired is a *habit*: launch with `run_in_background`, capture the PID, wait on `kill -0`.
   Where a habit is available, prefer it to a rule.
+
+## Check what a knob does before sweeping it
+
+I identified `coverage_radius` as the lever on how much of the brain CBES estimates, swept it from
+8 mm to 45 mm, and got a covered-share of **0.089 at every radius, to three decimals**. Five
+values of a parameter, one answer: the parameter does not do what I said it does.
+
+It governs how far from a reported focus a study counts as having been *silent* rather than
+uninformative -- which changes the estimates without changing where they exist. The extent of the
+map is set by the *pooling kernel*, so the lever is `fwhm`.
+
+The tell was there in the output and nearly went past me, because the column I was watching (AUC)
+*did* move: 0.796, 0.819, 0.850, 0.863, 0.817 across the radii. A knob that moves one column and
+not another is not a broken knob; it is a knob doing something other than what you think. The
+check is one line:
+
+> **Before reading a sweep, confirm the parameter moved the thing you are attributing to it.**
+> If a column is identical across every setting, stop -- either the parameter is not wired in, or
+> it does not control that column, and both change the conclusion.
+
+This is the same family as the statistic-convention bug and the `study-min` degeneracy: in all
+three the harness was doing something reasonable that I had mislabelled, and the label was what I
+reasoned from. Cheap to catch, expensive to miss.
