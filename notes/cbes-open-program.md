@@ -2816,3 +2816,43 @@ two channels are consistent. Requires `simulate_field=True`.
 
 Test file rewritten from scratch: 105 tests -> 64, all passing, organised around what each
 channel does rather than around the deleted parameters.
+
+## jdkent's threshold idea, in its safe form: the minimum as a bound, not an estimate
+
+Shipped as `clamp_threshold=True`.
+
+Estimating the cut from the smallest reported value was measured and rejected -- it undoes an
+order statistic it cannot identify and overshot a cluster-forming cut by about 1 z. But there is
+a strictly weaker use: anything a study reported *cleared* its cut, so
+
+    c_k <= min_j |z_kj|
+
+is a hard inequality. So it can **clamp** an assumed constant rather than replace it. It can only
+move a cutoff down, only for a study whose own table contradicts the assumption, and never below
+the truth.
+
+Three regimes, field simulator, 8 seeds, truth known exactly, assumption 3.29 z:
+
+| regime | cutoffs moved | rmse quiet | rmse middle | rmse effect |
+|---|---|---|---|---|
+| studies at 2.4/2.8/3.29/3.8 z | 9 of 20 | 0.1236 -> **0.1094** (p=0.0001) | 0.0817 -> **0.0734** (p=0.015) | 0.0727 -> 0.0743 (p=0.79) |
+| every study at 3.29 z | 0 of 20 | bit-identical | bit-identical | bit-identical |
+| every study at 4.5 z (thin tables) | 0 of 20 | bit-identical | bit-identical | bit-identical |
+
+A strict no-op in both regimes where it should not act, including the thin-table case (a paper
+reporting only its strongest peaks, where the minimum sits far above the cut). Safe on by default.
+
+**Unexplained, recorded rather than relied on.** In the first regime the clamp *beats the oracle*
+(0.1094 against 0.1123 quiet, 0.0734 against 0.0749 middle), and in the third the true thresholds
+are worse than the too-low assumption (0.1278 against 0.1059 quiet; bias at the effect +0.0154
+against -0.0653). A cutoff slightly below the truth is compensating for something. Likely cause:
+the model treats a report as `|g| >= c` while a reported peak is `|g| >= c` **and** a local
+maximum -- a strictly smaller event -- so P(report) is overstated and a low c offsets it. Testable
+by replacing the exceedance probability with the RFT peak-height survival; not done.
+
+### Test-harness lesson, third this session
+
+The "heights never reach the estimate" test scaled reported statistics by `3z + 7`. That is not
+monotone in `|z|`: it pulls negative peaks toward zero and *lowers* the smallest reported
+magnitude, which is now exactly the quantity the estimator reads. The test failed, the code was
+right. Use a pure scaling when the thing under test is a function of `|z|`.
