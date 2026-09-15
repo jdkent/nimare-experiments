@@ -1,0 +1,41 @@
+NIDM pain: 21 studies, 1 images held fixed, 8 splits
+
+  split 1/8
+  split 2/8
+  split 3/8
+  split 4/8
+  split 5/8
+  split 6/8
+  split 7/8
+  split 8/8
+
+          estimate       r  rank r    AUC  mean err  err at top    rmse
+       images only  +0.520  +0.514  0.820    +0.254      +0.198   0.446
+     mixed (ships)  +0.320  +0.287  0.750    +0.271      +0.129   0.506
+      silence only  +0.472  +0.534  0.835    +0.084      -0.024   0.358
+  coordinates only  +0.218  +0.205  0.650    +1.451      +1.230   1.587
+
+Paired across splits, silence-only minus each comparator (n = 8 splits):
+
+  vs mixed (ships)
+         metric  difference  paired p
+              r      +0.152    0.0051 (higher)
+         rank r      +0.247    0.0013 (higher)
+            AUC      +0.084    0.0040 (higher)
+       mean err      -0.187    0.0009 (closer to 0)
+     err at top      -0.154    0.0035 (closer to 0)
+           rmse      -0.148    0.0001 (lower)
+
+  vs images only
+         metric  difference  paired p
+              r      -0.048    0.0596
+         rank r      +0.020    0.0072 (higher)
+            AUC      +0.015    0.0609 (higher)
+       mean err      -0.170    0.0000 (closer to 0)
+     err at top      -0.222    0.0007 (closer to 0)
+           rmse      -0.088    0.0007 (lower)
+
+The variant earns its place only if it holds pattern near images-only AND beats it
+on the error at the top decile. Pattern collapsing toward the coordinates-only floor
+would mean the silence geometry distorts the map, which the flattening retraction
+would have predicted and this design was built to escape.

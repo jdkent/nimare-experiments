@@ -943,3 +943,50 @@ So the prediction, in two parts:
 The failure mode that would refute both: if the pattern correlation at one image falls toward the
 coordinates-only floor of +0.218, the silence geometry is carrying the map rather than the single
 image, and one image is not enough to anchor it. That is the thing to look at first.
+
+### It works at one image, and works *better* there. Both predictions held.
+
+```
+--- 1 image, 8 splits ---
+        estimate          r     rank r        AUC   mean err  err at top       rmse
+     images only     +0.520     +0.514      0.820     +0.254      +0.198      0.446
+   mixed (ships)     +0.320     +0.287      0.750     +0.271      +0.129      0.506
+    silence only     +0.472     +0.534      0.835     +0.084      -0.024      0.358
+coordinates only     +0.218     +0.205      0.650     +1.451      +1.230      1.587
+```
+
+**Prediction 1 held: no collapse.** Pattern lands at +0.472 against +0.520 for the single image
+alone -- 0.048 below, paired p 0.0596, not significant -- and nowhere near the coordinates-only
+floor of +0.218 that would have meant the silence geometry was carrying the map. The shipping mix
+at one image is the thing that collapses, to +0.320, and the attribution was right: it is the
+single-donor scale, and removing the scale removes the collapse.
+
+**Prediction 2 held, and by more than expected.** The magnitude gain is larger at one image than
+at two -- mean error improves by 0.170 against 0.126, `rmse` by 0.088 against 0.069 -- because a
+single image is a more upward-biased baseline for silence to correct.
+
+**The unpredicted part is the interesting one: at one image the trade disappears.** Paired against
+images-only, silence-only *wins* `rank r` (+0.020, p 0.0072) and `AUC` (+0.015, p 0.0609) as well
+as all three magnitude columns (p 0.0007 or below), and loses only Pearson `r` (-0.048, p 0.0596,
+not significant). Against the shipping mix it wins all six, every one significant at p 0.0051 or
+below.
+
+Laid against the two-image table, the trend is monotone in the right direction:
+
+```
+                     r     rank r    AUC   mean err  err at top    rmse
+silence - images
+        at 1 image  -0.048   +0.020  +0.015   -0.170     -0.222   -0.088
+       at 2 images  -0.080   -0.030  -0.021   -0.126     -0.241   -0.069
+```
+
+**The weaker the image anchor, the more a corpus of silences is worth.** That is the opposite of
+the shipping mix, which degrades *fastest* at one image because that is where its one-donor scale
+is worst. So the two-image floor is a requirement of the magnitude-using path, not of the
+estimator: the silence-only path is well-behaved at one image and gains more there than at two.
+
+Two things this does not settle. `g_absolute` is gated on two donors, and whether that gate should
+also relax in silence-only mode is a separate question from whether the fit behaves -- the scale
+argument for it is different when no coordinate magnitude is being scaled. And the splits are
+still eight overlapping halves of 21 studies, so the p-values are optimistic; the effect sizes on
+the error columns are what carry the conclusion.
