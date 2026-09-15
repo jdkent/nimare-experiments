@@ -38,7 +38,19 @@ half-width over the effect.
 | 12 | 2 | +0.127 | 1.36 | 0.87 | 0.33 |
 | 12 | 6 | +0.027 | 1.27 | 0.99 | 0.22 |
 
-(the 12-of-12, heterogeneity and 24-study arms were still running at the time of writing)
+| 12 | 0, τ 0.3 | +0.302 | 1.58 | 0.80 | 0.61 |
+| 12 | 6, τ 0.3 | +0.012 | 1.16 | 0.96 | 0.36 |
+| 12 | 12, τ 0.3 | −0.015 | 1.12 | 0.93 | 0.27 |
+| 24 | 0 | +0.248 | 2.24 | **0.28** | 0.28 |
+| 24 | 6 | +0.073 | 1.38 | 0.89 | 0.20 |
+| 24 | 24 | −0.022 | 1.11 | 0.97 | 0.11 |
+
+Coverage still degrades with more studies (0.72 → 0.28), the signature of a fixed bias with a
+shrinking interval. `se/RMSE` tracks coverage across the whole table (0.61 / 0.45 / 1.18 / 0.97
+against coverage 0.72 / 0.28 / 0.99 / 0.97) while `se/sd` ranks the same arms in the wrong
+order — the metrics-that-lie entry, confirmed. Weight-share refit on all six τ=0 arms:
+`b0 = 0.260`, `r = 6.40`, max residual 0.022; the same six donors give +0.027 at f=0.50 and
++0.073 at f=0.25, so it is the share and not the count, a third time.
 
 So: the coordinates-only magnitude runs about **32% high**, not 63%, and the interval covers 0.72
 against a nominal 0.95 — a real failure, not a collapse. Two images halves the bias; six
@@ -198,7 +210,13 @@ degrades smoothly to 0.11 outside it.
   sensitivity grows with the height (1.08× at z=3.3, 1.38× at z=6). Published z-maps often have a
   higher effective df, so the likely direction is a further over-statement.
 
-CI green on every push. 100 tests pass.
+- The voxel-level family-wise correction is now withheld when the permutation distribution of
+  the maximum barely moves (both a low distinct-value share and a low coefficient of variation).
+  The arrangement-count guard passed a configuration that rejected at 0.150 against a nominal
+  0.050, because two-focus studies admit 2^k arrangements while swapping two similar magnitudes
+  moves the map's maximum hardly at all.
+
+CI green on every push. 101 tests pass.
 
 ## What needs your decision
 
