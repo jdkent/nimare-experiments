@@ -1381,3 +1381,48 @@ Worth a sensitivity check on the union of coverage instead.
 is a single source, which is what the retracted height-flattening claim also rested on before
 the real-data check reversed it. A second collection -- the NeuroVault paradigm sets -- should
 carry this before it goes near the PR.
+
+## #38 — does a plain convergence map localise as well as CBES? (answered, and the answer splits)
+
+NIDM pain, 21 studies, cluster-extent reporting with one max-statistic focus per cluster, 10
+splits, held-out inverse-variance pooling as the reference, every estimator reading exactly the
+same tables. Scored on localisation only, since a convergence statistic has no effect-size scale.
+
+```
+estimate              rank r vs truth   AUC top decile
+CBES g_marginal                 0.425            0.763
+CBES prevalence                 0.240            0.667
+CBES g                          0.216            0.653
+MKDA density / KDA              0.294            0.652
+ALE                             0.203            0.643
+```
+
+The answer splits, and the split is the interesting part.
+
+**CBES's magnitude map `g` does not localise better than a convergence statistic.** AUC 0.653
+against MKDA's 0.652 and ALE's 0.643 -- level, on a reference the magnitude estimator is aimed at
+and the convergence ones are not. All the censored-likelihood machinery, the selection model and
+the effect-size conversion buy nothing here over a smoothing kernel.
+
+**`g_marginal` does, by a clear margin.** AUC 0.763, a gain of 0.11 over the best convergence arm
+and 0.11 over `g` itself. So what earns its keep is specifically the *product* of magnitude and
+prevalence, not the magnitude machinery alone -- which is the same conclusion arrived at from the
+estimand side (`g_marginal` shares an IBMA's estimand; `g` has no external reference) and from
+the mechanism side (`g_marginal` is magnitude times an empirical reporting probability).
+
+**`prevalence` alone is also level with convergence**, 0.667 against 0.652. That is unsurprising
+-- it is the count channel expressed differently -- and it is a useful sanity check that the
+comparison is measuring what it claims.
+
+With the caveat pre-committed before these numbers: the reference is an image-based estimate of
+`pi * mu`, which is exactly what `g_marginal` estimates and what ALE and MKDA do not, so some of
+that 0.11 is definitional rather than earned. The defensible claim is the narrow one:
+
+> **If what a reader wants is a map of where the effect is large, `g_marginal` does better than a
+> convergence statistic on a held-out image reference, and `g` does not. If what they want is a
+> map of where studies agree, ALE answers that question and this comparison does not test it.**
+
+Still owed before this goes near the PR: a second collection (the NeuroVault paradigm sets), and
+a sensitivity check on the voxel set, which is currently CBES's own coverage. A paired test across
+splits is running, since the splits share studies and an unpaired comparison would be swamped by
+the between-split variance.

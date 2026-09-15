@@ -147,12 +147,28 @@ if __name__ == "__main__":
             if np.isfinite(rho):
                 rows[label].append((rho, auc))
 
-    print(f"{'estimate':20s} {'rank r vs truth':>16s} {'AUC top decile':>15s} {'splits':>7s}")
+    print(f"{'estimate':20s} {'rank r':>8s} {'(sd)':>7s} {'AUC':>8s} {'(sd)':>7s} {'splits':>7s}")
     for label in names:
         a = np.array(rows[label])
         if not a.size:
-            print(f"{label:20s} {'--':>16s} {'--':>15s} {0:7d}")
+            print(f"{label:20s} {'--':>8s} {'--':>7s} {'--':>8s} {'--':>7s} {0:7d}")
             continue
-        print(f"{label:20s} {a[:,0].mean():16.3f} {a[:,1].mean():15.3f} {len(a):7d}")
+        print(f"{label:20s} {a[:,0].mean():8.3f} {a[:,0].std(ddof=1):7.3f} "
+              f"{a[:,1].mean():8.3f} {a[:,1].std(ddof=1):7.3f} {len(a):7d}")
+
+    # The splits share studies, so the arms are paired and a paired test is the right one --
+    # the between-split variance is common to all of them and would swamp an unpaired
+    # comparison. The reference for the comparison is the best convergence statistic.
+    print("\nPaired against MKDA density, the strongest convergence arm, across splits:")
+    base = np.array(rows["MKDA density"])
+    for label in ("CBES g", "CBES g_marginal", "CBES prevalence", "ALE"):
+        a = np.array(rows[label])
+        if a.shape != base.shape or not a.size:
+            continue
+        for j, what in ((0, "rank r"), (1, "AUC   ")):
+            d = a[:, j] - base[:, j]
+            t = stats.ttest_rel(a[:, j], base[:, j])
+            print(f"  {label:18s} {what}  {d.mean():+.3f}  (sd {d.std(ddof=1):.3f}, "
+                  f"paired p {t.pvalue:.3f})")
     print("\nIf a convergence statistic localises as well as the magnitude map, the censored")
     print("likelihood is not earning its complexity on the use a reader puts the map to.")
