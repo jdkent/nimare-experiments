@@ -34,6 +34,12 @@ from load_pain import load_pain
 from reporting import report_peaks
 
 SCHEME, FOCUS = "cluster", "max"
+# "extracted" re-derives each table from that study's z map with report_peaks, which is what
+# every real-data result here used. "published" uses the collection's own transcribed
+# coordinates. The audit in is_the_extraction_faithful.py found those two agree far less than
+# assumed -- cluster recovers 23% of published peaks within 8 mm -- so which one the headline
+# result rests on is a question about the claim, not a detail.
+TABLES = os.environ.get("TABLES", "extracted")
 N_SPLITS = int(os.environ.get("NSPLITS", 8))
 WORKDIR = f"/tmp/claude-0/validate_{os.getpid()}"
 os.makedirs(WORKDIR, exist_ok=True)
@@ -72,7 +78,7 @@ def write_image(values, path):
     return path
 
 
-def build(image_members, coord_members, maps, sizes):
+def build(image_members, coord_members, maps, sizes, published=None):
     studies = []
     for i in image_members:
         g, var = g_and_var(maps[i], sizes[i])
@@ -84,6 +90,35 @@ def build(image_members, coord_members, maps, sizes):
                 {"url": write_image(var, f"{WORKDIR}/gvar_{i}.nii.gz"),
                  "filename": f"gvar_{i}.nii.gz", "value_type": "g_var", "space": "MNI"}]}]})
     for i in coord_members:
+        if published is not None:
+            # A paper does not record the height it used, so no reporting_threshold is
+            # supplied: clamp_threshold reads the bound off the smallest reported statistic,
+            # which is what it exists for. The transcribed rows carry no statistic either, so
+            # each point is given the study's own z map value at its location -- the closest
+            # honest stand-in for the number the table would have printed.
+            points = published.get(i)
+            if points is None or not len(points):
+                continue
+            meta = {"sample_sizes": [int(sizes[i])]}
+            entries = []
+            for xyz in points:
+                ijk = np.rint(nib.affines.apply_affine(
+                    np.linalg.inv(affine), np.asarray(xyz, dtype=float))).astype(int)
+                if not (np.all(ijk >= 0) and np.all(ijk < np.asarray(shape))
+                        and mask_bool[tuple(ijk)]):
+                    continue
+                flat = np.flatnonzero(mask_bool.ravel() == 1)
+                index = int(np.searchsorted(
+                    flat, np.ravel_multi_index(tuple(ijk), shape)))
+                entries.append({"space": "MNI",
+                                "coordinates": [float(v) for v in xyz],
+                                "values": [{"kind": "Z",
+                                            "value": float(abs(maps[i][index]))}]})
+            if not entries:
+                continue
+            studies.append({"id": f"c{i}", "name": f"c{i}", "metadata": meta, "analyses": [
+                {"id": f"c{i}", "name": "1", "metadata": meta, "points": entries}]})
+            continue
         foci, height = report_peaks(maps[i], mask_bool, shape, zooms,
                                     scheme=SCHEME, focus=FOCUS)
         if not foci:
@@ -101,7 +136,13 @@ def build(image_members, coord_members, maps, sizes):
 def fit(studies, **kwargs):
     if len(studies) < 2:
         return None
-    est = CBES(mask=masker, null_method="none", threshold="reporting_threshold", **kwargs)
+    # A published table records no height, so the extracted arm reads each study's own cut from
+    # metadata while the published arm assumes the conventional p < 0.001 (z = 3.09) and lets
+    # clamp_threshold lower it per study to that study's smallest reported statistic, which is a
+    # hard upper bound on whatever cut it really used. That asymmetry is unavoidable and is
+    # exactly the situation the clamp was built for.
+    threshold = "reporting_threshold" if TABLES == "extracted" else 3.09
+    est = CBES(mask=masker, null_method="none", threshold=threshold, **kwargs)
     res = est.fit(Studyset({"id": "x", "name": "x", "studies": studies},
                            target=None, mask=mask_img))
     have = set(res.maps)
@@ -128,14 +169,24 @@ def score(est, truth, use):
 if __name__ == "__main__":
     n_images = int(os.environ.get("NIMAGES", 2))
     ss = load_pain()
-    maps, sizes = [], []
+    maps, sizes, study_ids = [], [], []
     for row, n in zip(ss.images.itertuples(), ss.sample_sizes()):
         maps.append(np.nan_to_num(masker.transform(row.z).ravel()))
         sizes.append(int(n if np.ndim(n) == 0 else np.asarray(n).ravel()[0]))
+        study_ids.append(row.study_id)
     maps = np.array(maps)
+    published = None
+    if TABLES == "published":
+        frame = ss.coordinates
+        by_study = {sid: g[["x", "y", "z"]].astype(float).to_numpy()
+                    for sid, g in frame.groupby("study_id")}
+        published = {i: by_study.get(sid) for i, sid in enumerate(study_ids)}
+        have = sum(1 for v in published.values() if v is not None and len(v))
+        print(f"published tables: {have}/{len(study_ids)} studies, "
+              f"{sum(len(v) for v in published.values() if v is not None)} peaks")
     total = len(maps)
     print(f"NIDM pain: {total} studies, {n_images} images, {N_SPLITS} splits, "
-          f"scheme={SCHEME}/{FOCUS}\n", flush=True)
+          f"tables={TABLES}, scheme={SCHEME}/{FOCUS}\n", flush=True)
 
     rng = np.random.default_rng(0)
     rows, dofs = {}, []
@@ -145,11 +196,12 @@ if __name__ == "__main__":
         work, held = order[:half], order[half:]
         truth = np.abs(pooled(held, maps, sizes))
         images, tables = list(work[:n_images]), list(work[n_images:])
-        shipped = fit(build(images, tables, maps, sizes))
+        shipped = fit(build(images, tables, maps, sizes, published))
         # The control is the same collection with the silence switched off, not the images on
         # their own: an image-only collection is refused now, and rightly -- with no coordinate
         # table there is nothing for CBES to add over an IBMA.
-        images_alone = fit(build(images, tables, maps, sizes), selection_model="none")
+        images_alone = fit(build(images, tables, maps, sizes, published),
+                           selection_model="none")
         if shipped is None:
             continue
         only = np.abs(pooled(images, maps, sizes))

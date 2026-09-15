@@ -4175,3 +4175,42 @@ So no scheme reproduces published tables. What this does and does not invalidate
 with pain's *published* tables, `clamp_threshold` supplying the height bound from the smallest
 reported statistic, against the same reference. If the -22% rmse survives on real tables, the
 claim is about the estimator. If it does not, it was about `report_peaks`.
+
+## The headline result survives on the published tables, and is better centred there
+
+The audit above made this the most consequential outstanding run: CBES's central real-data claim
+had only ever been measured on `report_peaks` output that recovers 23% of pain's published peaks
+within 8 mm. Pain carries its own 267 transcribed peaks, so the claim can be tested on them.
+
+Published tables get no recorded height -- a paper does not print its cut -- so the assumed cut
+is the conventional p < 0.001 (z = 3.09) and `clamp_threshold` lowers it per study to that
+study's smallest reported statistic, which is a hard upper bound on whatever it really used.
+Each transcribed point is given its study's own z-map value at that location, the closest honest
+stand-in for the statistic the table would have carried. Eight splits, same reference, same arms:
+
+| estimate | bias | at top | rmse | rank r | AUC |
+|---|---|---|---|---|---|
+| images only, pooled | +0.136 | +0.137 | 0.269 | 0.484 | 0.893 |
+| CBES silence off | +0.142 | +0.155 | 0.272 | 0.499 | 0.899 |
+| **CBES `g`, published** | **+0.069** | **+0.005** | **0.230** | 0.480 | 0.886 |
+| CBES `g`, extracted | +0.075 | -0.065 | 0.210 | 0.486 | 0.889 |
+| CBES `g_marginal`, published | -0.064 | -0.291 | 0.184 | 0.483 | 0.887 |
+
+Paired against images-only over the 8 splits, published arm: rmse -0.040 (p = 0.0024), mean
+error -0.067 (p = 0.0001), error at top -0.132 (p = 0.0001), rank r -0.004 (p = 0.84), AUC
+-0.006 (p = 0.30), Pearson r -0.030 (**p = 0.075**, no longer significant).
+
+**So the claim is about the estimator and not about `report_peaks`.** Three things worth keeping:
+
+  * The bias at the strongest voxels goes to **+0.005** against images-only's +0.137. That is
+    the best-centred top stratum of any arm in the whole program, and it is on real coordinates.
+  * The Pearson cost that was significant on extracted tables (0.042, p = 0.017) is smaller and
+    not significant on published ones (0.030, p = 0.075). The extraction was costing pattern.
+  * The rmse *gain* is smaller on published tables (14% against 22%), and that is the expected
+    direction given the audit: extraction finds 119 peaks where papers printed 267, so it reads
+    more voxels as silent, shrinks harder, and scores better on an rmse dominated by the 9204
+    near-zero voxels while over-shrinking the top (-0.065 against +0.005).
+
+The docstring now carries both rows and says the published one is the one to quote. This is the
+first time the central real-data claim has rested on coordinates a human transcribed from a
+paper rather than on my own proxy for them.
