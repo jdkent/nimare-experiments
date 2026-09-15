@@ -470,6 +470,10 @@ A sweep of the penalty and the basis, with the intensity constant fixed:
 | 24 | roughness | 30 | 0.679 | +0.532 | 1.82 |
 | 24 | roughness | 300 | 0.679 | +0.472 | 1.96 |
 | 48 | ridge | 0.01 | **0.954** | **+0.936** | **1.47** |
+| 48 | ridge | 1 | 0.954 | +0.934 | 1.46 |
+| 48 | roughness | 1 | 0.954 | +0.922 | 1.47 |
+| 48 | roughness | 30 | 0.954 | +0.837 | 1.52 |
+| 48 | roughness | 300 | 0.954 | +0.677 | 1.80 |
 
 The roughness hypothesis is refuted: it degrades the correlation and does not fix the inflation,
 so CBMR's penalty is not the answer to this particular problem. The basis is: doubling it lifts
@@ -484,3 +488,14 @@ was not neutral between arms, and is suspended pending the rerun.
 
 The lesson is the same one the harness bugs kept teaching: a shared handicap is not a fair
 comparison when the arms differ in how much they need the thing being limited.
+
+Completing the sweep at the larger basis settles the penalty question: a hundredfold change in
+ridge strength moves the correlation from 0.936 to 0.934 and the inflation from 1.47 to 1.46, and
+roughness at matched strength is the same. Heavy penalties only hurt. The residual inflation is
+**insensitive to regularisation**, so it is not overfitting and CBMR's roughness penalty is the
+right tool for a different problem.
+
+Basis size explains the correlation; something else sets the level. The named suspect is the
+threshold: these probes infer each study's cut as the smallest reported value, the signal-dependent
+floating cut that has caused trouble throughout this project. T5 suggested that is benign when the
+shape is known, and the field setting is exactly where it would stop being benign.
