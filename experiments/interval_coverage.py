@@ -163,31 +163,37 @@ def one(seed, n_studies, n_image, tau, peak_bias=None, fwhm=10.0,
 #: since the coverage failure here is entirely bias rather than width.
 FWHM_SWEEP = (10.0, 16.0, 24.0)
 
-#: The configuration the docstring recommends for a mixed collection: the per-study correction
-#: with its overall scale read off the image studies. Every arm below with `peak_bias=None`
-#: measures only the *dilution* effect of images -- them contributing unbiased values alongside
-#: the coordinates -- and not the *calibration* effect, where they pin the coordinate arm's own
-#: scale. Those are different mechanisms and the weight-share model describes only the first.
-CALIBRATED = ("per-study", "images")
+#: The documented configuration for a collection carrying both kinds of study: the per-study
+#: peak-height correction with its overall scale read off the image donors. This is the primary
+#: set, because characterising a method in a configuration its own documentation warns against
+#: is how a whole session's magnitude numbers came to describe a variant -- `peak_bias=None`
+#: lets the images outvote the coordinates without correcting them, and every arm of the first
+#: version of this table used it.
+CALIBRATED = dict(peak_bias="per-study", peak_bias_scale="images")
 
-#: (label, studies, of which supplying images, tau, peak_bias)
-#: The `per-study` rows test the remedy the docstring itself recommends when no images are
-#: available, so that the coordinates-only failure is measured against its own best defence
-#: rather than against a configuration nobody is advised to use.
-ARMS = [
-    ("12 studies,  0 images, tau 0.0", 12, 0, 0.0, None),
-    ("12 studies,  0 images, per-study", 12, 0, 0.0, "per-study"),
-    ("12 studies,  2 images, tau 0.0", 12, 2, 0.0, None),
-    ("12 studies,  6 images, tau 0.0", 12, 6, 0.0, None),
-    ("12 studies, 12 images, tau 0.0", 12, 12, 0.0, None),
-    ("12 studies,  0 images, tau 0.3", 12, 0, 0.3, None),
-    ("12 studies,  6 images, tau 0.3", 12, 6, 0.3, None),
-    ("12 studies, 12 images, tau 0.3", 12, 12, 0.3, None),
-    ("24 studies,  0 images, tau 0.0", 24, 0, 0.0, None),
-    ("24 studies,  0 images, per-study", 24, 0, 0.0, "per-study"),
-    ("24 studies,  6 images, tau 0.0", 24, 6, 0.0, None),
-    ("24 studies, 24 images, tau 0.0", 24, 24, 0.0, None),
-]
+#: Kernel widths to sweep in the coordinates-only arms, where the scale cannot be calibrated at
+#: all. Widening improves the map on real data and shrinks the interval, so it trades the two.
+FWHM_SWEEP = (10.0, 16.0, 24.0)
+
+#: (label, studies, images, tau, peak_bias, peak_bias_scale, fwhm)
+#: Coordinates-only arms cannot use the calibration -- there are no donors to read a scale from --
+#: so they carry `peak_bias="per-study"` with the default scale, which is what a caller without
+#: images is left with, plus the fwhm sweep.
+ARMS = []
+for _ns in (12, 24):
+    for _w in FWHM_SWEEP:
+        ARMS.append((f"{_ns} studies,  0 images @ fwhm {_w:.0f}" if _w != 10.0
+                     else f"{_ns} studies,  0 images", _ns, 0, 0.0, "per-study", 1.0, _w))
+    for _ni in ((2, 6, 12) if _ns == 12 else (2, 6, 24)):
+        ARMS.append((f"{_ns} studies, {_ni:2d} images, calibrated", _ns, _ni, 0.0,
+                     CALIBRATED["peak_bias"], CALIBRATED["peak_bias_scale"], 10.0))
+        # The variant, kept alongside so the difference is visible rather than asserted.
+        ARMS.append((f"{_ns} studies, {_ni:2d} images, peak_bias=None", _ns, _ni, 0.0,
+                     None, 1.0, 10.0))
+for _ni in (0, 6, 12):
+    ARMS.append((f"12 studies, {_ni:2d} images, tau 0.3", 12, _ni, 0.3,
+                 CALIBRATED["peak_bias"] if _ni else "per-study",
+                 CALIBRATED["peak_bias_scale"] if _ni else 1.0, 10.0))
 
 if __name__ == "__main__":
     # The convention check this bed exists to respect, run on a null field before anything is
@@ -200,15 +206,7 @@ if __name__ == "__main__":
     print(f"{N_SIMS} replications per arm; interval is g +/- 1.96*se\n")
     print(f"{'arm':34s} {'mean g':>7s} {'bias':>7s} {'mean se':>8s} {'sd of g':>8s} "
           f"{'se/sd':>6s} {'cover':>6s} {'half/truth':>10s} {'mean pi':>8s} {'report':>7s}")
-    arms = [(f"{lab} @ fwhm {w:.0f}" if w != 10.0 else lab, ns, ni, tau, pb, w, 1.0)
-            for lab, ns, ni, tau, pb in ARMS
-            for w in (FWHM_SWEEP if (ni == 0 and tau == 0.0 and pb is None) else (10.0,))]
-    # The recommended mixed configuration, on the arms where it can do anything: it needs both
-    # images to read the scale off and coordinates for that scale to apply to.
-    arms += [(f"{ns} studies, {ni:2d} images, calibrated", ns, ni, 0.0,
-              CALIBRATED[0], 10.0, CALIBRATED[1])
-             for ns, ni in ((12, 2), (12, 6), (24, 6))]
-    for label, ns, ni, tau, pb, width, pbs in arms:
+    for label, ns, ni, tau, pb, pbs, width in ARMS:
         rows = Parallel(n_jobs=8)(delayed(one)(s, ns, ni, tau, pb, width, pbs)
                                   for s in range(N_SIMS))
         refused = sum(r is None for r in rows)
