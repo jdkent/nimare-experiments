@@ -3620,3 +3620,90 @@ The docstring now says explicitly that the share bounds *which caveats apply* an
 about the interval's width, so nobody infers the rule I just failed to establish. And a uniform
 3x over-statement points at something structural -- the conditional-vs-marginal mismatch, or an
 incomplete Louis missing-information correction -- rather than anything per-voxel.
+
+## Retraction: every `se/sd` on record was computed on `sd(|g|)`, and so was every "bias" in the quiet stratum
+
+Suspect the test before the theory, again -- and this one had been shipped.
+
+`g` is a signed inverse-variance mean. The beds all did
+
+    gs.append(np.abs(res.get_map("g", return_type="array").ravel()))
+
+before taking a spread across replications. At a voxel whose truth is zero, `sd(|g|)` is about
+0.6 of `sd(g)`, and `mean(|g|)` is about 0.8 `sd(g)` above zero rather than at it. So the
+absolute value did two things at once: it shrank the denominator of `se/sd` and it manufactured a
+positive bias out of nothing. Both landed in the class docstring.
+
+**The calibration arm that should have caught it.** Give all 20 studies images and switch the
+selection model off, and the fit is a textbook local inverse-variance random-effects
+meta-analysis, where `se/sd` must be near 1:
+
+| arm | stratum | bias | sd(g) | sd(&#124;g&#124;) | se | se/sd | se/sd(&#124;g&#124;) | cov |
+|---|---|---|---|---|---|---|---|---|
+| A textbook IVW (20 images, no selection) | null | -0.001 | 0.0378 | 0.0226 | 0.0433 | **1.15** | 1.92 | 0.98 |
+| A | g=0.2 | -0.008 | 0.0372 | 0.0372 | 0.0435 | 1.17 | 1.17 | 1.00 |
+| A | g=0.6 | -0.025 | 0.0426 | 0.0426 | 0.0460 | 1.08 | 1.08 | 1.00 |
+| B images only (2 images, no selection) | null | -0.001 | 0.1225 | 0.0738 | 0.1503 | 1.23 | 2.04 | 1.00 |
+| B | g=0.6 | -0.025 | 0.1317 | 0.1317 | 0.1555 | 1.18 | 1.18 | 1.00 |
+| C shipped (2 images, zero-inflated) | null | -0.001 | 0.1120 | 0.0644 | 0.2462 | **2.20** | 3.82 | 0.98 |
+| C | g=0.2 | -0.084 | 0.1041 | 0.0868 | 0.2036 | 1.96 | 2.35 | 1.00 |
+| C | g=0.6 | -0.016 | 0.0836 | 0.0836 | 0.1156 | 1.38 | 1.38 | 1.00 |
+
+Arm A reads 1.08 to 1.17, so the harness is sound. Note the `sd(|g|)` column: at the null
+stratum it is 1.7x the signed one in every arm, and at the foci it is identical, because there
+the estimate is far enough from zero that the absolute value is a no-op. That is exactly the
+signature -- and it explains why the docstring's *quiet* column ran 2.71 to 3.74 while its
+*effect* column ran 1.55 to 1.97.
+
+**What the corrected numbers are.** Re-running the shipped interval table with signed `g`, 40
+replications: quiet bias goes from +0.114 to **-0.000** at one image and from +0.093 to
+**+0.001** at two; quiet `se/sd` from 2.71 to **1.51** and from 3.17 to **1.80**; the effect
+stratum moves little, 1.55 to 1.39 and 1.78 to 1.66. So:
+
+  * **The estimator is not biased upward where there is no effect.** That claim was an artifact
+    of the absolute value and has to come out of the docstring.
+  * **`se/sd` is 1.3 to 1.9, not 1.55 to 3.74.** Still conservative, still worth fixing, but not
+    the three-fold failure on record.
+  * **Some of the conservatism is not the censoring term at all.** A textbook all-image IVW fit
+    reads 1.08 to 1.17 in this bed, so the baseline is already above 1 (DL `tau2` on the se, and
+    the conditional-vs-marginal distinction). The shipped fit's remaining gap is 1.6 to 1.9.
+
+**And the share result reverses.** Re-run at 48 replications on signed `g`:
+
+| coordinate_share | voxels | se/sd | mean se | sd of g | bias |
+|---|---|---|---|---|---|
+| [0.00, 0.05) | 25 | 1.87 | 0.1935 | 0.1036 | +0.0029 |
+| [0.05, 0.10) | 445 | 1.82 | 0.2036 | 0.1119 | -0.0031 |
+| [0.10, 0.25) | 11037 | 1.87 | 0.1923 | 0.1028 | -0.0023 |
+| [0.25, 0.50) | 4040 | 1.63 | 0.2219 | 0.1358 | -0.0010 |
+| [0.50, 1.01) | 78 | **1.33** | 0.3353 | 0.2526 | -0.0017 |
+
+Top decile 1.54, bottom decile 1.86. Not flat: **monotone decreasing in the share**, so the
+interval is better calibrated where the coordinates act most. And not a signal effect -- only a
+few hundred of these 15625 voxels carry any truth, so the 4040 voxels in the [0.25, 0.50) band
+are nearly all null, and the gradient holds among them. The bias column is now flat at zero
+across every band, which is the same retraction again.
+
+**But do not read that as "the coordinates fix the interval."** Look at `sd of g`: it *rises*
+with the share, 0.103 to 0.253. The coordinate channel adds real sampling variability -- which
+voxels a study reports is itself random across replications -- and `se` rises less than `sd`
+does. So two errors are cancelling: a baseline `se` that is too conservative, and a censoring
+term whose contribution to the sampling variance is under-counted. `se/sd` near 1 at high share
+is an accident of their meeting, not a calibrated interval.
+
+That is a better-posed open question than the one I had: not "why is the se 3x too big" (it is
+not) but **"why does the observed information under-count the variance the indicator injects,
+while the baseline over-counts?"**
+
+**Scope of the contamination.** Bounded, and worth being precise about. The defect only bites
+where a spread of `|g|` is called the estimator's sampling spread, or a bias of `|g|` is read
+against a near-zero truth. In `hcp_sdm_vs_cbes.py`, `does_prevalence_decide_it.py` and
+`validate_redesign.py` the *truth is taken in absolute value too* (`truth = np.abs(hedges(...))`),
+so those are magnitude-against-magnitude comparisons with the same transformation on every arm:
+the CBES/SDM-PSI/images-only rankings, the HCP held-out result and the pain split-half rmse all
+stand. What falls is the interval section and the share paragraph -- both docstring content.
+
+Habit to add to the list that already has "report n and SE beside any number" and "report
+relative error per stratum": **a calibration arm is not optional, and it has to be an arm whose
+answer is known analytically.** Arm A costs one line in the arm list and would have caught this
+the first time `se/sd` was ever printed.

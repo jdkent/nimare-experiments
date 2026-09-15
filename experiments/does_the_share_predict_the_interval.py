@@ -54,7 +54,7 @@ if __name__ == "__main__":
             image_dir=tempfile.mkdtemp(), noise_extent=EXTENT, field_zooms=ZOOMS,
             blob_fwhm=BLOB)
         res = CBES(mask=MASK, null_method="none", threshold="reporting_threshold").fit(ss)
-        gs.append(np.abs(res.get_map("g", return_type="array").ravel()))
+        gs.append(res.get_map("g", return_type="array").ravel())
         ses.append(res.get_map("se", return_type="array").ravel())
         shares.append(res.get_map("coordinate_share", return_type="array").ravel())
     G, SE, SHARE = np.array(gs), np.array(ses), np.array(shares)

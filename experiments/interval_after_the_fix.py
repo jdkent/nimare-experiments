@@ -75,7 +75,7 @@ if __name__ == "__main__":
                            threshold="reporting_threshold", **options).fit(ss)
             except ValueError:
                 continue
-            gs.append(np.abs(res.get_map("g", return_type="array").ravel()))
+            gs.append(res.get_map("g", return_type="array").ravel())
             ses.append(res.get_map("se", return_type="array").ravel())
             dofs.append(res.get_map("dof", return_type="array").ravel())
         if len(gs) < 5:
