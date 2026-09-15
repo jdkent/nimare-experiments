@@ -4271,3 +4271,48 @@ Ordered by whether it would change what gets built:
    written down next to the delta-method code.
 
 Items 1 and 3 are the ones that would change the estimator.
+
+## Why the maxima density has the sign backwards: a term it does not contain
+
+The last specification error, and the numerics had said "no" without saying why. `#63` recorded
+that the RFT expected-maxima route made every focus worse and that no constant `q` helped. The
+derivation (`proofs/reporting_probability.py`, 4 claims) locates the reason.
+
+Write the observed field as `Z = m + e`, `e` smooth stationary Gaussian of mean zero, `m` the
+signal. A local maximum at the origin needs `Z'(0) = 0` and `Z''(0) < 0`. At a *signal peak*:
+
+  * `Z'(0) = m'(0) + e'(0) = e'(0)`, because `m'(0) = 0` by definition of a peak. The
+    first-order condition says exactly what it says under the null.
+  * `Z''(0) = m''(0) + e''(0) = -kappa + e''(0)` with `kappa = -m''(0) > 0`. So
+
+        P(Z''(0) < 0) = P(e''(0) < kappa) = Phi(kappa / sigma_2),
+
+    where `sigma_2 = sd(e''(0))`.
+
+**The zero-mean field is the case `kappa = 0`, where that probability is exactly 1/2.** And
+`Phi(kappa/sigma_2)` is strictly increasing in `kappa`, so a null-field density is not merely
+*different* at a signal peak -- it is a **lower bound**. The understatement factor is
+`2 Phi(kappa/sigma_2)`, equal to 1 at `kappa = 0` and tending to **2** as the peak sharpens.
+
+So: exactly one of the two conditions defining a local maximum picks up the signal, and it is the
+one the standard density pins at one half. Applying that density at a signal peak understates the
+chance of a maximum by up to a factor of two, understates it most where the effect is sharpest,
+and therefore supplies a correction that is too large precisely where the effect is -- which is
+the direction the measurements found, and why the route looked like it had the sign reversed.
+
+**What this does and does not settle.** It gives the direction of the error and a factor-of-two
+bound, and it says the fix is not a different density but the *same* density with the signal's
+own curvature in it -- a quantity the model does not carry and which is not recoverable from a
+coordinate table. It does **not** derive the non-monotone pattern (1.00, 1.78, 1.08, 1.13), which
+would need the interaction with the height threshold; that is stated in the proof rather than
+glossed.
+
+So the honest status of the reported limb: the error is understood, bounded, and **not fixable
+from tables alone**, because the correction needs a per-study peak sharpness that papers do not
+report. That is a better place to leave it than "the RFT route has the sign backwards", which was
+true and unexplained.
+
+One process note. A fifth claim in the first draft was `simplify(m'(0)) == 0` at a peak, which is
+a tautology dressed as a proof -- it would have printed `[ok]` and established nothing. Removed.
+jdkent's examples guard against exactly this with anti-vacuity asserts, and it is worth copying
+the habit rather than only the format.
