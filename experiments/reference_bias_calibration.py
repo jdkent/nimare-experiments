@@ -26,7 +26,8 @@ affine[:3, :3] *= step
 affine[:3, 3] = -step * (np.array(shape) - 1) / 2
 
 print(f"true g = {TRUE_G} at the blob centre, {N_SIMS} simulations, {N_STUDIES} studies\n")
-print(f"{'active if |z| >':>15} {'reference':>10} {'true mu there':>14} {'bias':>8}")
+print(f"{'active if |z| >':>15} {'true-effect band':>14} {'voxels':>8} "
+      f"{'reference':>10} {'true mu there':>14} {'bias':>8}")
 for cut in (3.2905, 4.0, 4.5, 5.0):
     refs, truths = [], []
     for seed in range(N_SIMS):
@@ -56,11 +57,23 @@ for cut in (3.2905, 4.0, 4.5, 5.0):
         use = (n_active >= 2) & np.isfinite(ref)
         if use.sum() < 20:
             continue
-        refs.append(float(ref[use].mean()))
-        # Truth is the same for every study, so the true mu at those voxels is the blob height.
-        truths.append(float(T[0][use].mean()))
+        refs.append((ref[use], T[0][use]))
     if not refs:
-        print(f"{cut:15.2f}   too few voxels")
+        print(f"{cut:15.2f}   too few voxels at any signal level")
         continue
-    ref_mean, true_mean = np.mean(refs), np.mean(truths)
-    print(f"{cut:15.2f} {ref_mean:10.3f} {true_mean:14.3f} {ref_mean / true_mean:8.3f}")
+    ref_all = np.concatenate([r for r, _ in refs])
+    true_all = np.concatenate([t for _, t in refs])
+    # Stratified by the true effect at the voxel. Averaging over every voxel with two active
+    # studies is dominated by the ones where there is no effect at all -- conditioning a study
+    # on clearing its threshold at a null voxel selects a pure noise excursion, so the
+    # reference is large there while the truth is ~0, and the ratio is unbounded. That says
+    # the reference cannot be trusted where there is no signal, which is true but useless; the
+    # question is how far it runs above a *real* effect.
+    bands = [(0.0, 0.05), (0.05, 0.2), (0.2, 0.4), (0.4, 0.6), (0.6, 10.0)]
+    for lo, hi in bands:
+        band = (true_all >= lo * TRUE_G) & (true_all < hi * TRUE_G)
+        if band.sum() < 50:
+            continue
+        r_mean, t_mean = ref_all[band].mean(), true_all[band].mean()
+        print(f"{cut:15.2f} {f'{lo:.2f}-{hi:.2f} x g':>14} {int(band.sum()):>8} "
+              f"{r_mean:10.3f} {t_mean:14.3f} {r_mean / max(t_mean, 1e-9):8.3f}")

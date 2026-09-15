@@ -148,3 +148,65 @@ The whole 10x is the selection correction.
 Cluster-extent thresholding lifts the inferred threshold by 0.19-0.57 z, and most modern fMRI
 papers use cluster-extent or TFCE. `threshold="pooled-min"` applies the most liberal study's cut
 to everyone. (`thresh_est.py`, `thresh_check.py`, `radius_threshold.py`)
+
+## The within-analysis null (2026-09-14/15)
+
+Shuffling reported values across the whole focus table let a large-N study's peak land on a
+small-N study's voxel. Restricting the shuffle to within an analysis fixed it: under a global
+null with sample sizes from 10 to 1000, the uncorrected rate went from 96.7% to 0.0125, and it
+no longer depends on how widely precision varies (0.0113 at N 20-40). Images take the same
+within-study rearrangement rather than a sign flip, so both sides randomize one hypothesis.
+(`within_analysis_null_rates.py`)
+
+The cost is power. At a focal g = 0.8 across 30 studies: 0.710 uncorrected, **0.030 voxel FWE**.
+The observed max |z| sits only ~19% above the null median, because permuting within a study
+keeps every large value in the map and merely scatters it, while a maximum over thousands of
+voxels catches whichever scattered voxel drew well. Cluster size and mass are statistics of
+concentration and should survive better; under the global null they read 0.000 and 0.050 against
+a voxel rate of 0.100. (`cluster_power.py`)
+
+**A measurement error worth remembering.** `within_analysis_null_rates.py` first reported the
+mean *share* of voxels rejected, not the familywise rate. That reads 0.0000 where the rate is
+about 0.10, and it made the test look far more conservative than it is.
+
+## Finding 7 and the magnitude (2026-09-14/15)
+
+Four instruments in a row were wrong in ways that each produced a confident conclusion:
+
+1. The likelihood already integrates to one over reported-and-silent, so it is a censored
+   likelihood and adding a truncation normaliser double-charges the selection. Prevalence
+   collapsed to its floor and z fell to 0.026.
+2. The default point simulator has no peak-height inflation at all, so it cannot test a
+   peak-height correction.
+3. The field simulator wrote `signal * scale + noise` as a Z when that is the *t* statistic's
+   noncentrality. Converting its own peaks returned g = 8.8 against a true 1.6, and it inverted
+   the apparent direction of the bias. Fixed with `t_to_z`; the natural reporting density also
+   fell from 28-29 peaks/study to 13.8, inside the realistic range.
+4. Every real-data reference estimated the wrong quantity. The inverse-variance pooled image
+   map estimates pi*mu; CBES estimates mu. `g * prevalence` matches it (ratio 1.17, r 0.575)
+   where `g` alone reads 2.3-9.9x high.
+
+Corrected simulator, prevalence 1: ratio to truth 0.23 / 0.68 / 0.97 / 0.93 / 0.95 / 0.95 at
+true g = 0.2 / 0.4 / 0.6 / 0.8 / 1.2 / 1.6. Above ~0.6 the required scale is 1.05 +- 0.02 across
+a 2.7-fold range, which is not what an unidentified constant looks like.
+
+`peak_information` does not discriminate: excess z is +0.03 at true g of 0.2, 0.4 *and* 0.6,
+where the ratio runs 0.23 to 0.97. Real collections sit in that same band, so excess z near zero
+says nothing about whether the magnitude is right.
+
+The conditional reference built by conditioning a study on clearing its own threshold is
+inflated and nearly flat in true signal: it reads 1.09-1.42 while the pooled truth varies
+tenfold. CBES moves 0.42-1.13 over the same range, so it is the more responsive instrument.
+(`matched_by_signal.py`)
+
+Across five collections and four thresholds the CBES/reference ratio rises monotonically with
+the inferred cut in every one, `ratio = 0.328 + 0.203*cut` (r 0.651, residual sd 0.126), and
+`log(peaks)` does not predict it (r -0.238, p 0.34). But the roster shrinks as the threshold
+rises, so the within-collection slope is confounded with study count.
+(`threshold_correction_fit.py`)
+
+**What none of this could settle**, and why the HCP work exists: with one map per study, "this
+study has an effect here" is not observable independently of the effect's size. Collection 4337
+has per-subject maps for 787 subjects across 23 contrasts, so synthetic studies can be built
+from one set of subjects and the truth measured on a disjoint set.
+(`hcp_index.py`, `hcp_heldout_validation.py`)
