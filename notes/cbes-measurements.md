@@ -366,3 +366,38 @@ buying at most the 1% above.
 
 The mask device works and is verified: masks load, are keyed per analysis, and the fitted values
 move. The negative result is the model's, not the harness's.
+
+### Assuming a cluster size, in the version that could have worked
+
+Cancelling the misread silence was the weak form of the idea. The strong form lets the assumed
+cluster carry the study's reported *value*, so the focus speaks for the whole cluster instead of
+a 13 mm neighbourhood of its peak. `fwhm` already does exactly that, with the coverage radius
+following at twice its size, and it needs no reported extent -- which matters, because papers do
+not give one reliably.
+
+| fwhm | coverage | r | 0-50% | 50-75% | 75-90% | 90-99% | 99-100% |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 10 mm | 20 mm | +0.209 | 20.74 | 7.86 | 4.82 | 3.13 | 2.30 |
+| 15 mm | 30 mm | +0.177 | 21.23 | 7.64 | 4.79 | 3.18 | 2.28 |
+| 20 mm | 40 mm | +0.150 | 21.17 | 7.51 | 4.71 | 3.15 | 2.24 |
+| 25 mm | 50 mm | +0.138 | 20.50 | 7.25 | 4.56 | 3.07 | 2.19 |
+
+The held-out truth spans elevenfold across those strata. Widening the assumed cluster from 20 mm
+to 50 mm moves the top-stratum ratio from 2.30 to 2.19 and costs a third of the correlation.
+Both forms of the assumption are ruled out.
+
+### The running tally of what does not fix the compression
+
+1. The truncated-normal selection correction. Wrong event for a local maximum: it returns 0.257
+   for a true mean of 0.5 and 3.6 for a true mean of 2.0.
+2. `peak_bias='per-study'`, the estimator's own documented remedy. Ratio 3.98 to 3.83.
+3. Subtracting the censoring floor `u/sqrt(N)`. Fixes part of the level, none of the shape.
+4. Reporting properly instead of capping. Worth a lot to the correlation, +0.217 to +0.453, and
+   nothing to the shape.
+5. Centre-of-mass foci, which carry no winner's curse. Level 4.58 to 2.49, shape unchanged.
+6. Oracle cluster-extent coverage, using the true significant set. About 1%.
+7. An assumed cluster size driving the kernel. Nothing, and the correlation falls.
+
+Seven independent changes, no movement. That points at the input rather than the model, which
+`information_ceiling.py` tests directly by comparing the reported magnitudes against the
+held-out truth at the same locations, with no estimator in between.
