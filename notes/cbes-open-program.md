@@ -1289,3 +1289,55 @@ conclusion the instrument produced, including the ones that were negative.** A b
 an estimate also inflates the evidence against predictions that said the estimate would be
 smaller, and those retractions need revisiting too. I found this one by accident rather than by
 audit, which is the wrong way round.
+
+## E3 and E7 re-run on the correct convention (both confirmed, one with a caveat I owe)
+
+### E3 — power spread identifies the split
+
+With a genuine noncentral t, per-study cuts derived from a reporting p on each study's own t
+scale, and the threshold handed in rather than inferred. True `mu = 0.6` at every cell.
+
+```
+roster        fitted prevalence at true 0.25/0.50/0.75/1.00   slope   fitted g across the sweep
+fixed         0.453  0.702  0.926  0.943                     +0.677   0.387 0.497 0.547 0.603
+n varies      0.318  0.594  0.803  0.980                     +0.878   0.506 0.482 0.537 0.588
+both vary     0.233  0.488  0.752  0.986                     +1.009   0.554 0.561 0.604 0.577
+```
+
+Confirmed, and more cleanly than on the buggy convention. The prevalence slope rises +0.677 to
++1.009 and lands on 1. The `g` column, which should be a constant 0.6, swings 0.387 to 0.603 under
+the fixed roster -- a 56% range driven entirely by a parameter it is meant to be separate from --
+and is flat at 0.55-0.60 once both sample sizes and thresholds vary. The marginal slope goes
++0.804 to +0.982, a 22% improvement against the prevalence's 49%, so my original prediction that
+the product "stays roughly constant" while the factors improve is closer to right here than it
+was on the uncorrected data (where it moved 53%).
+
+**The caveat I owe on this bed.** With both varying, `g` comes back at 0.554-0.604 against a truth
+of 0.600 -- apparently unbiased, which flatly contradicts the coverage bed's +0.26. The difference
+is that this bed has **no winner's curse**: it draws one value at the site and jitters its
+location, rather than taking the maximum of a smooth field over a surviving cluster. So E3
+measures *identification* -- whether the prevalence/magnitude split can be recovered -- and not
+selection bias. The two are separate and additive, and the honest statement is that heterogeneous
+power stops `g` being contaminated by prevalence; it does nothing about the peak-height inflation,
+which is what the coverage bed measures. I would have over-read this without the contrast.
+
+### E7 — the `g_marginal` cancellation needs silence to work on
+
+```
+site                 rep dens  true mu      g  g bias  true pi     pi  true marg  g_marg  marg bias
+strong, universal        0.93     0.80  1.062  +0.262     1.00  0.997      0.800   1.058     +0.258
+strong, uncommon         0.39     0.80  1.042  +0.242     0.40  0.371      0.320   0.386     +0.066
+weak, universal          0.28     0.45  0.618  +0.168     1.00  0.602      0.450   0.355     -0.095
+weak, uncommon           0.12     0.45  0.647  +0.197     0.40  0.220      0.180   0.136     -0.044
+```
+
+Confirmed and sharper. At the densely-reported site the prevalence saturates at 0.997, so there is
+nothing to offset `g`'s +0.262 and `g_marginal` inherits essentially all of it (+0.258). At the
+other three the cancellation works well: +0.066, -0.095, -0.044 against truths of 0.32, 0.45 and
+0.18. And the prevalence at the "strong, uncommon" site is accurate (0.371 against a true 0.40),
+because that site sits inside the window of detectability.
+
+So `g_marginal` is trustworthy where the effect is not reported by nearly everyone, and inherits
+the full peak-height inflation where it is. Since "reported by nearly everyone" is what makes a
+voxel interesting to a reader, that is a caveat to state in the docstring rather than a
+reassurance.
