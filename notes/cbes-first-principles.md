@@ -638,3 +638,126 @@ is directly usable for planning, replication judgements and simulating coordinat
 bias enters. Cross-collection magnitude comparison when thresholds or sample sizes differ, since
 the estimand's definition moves with the rate function's curvature. Separating prevalence from
 magnitude. Power calculations for a new study, which need the marginal on a real scale.
+
+## 17. The one intuition that has survived everything: counts carry the signal, heights do not
+
+Stated as a single claim, because it now organises almost every result in this program:
+
+> In a coordinate table, the information about an effect is in *whether and where* foci appear,
+> not in *how large* the reported statistics are. Every method that used counts and locations has
+> worked; every method that used reported magnitudes has failed, and failed in the direction the
+> selection predicts.
+
+The evidence, gathered for other reasons and pointing the same way each time:
+
+| measurement | what it says |
+| --- | --- |
+| peak height moves 0.055 z per unit g at a 3.29 cut, while the count moves ~10x | the height channel carries a few percent of what the count channel does |
+| one coordinate explains 5-9% of the variance in the truth at its own location | a single mark is nearly uninformative |
+| coordinates-only `g` is +63% biased; coverage 0.10 at 12 studies, 0.00 at 24 | the height-based estimator does not converge on the truth, it converges on the threshold |
+| `peak_bias='per-study'` moves the bias +0.506 -> +0.514 | the between-study part of the height bias is negligible; the common part is everything |
+| adding coordinates to images degrades magnitude (r 0.774 -> 0.614) | height information is not merely weak, it is contaminated, and the contamination is shared so it does not average away |
+| the point-process fit recovers the scale to 1-5% and the field to r 0.934 | the count/location channel is strong enough to recover a magnitude *indirectly* |
+| `prevalence` is the only output with no external competitor and it is count-driven | what holds up is what counts |
+
+**Why this is not obvious a priori.** A reported peak height looks like a measurement of effect
+size -- it is on the right scale, it has a sample size attached, it converts to a Hedges' g. The
+trouble is that it is the maximum of a field over a region selected *because* it was large, so
+its distribution is pinned near the threshold almost independently of the truth. The floor at
+mu = 0 is 3.84 at a 3.29 cut and 3.90 at mu = 0.5; the truth moved by half a standard deviation
+and the reported height moved by 0.06. Whereas the *number* of surviving clusters went from 45.7
+to 64.6 -- a 41% change. The signal was never in the value.
+
+**What follows for the design.** CBES is built the other way round: a censored likelihood on
+reported magnitudes, with locations serving only as support for a smoothing kernel. That places
+the model's whole estimating equation in the channel that carries least, and uses the strong
+channel only to decide which voxels to touch. The point-process formulation (task #40) inverts
+that -- intensity estimated from where and how often foci appear, with magnitudes ignored or used
+only as weights -- and it is the only approach here that has recovered an absolute scale from
+coordinates alone.
+
+**What follows for the deliverable.** If this is right, `prevalence` is the feature and `g` is a
+vestige of the wrong premise. `prevalence` is the count channel expressed directly; its known
+faults (a floor near 0.2, compression, non-monotonicity at weak effects, ordering reliable only
+on average) are calibration problems in a quantity that is at least identified. `g`'s fault is
+that the data barely constrain it. Those are not the same kind of problem and they should not be
+presented as equally fixable.
+
+**The check that would falsify it.** A count-only estimator should then beat the height-based
+magnitude map at recovering the *pattern* of the truth, and a naive count of studies with a
+nearby focus should be competitive with the fitted `prevalence`. Both are queued
+(`prevalence_vs_naive.py`, task #38). If the naive count loses badly to the fitted prevalence,
+the likelihood is extracting something real from the heights after all and this claim is too
+strong.
+
+## 18. What identifies prevalence separately from magnitude: heterogeneous power
+
+Write down what the data at a voxel actually are, once the intuition of section 17 is taken
+seriously and the reported heights are set aside as nearly uninformative. For study *k* and voxel
+*v* the informative observation is a binary one:
+
+    R_kv = 1 if study k reported a focus within r of v, else 0
+
+and its probability factors into having the effect and detecting it:
+
+    E[R_kv] = pi_v * D(mu_v, n_k, u_k)
+
+with `D` the probability that a study of sample size `n_k` reporting at threshold `u_k` produces
+a surviving cluster there given a true effect `mu_v`. This is exactly an **occupancy model with
+imperfect detection**: `pi` is occupancy, `D` is the detection function, and the observation is a
+detection/non-detection record.
+
+That framing imports a known and decisive result. In an occupancy model, occupancy and detection
+are **separately identified only through repeat visits or through covariates that shift detection
+while leaving occupancy alone** (MacKenzie et al. 2002 is the canonical statement; it is why
+occupancy designs mandate repeat surveys). With a single visit and no detection covariates, only
+the product `pi * D` is identified -- any `pi` can be traded against any `D` that preserves it.
+
+Map that back:
+
+| occupancy model | coordinate meta-analysis |
+| --- | --- |
+| site | voxel |
+| occupancy `pi` | fraction of studies with the effect |
+| detection probability | probability a study's map survives thresholding there |
+| repeat visits to a site | multiple studies covering the voxel |
+| detection covariates | sample size `n_k`, reporting threshold `u_k`, smoothness |
+
+**So `pi` and `mu` in CBES are separately identified only by the spread of sample sizes and
+reporting thresholds across the studies that cover a voxel.** With a homogeneous roster --
+every study 20 subjects at p < 0.001 corrected -- the likelihood has one identified combination
+and the split into prevalence and magnitude is determined by the model's functional form rather
+than by the data, however many studies there are.
+
+This explains, in one mechanism, four findings that were recorded separately as puzzles:
+
+- **`g_marginal` is the best-behaved magnitude map.** It is the closest thing the estimator emits
+  to the identified combination. It was written up as "two biases happen to cancel"; the reason
+  the cancellation keeps recurring is that the product is what the data pin down.
+- **`prevalence` has a floor near 0.2 and is non-monotone at weak effects.** A weakly identified
+  parameter is pushed around by the prior implicit in the likelihood's shape, and non-monotonicity
+  is what a ridge in the likelihood looks like when you profile it.
+- **The `pi`/`mu` split is unstable across collections while the product is stable.** Textbook
+  weak identifiability.
+- **Peak heights cannot rescue it.** The height channel carries ~5% of the count channel's signal,
+  so it cannot supply the second equation the separation needs.
+
+**The prediction, which is E3 and is now sharp.** Separation quality should improve with the
+*spread* of `n` and `u` across studies covering a voxel, and should be near-absent when the
+roster is homogeneous. Specifically: fit the same true `(pi, mu)` under a roster with `n` fixed at
+30, then with `n` drawn over 15-120, then with the reporting threshold varying too. If the theory
+holds, the fitted `pi` should be badly biased and nearly flat in the truth under the fixed roster
+and should track the truth increasingly well as the spread grows -- while `pi*mu` stays about as
+good in all three. That is a clean separation of "the product is identified" from "the factors
+are", and it is decisive either way.
+
+**What it would give the user if it holds.** A diagnostic the estimator can compute before
+fitting: the spread of sample sizes among studies contributing at each voxel. Where that spread
+is small, report the product and refuse the split. That is a far better guard than a warning
+about "regimes", because it is computed from the collection in hand.
+
+**And a design direction.** If identification comes from heterogeneous power, then the estimator
+should be *told* each study's power rather than inferring it from a reported height -- which
+means the sample size and the threshold are the load-bearing inputs, and the statistic column is
+close to decoration. That is testable too: refit with the reported magnitudes replaced by their
+per-study mean, destroying all within-study height information, and see how much is lost.

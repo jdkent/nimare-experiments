@@ -194,3 +194,92 @@ unearned complexity, and should be the arbiter when the point estimates are clos
 The gap between the second and the third is the honest state of the field, not a defect peculiar
 to this estimator, and the criteria should be stated so that a method may pass as a relative map
 and say so, rather than quietly claiming the third.
+
+## Metrics that lie, continued
+
+**Coverage without width.** A first coverage run reported 100% coverage in all seven arms and
+looked like a pass. It was not: in the coordinates-only arm the reported `se` was eight times
+the estimator's own sampling sd while the point estimate was 23% high. The interval covered
+because it covered almost everything. Coverage is only interpretable alongside the half-width as
+a fraction of the effect; an interval with `1.96*se/truth` near or above 1 has certified nothing.
+Report the pair, never coverage alone.
+
+**se/sd is the wrong honesty check when the estimator is biased.** The natural diagnostic --
+reported `se` against the sd of the estimate across replications -- asks whether the width
+matches how much the estimator *moves*. That is the right question only if the estimator is
+centred. A systematically biased estimator can be extremely stable: the coordinates-only fit had
+sd 0.135 against a bias of +0.575, so `se/sd` of 1.85 looked mildly conservative while coverage
+was 0.33. The quantity that predicts coverage is `se` against total error,
+`RMSE = sqrt(bias^2 + sd^2)`:
+
+```
+                             bias     sd    RMSE     se   se/sd  se/RMSE  coverage
+12 studies,  0 images      +0.575  0.135   0.591  0.249    1.85     0.42      0.33
+12 studies, 12 images      +0.003  0.049   0.049  0.056    1.16     1.14      1.00
+24 studies,  0 images      +0.496  0.088   0.504  0.119    1.35     0.24      0.00
+```
+
+`se/sd` ranks these three as 1.85 / 1.16 / 1.35 -- no signal. `se/RMSE` ranks them 0.42 / 1.14 /
+0.24, in exactly the order of their coverage. Report both, but read coverage off `se/RMSE`.
+
+**Coverage that gets worse with more studies is a bias signature.** The coordinates-only arm goes
+from 0.33 coverage at 12 studies to 0.00 at 24. Nothing about the estimate deteriorated -- the
+bias is the same and the sd fell. A fixed bias with a shrinking interval is the one failure mode
+that *looks* like improvement on every accuracy metric (RMSE falls, correlation rises) while the
+inference gets strictly worse. Any validation suite that reports only accuracy will miss it, and
+this one did for months.
+
+## Reflection: what success can still mean for `g`
+
+The coverage measurements change what is worth aiming at, so it is worth restating the target
+rather than carrying on against the old one.
+
+Coverage of `g +/- 1.96*se` for a truth of 0.800, prevalence 1, 12 studies, 100 replications:
+
+```
+  images of 12   bias    se     coverage   1.96*se / truth
+       0        +0.506  0.179     0.10          0.44
+       0 *      +0.514  0.193     0.16          0.47      * peak_bias='per-study'
+       2        +0.248  0.162     0.67          0.40
+       6        +0.079  0.092     0.85          0.23
+```
+
+Three things follow, and none of them is a tuning problem.
+
+**1. The documented remedy for having no images does not work on the bias.** `peak_bias`
+`'per-study'` moved the bias from +0.506 to +0.514 -- nothing. This is not a contradiction of the
+docstring, which says in terms that the per-study correction removes the part of the bias that
+*varies between studies* and that fixing the common scale still needs images. It is a number for
+that claim, and the number says the between-study part is negligible next to the common part.
+Advice that stops at "use peak_bias" is advice to do nothing.
+
+**2. The interval never reaches nominal coverage in any genuinely coordinate-based
+configuration.** At six of twelve studies imaged -- a far larger share than real collections
+have -- it is 0.85. The "12 of 12" arm does reach ~1.00, but it is not a CBES result at all: donor
+coordinates are dropped, so with every study imaged the coordinate table is empty and the fit is
+an IBMA wearing CBES's interface (see task #47). The honest reading is that the interval on `g`
+has no validated operating point.
+
+**3. Coverage degrades as studies accumulate.** 0.33 at 12 studies and 0.00 at 24, in the
+coordinates-only arm of the smoke run. A fixed bias with a shrinking interval gets worse with
+more data while every accuracy metric improves. So "more studies" is not a route to a working
+interval; it is a route to being confidently wrong.
+
+**So success for `g` cannot be coverage of an absolute magnitude.** Two targets remain available,
+and they are not the same:
+
+- *Relative success.* `g` is read as a pattern -- which regions are stronger than which -- and
+  success is the correlation and the within-map ordering, with the absolute scale disclaimed and
+  `se` either withdrawn or documented as sampling-only. This is only available if the
+  coordinates-only bias is *one multiplicative constant*; if the ratio `g/truth` varies with the
+  true strength, the pattern is distorted too and there is nothing to read relatively. That is
+  what `is_g_a_scale_error.py` decides, and it should be decided before this target is adopted.
+- *Marginal success.* `g_marginal = g * prevalence` shares an IBMA's estimand, so it is the one
+  output with an external reference and can be held to coverage against one. It currently has no
+  standard error at all (task #43), which is the gap to close.
+
+What should be dropped as a target: an absolute `g` with a covering interval from coordinates.
+Nothing measured over this program suggests it is reachable, and the reason is not
+implementation. A reported peak height carries ~0.055 z of signal per unit of g at a 3.29 cut
+(`peak_height_curve`), so the magnitude channel is almost closed before any estimator touches
+it. An estimator cannot recover information the reporting practice did not emit.
