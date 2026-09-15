@@ -3531,3 +3531,43 @@ papers do not report reliably, **estimated smoothness (FWHM) is routinely report
 both print it, and it appears in methods sections. So the concrete route is a `smoothness`
 metadata field feeding an RFT expected-maxima density, which turns this from "needs a quantity we
 cannot have" into "needs a field papers already publish". Links to #63.
+
+### Error bars on the 1.78, and a correction to the route I recommended
+
+Put a Poisson CI on the reporting-rate ratio (24 collections, so the counts are the total across
+them), because "overstated by 1.78" was a ratio of two small counts with no uncertainty attached:
+
+| truth | reports | q = obs/model | 95% CI | reading |
+|---|---|---|---|---|
+| 0.2 | 3 | 1.03 | [0.00, 2.20] | **unmeasured** -- my "1.00" was meaningless |
+| 0.4 | 21 | **0.58** | **[0.33, 0.84]** | excludes 1: the over-statement is real |
+| 0.6 | 163 | 1.00 | [0.85, 1.15] | consistent with no over-statement |
+| 0.8 | 299 | 0.89 | [0.79, 0.99] | excludes 1, mildly |
+
+**The 1.78 survives** (1/0.58 = 1.72, CI [1.19, 3.0]), so the defect is real. Two things I stated
+with more confidence than the data carry: the value at 0.2 is not measured at all, and **q is not
+demonstrably non-monotone** -- the 0.6 and 0.8 intervals overlap heavily, so the shape is "well
+below 1 at 0.4, at or just below 1 above the window", which is monotone-increasing-then-flat.
+
+**And that overturns the route I recommended.** I said the fix needs `q(mu)` from reported
+smoothness via an RFT expected-maxima density. Checked against the measurement, that has the
+*sign backwards*. The RFT clump argument is `q ~ 1/clump size ~ u^3` with `u = (c - mu)/sigma`, so
+it predicts q **falling** as mu rises (u goes +1.10, 0.00, -1.10 across the three foci). The data
+show q **rising** (0.58, 1.00, 0.89).
+
+The reason is that the RFT density describes a *zero-mean* field, and these are *signal peaks*. At
+a strong focus the blob's own curvature makes that voxel the local maximum, so q approaches 1; at
+a marginal focus the noise decides which of several exceeding voxels is the max, so q falls. The
+governing quantity is the signal's curvature relative to the noise smoothness -- **not** the null
+expected-maxima density, and not recoverable from a coordinate table.
+
+So "supply smoothness and compute q from RFT" is withdrawn. What remains established: the defect
+is real at the window, acting on `P(report)` closes it (q = 0.56 takes the 0.4 focus from -11% to
++1%), no constant q helps overall, and the correct `q` depends on a signal curvature this model
+has no way to observe. Which makes this harder than I claimed an hour ago, not easier.
+
+Also worth recording because it invalidated a hypothesis before I tested it: I suspected the
+cluster-forming extent requirement was the mechanism. It cannot be, on this bed -- the field
+simulator's rule is `(magnitude == maximum_filter(magnitude, size=3)) & (magnitude >= threshold)`,
+every suprathreshold local maximum and no extent test at all. Read the generator, not the
+assumption.

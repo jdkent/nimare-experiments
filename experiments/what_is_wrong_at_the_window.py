@@ -104,13 +104,22 @@ if __name__ == "__main__":
             rows[j]["true_rate"].append(
                 1.0 - (norm.cdf((cutoff_g - effect) / sigma) - norm.cdf((-cutoff_g - effect) / sigma))
             )
+    print(f"\n{'truth':>6} {'reports':>9} {'total':>7} {'obs rate':>10} {'model rate':>11} "
+          f"{'q = obs/model':>15}")
     for j, effect in enumerate(EFFECTS):
         r = rows[j]
-        print(f"{effect:6.1f} {np.mean(r['rep']):9.2f} {np.mean(r['sil']):7.2f} "
-              f"{np.mean(r['mu']):10.3f} {np.mean(r['inv']):14.3f} "
-              f"{np.mean(r['true_rate']):10.3f}")
-        print(f"{'':6} {'':9} {'':7} {'':10} "
-              f"observed rate {np.mean(r['rep']) / max(np.mean(r['rep']) + np.mean(r['sil']), 1):.3f}")
+        # The ratio of two rates built from a handful of reports. Its uncertainty is dominated
+        # by the Poisson count in the numerator, so report that rather than a bare point
+        # estimate -- a "1.78 over-statement" resting on 14 reports is not a measurement.
+        total_reports = float(np.sum(r["rep"]))
+        total_pairs = float(np.sum(r["rep"]) + np.sum(r["sil"]))
+        obs = total_reports / max(total_pairs, 1.0)
+        model = float(np.mean(r["true_rate"]))
+        rel = 1.0 / np.sqrt(max(total_reports, 1e-9)) if total_reports else np.inf
+        q = obs / model if model > 0 else np.nan
+        lo, hi = q * (1 - 1.96 * rel), q * (1 + 1.96 * rel)
+        print(f"{effect:6.1f} {total_reports:9.0f} {total_pairs:7.0f} {obs:10.4f} "
+              f"{model:11.4f} {q:8.2f} [{max(lo, 0):.2f}, {hi:.2f}]")
 
     print(f"\nDoes widening the report radius help *at the window*? (per focus)")
     print(f"{'radius':>8} " + " ".join(f"{'g@' + str(e):>14}" for e in EFFECTS))
