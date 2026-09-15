@@ -462,3 +462,44 @@ Below the median it is still four to five times the truth, so the compression is
 the PR description rewritten: the within-analysis null, the refusal of degenerate collections,
 the corrected familywise error rates, the no-cap validation protocol, and the magnitude limits
 above replacing the numbers that came from the capped extraction.
+
+## One image beats ten coordinate tables, and mixing them costs
+
+`do_coordinates_help.py` scores three estimates of the same held-out half of NIDM pain: inverse-
+variance pooling of `k` image studies alone, CBES with those `k` as images and the rest of the
+working half as coordinate tables, and CBES on the whole working half as tables. Eight splits,
+cluster-extent reporting, one focus per surviving cluster.
+
+| images | estimate | r | ratio | rmse |
+| --- | --- | --- | --- | --- |
+| 1 | images only | +0.520 | 1.62 | 0.446 |
+| 1 | images + 9 coordinate studies | +0.083 | 1.92 | 0.666 |
+| 2 | images only | +0.723 | 1.50 | 0.346 |
+| 2 | images + 8 coordinate studies | +0.545 | 1.35 | 0.345 |
+| 3 | images only | +0.774 | 1.34 | 0.276 |
+| 3 | images + 7 coordinate studies | +0.614 | 1.25 | 0.285 |
+| 5 | images only | +0.829 | 1.22 | 0.210 |
+| 5 | images + 5 coordinate studies | +0.697 | 1.24 | 0.244 |
+| 0 | 10 coordinate studies | +0.218 | 4.51 | 1.587 |
+
+Adding coordinates costs correlation at every `k` and root mean square error at three of four.
+A single image study beats nine coordinate tables *plus itself*, +0.520 against +0.083, and beats
+ten coordinate studies alone by +0.52 to +0.22 at a quarter the error. The only thing the tables
+improve is the level, and only slightly.
+
+This is what a shared bias predicts and a shared noise would not. Per coordinate on this
+collection the reported g at a focus is 1.965 +- 0.593 against a held-out truth of 0.519 +-
+0.312: the error is a +1.45 bias against about 0.6 of noise, and the empirical error variance is
+only about twice the nominal variance the estimator assigns. Noise averages out with more
+studies. A bias every coordinate study shares does not -- pooling more of them converges harder
+on the wrong number, and mixing them with unbiased images drags the pool toward it in proportion
+to their weight.
+
+Three limits on the result: eight splits of one collection; every pain study is whole-brain, so
+the tables added no spatial coverage that the images did not already have, which would not hold
+against ROI images; and pain's median N of 16 makes a single image noisy, though still unbiased.
+
+What this does *not* score is what the coordinate pathway uniquely provides -- localisation
+inference under the within-analysis null, whose error rates are valid, and `prevalence`. Neither
+depends on the magnitude scale, so the finding bears on where `g` should come from, not on
+whether coordinates belong in the estimator.
