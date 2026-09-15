@@ -72,3 +72,46 @@ a literature.
 **S3.** The achievability framing in E5 suggests a criterion nobody states: does the output let a
 reader decide whether their planned study is possible? That is a different and more useful test
 than any correlation.
+
+---
+
+## U2 answered: three defects in how uncertainty is reported
+
+Read from the code and confirmed arithmetically.
+
+### U2a. `scale_interval_` is a sample range, and its error changes sign with donor count
+
+It is set to `(min(per_donor), max(per_donor))`. A sample range *grows* with the sample size while
+uncertainty about the common scale *shrinks* like one over the square root of it, so the two
+diverge in opposite directions. Drawing per-donor estimates from a normal with mean 0.60 and
+standard deviation 0.08, twenty thousand times:
+
+| donors | reported (min, max) width | honest 95% interval width | ratio |
+| --- | --- | --- | --- |
+| **2** | 0.0909 | 0.1781 | **0.51** |
+| 3 | 0.1351 | 0.1601 | 0.84 |
+| 5 | 0.1866 | 0.1323 | 1.41 |
+| 10 | 0.2467 | 0.0967 | 2.55 |
+| 20 | 0.2985 | 0.0692 | 4.32 |
+
+At the **two-donor floor the estimator requires for `g_absolute`**, and which the docstring
+specifically argues for, the reported interval is **half** the honest width -- it understates
+exactly where it matters most. By twenty donors it overstates by 4.3-fold, which also reverses
+the incentive to supply more images. The fix is a standard error of the mean across donors rather
+than their range.
+
+### U2b. `se` does not include the scale's uncertainty
+
+`g_absolute` is the same array as `g`, so its standard error is `g`'s, which is conditional on the
+scale being exactly right. The description text says the magnitudes should be read as an order of
+scale, which is honest prose, but the number a reader will use does not reflect it. An interval on
+a partially identified quantity that omits the identification uncertainty is a misrepresentation
+however carefully the surrounding paragraph is worded.
+
+### U2c. `g_marginal` has no standard error at all
+
+It is emitted as `fit["g"] * fit["prevalence"]` with no variance propagated. So the one magnitude
+map with a checkable reference -- the only one sharing an estimand with an image-based
+meta-analysis -- is the one carrying no uncertainty. Propagating it needs the covariance of the
+prevalence and the magnitude, which the observed information already contains, since the
+prevalence is profiled out of it by a Schur complement.
