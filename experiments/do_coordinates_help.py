@@ -17,6 +17,14 @@ If the middle beats the first, the coordinate pathway earns its place and the es
 keep it. If it does not, the compressed tables are diluting good data and the estimator should
 say so, or refuse them.
 
+The mixed fit is run under two settings, because the first version of this script got it wrong.
+With ``peak_bias=None`` the coordinates enter on their inflated scale -- a mean g near 2.0 on
+this collection -- while the images enter on the true one near 0.5, and nothing reconciles them.
+The estimator ships ``peak_bias="per-study"`` with ``peak_bias_scale="images"`` for exactly this
+case, and its own docstring warns that a mismatched constant makes the two kinds of study
+disagree about the same voxel. Judging mixing without it tests a configuration the code tells
+you not to use, and would explain a mix scoring worse than either of its parts.
+
 Truth is the inverse-variance pooling of the *other* half, so no study contributes to both
 sides. Coordinates come from :mod:`reporting`: multiplicity-corrected, whole surviving clusters,
 one focus each, nothing capped.
@@ -74,7 +82,7 @@ def write_image(values, path):
     return path
 
 
-def cbes_fit(image_members, coord_members, maps, sizes, workdir):
+def cbes_fit(image_members, coord_members, maps, sizes, workdir, calibrate=False):
     studies = []
     for i in image_members:
         g, var = g_and_var(maps[i], sizes[i])
@@ -99,8 +107,15 @@ def cbes_fit(image_members, coord_members, maps, sizes, workdir):
                  "values": [{"kind": "Z", "value": v}]} for ijk, v in foci]}]})
     if len(studies) < 2:
         return None
-    est = CBES(fwhm=10.0, mask=masker, peak_bias=None, null_method="none",
-               threshold="reporting_threshold" if coord_members else "study-min")
+    calibrated = calibrate and image_members and coord_members
+    est = CBES(
+        fwhm=10.0,
+        mask=masker,
+        peak_bias="per-study" if calibrated else None,
+        peak_bias_scale="images" if calibrated else 1.0,
+        null_method="none",
+        threshold="reporting_threshold" if coord_members else "study-min",
+    )
     res = est.fit(Studyset({"id": "x", "name": "x", "studies": studies},
                            target=None, mask=mask_img))
     g = res.get_map("g", return_type="array").ravel()
@@ -142,19 +157,22 @@ for _ in range(N_SPLITS):
             continue
         images, tables = list(work[:k]), list(work[k:])
         got_both = cbes_fit(images, tables, maps, sizes, workdir)
+        got_cal = cbes_fit(images, tables, maps, sizes, workdir, calibrate=True)
         got_coord = cbes_fit([], list(work), maps, sizes, workdir)
-        if got_both is None or got_coord is None:
+        if got_both is None or got_coord is None or got_cal is None:
             continue
         # Images-only reference, scored on the voxels the mixed fit covers so the three
         # estimates are judged on the same set.
         only = np.abs(pooled(images, maps, sizes))
-        use = got_both[1] & got_coord[1] & np.isfinite(got_both[0]) & np.isfinite(only)
+        use = (got_both[1] & got_coord[1] & got_cal[1]
+               & np.isfinite(got_both[0]) & np.isfinite(got_cal[0]) & np.isfinite(only))
         if use.sum() < 100:
             continue
-        rows.setdefault(k, {"images only": [], "images + coordinates": [],
-                            "coordinates only": []})
+        rows.setdefault(k, {"images only": [], "mixed, uncalibrated": [],
+                            "mixed, scaled to images": [], "coordinates only": []})
         rows[k]["images only"].append(score(only, use, truth))
-        rows[k]["images + coordinates"].append(score(got_both[0], use, truth))
+        rows[k]["mixed, uncalibrated"].append(score(got_both[0], use, truth))
+        rows[k]["mixed, scaled to images"].append(score(got_cal[0], use, truth))
         rows[k]["coordinates only"].append(score(got_coord[0], use, truth))
 
 print(f"  {'images':>7} {'estimate':>22} {'r':>7} {'ratio':>7} {'rmse':>7}")
@@ -165,4 +183,5 @@ for k in N_IMAGES:
         r, ratio, rmse = np.mean(np.array(values), axis=0)
         print(f"  {k:>7} {name:>22} {r:+7.3f} {ratio:7.2f} {rmse:7.3f}")
     print()
-print("If 'images + coordinates' beats 'images only' the tables are worth including.")
+print("If a mixed row beats 'images only' the tables are worth including. Compare the two"
+      "\nmixed rows first: if they differ, the earlier verdict was about the calibration.")
