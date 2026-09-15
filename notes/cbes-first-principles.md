@@ -761,3 +761,34 @@ should be *told* each study's power rather than inferring it from a reported hei
 means the sample size and the threshold are the load-bearing inputs, and the statistic column is
 close to decoration. That is testable too: refit with the reported magnitudes replaced by their
 per-study mean, destroying all within-study height information, and see how much is lost.
+
+### 18a. Precision on the last claim: weakly identified, not unidentified
+
+Section 18 says a homogeneous roster leaves only the product identified. That overstates it, and
+the overstatement matters because it predicts the wrong result for the test.
+
+There is a second identification route that survives a homogeneous roster: the *shape of the
+reported height distribution above the common threshold*. Reported values are a truncated sample,
+and a truncated normal's shape depends on how far its mean sits below the cut, so the observed
+heights do carry information about `mu` independently of how many studies reported. That is
+precisely the channel the censored likelihood is built on.
+
+It is a weak channel, not an absent one. Two measurements bound it: reported height moves 0.055 z
+per unit of true g at a 3.29 cut, and a truncated-normal MLE fitted to genuine local maxima
+returns 0.257 for a true 0.5 and 3.6 for a true 2.0 — biased in both directions, which is why
+that model was tried and rejected here. So the residual route is both weak and misspecified for
+local maxima.
+
+The corrected claim, and the one the test should be read against:
+
+> With a homogeneous roster the prevalence/magnitude split is **weakly** identified, through the
+> shape of the truncated height distribution alone — a channel carrying a few percent of the
+> count channel's signal and misspecified for maxima. Heterogeneous power adds a second,
+> stronger channel. The product is well identified throughout.
+
+Predicted shapes, so the result can falsify rather than accommodate: under a fixed roster the
+fitted prevalence should have a small but non-zero slope on the truth — poor, not flat. The slope
+should rise as `n` and then `u` are allowed to vary. The marginal's slope should be respectable in
+all three and change least. A *flat* fixed-roster slope would mean the height channel contributes
+nothing at all, which is stronger than anything measured so far and would be worth knowing; a
+fixed-roster slope already near 1 would kill the theory outright.
