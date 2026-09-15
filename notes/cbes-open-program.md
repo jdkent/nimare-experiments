@@ -2891,3 +2891,54 @@ silence does not.
 Next: #66, the peak-height survival. If P(report) is overstated because a reported peak is a local
 maximum rather than any exceedance, that is a candidate for both the negative bias at the effect
 and for why a too-low cutoff outperforms the true one.
+
+## Two attempts at the residual -0.039 bias, both falsified. The shipped choice is a joint optimum.
+
+Where the effect is largest, `g` comes back at -0.039 of bias. Two mechanisms proposed, both
+tested, both dead -- and both in a way that *confirms* the shipped configuration.
+
+**1. "A report is over-credited, because the model treats it as any exceedance."** A reported
+peak is `|g| >= c` **and** a local maximum, a strictly smaller event whose conditional
+probability falls with mu, so the true P(report | mu) should rise more slowly than the plain
+exceedance. Probed by raising the report limb's probability to a power `alpha`, which flattens
+its mu-sensitivity without changing its range:
+
+| alpha | 0.1 | 0.3 | 0.5 | 0.7 | **1.0** | 1.5 | 2.0 | 3.0 | 5.0 |
+|---|---|---|---|---|---|---|---|---|---|
+| bias, effect | -0.061 | -0.055 | -0.049 | -0.045 | **-0.039** | -0.024 | -0.008 | +0.011 | +0.024 |
+| rmse, effect | 0.091 | 0.083 | 0.077 | 0.073 | **0.070** | 0.076 | 0.098 | 0.134 | 0.170 |
+
+Sign backwards from the prediction: down-weighting makes the bias *worse*, monotonically. And
+`alpha = 1` -- the principled value, already shipped -- is the rmse optimum. `alpha ~ 2` zeroes
+the bias and costs 40% of rmse, so the knob trades bias for variance and buys nothing.
+
+**2. "Displacement discards the studies that detected the region."** A peak sits where the noise
+helped, so at the true focus a study that plainly detected the region names a *neighbouring*
+voxel, read as sign 0 rather than as a detection -- leaving an indicator sample enriched for
+genuine failures. Remedy: two radii, 20 mm for the silence (a reporting extent) and something
+small for the report (a localisation error).
+
+| report radius | rmse quiet | rmse middle | rmse effect | bias effect |
+|---|---|---|---|---|
+| **named voxel** | **0.1129** | **0.0737** | **0.0697** | **-0.0392** |
+| 4 mm | 0.1337 | 0.0803 | 0.1131 | +0.0939 |
+| 6 mm | 0.1585 | 0.1636 | 0.1224 | +0.1023 |
+| 8 mm | 0.1818 | 0.2598 | 0.1257 | +0.1056 |
+| 12 mm | 0.2786 | 0.3736 | 0.1257 | +0.1056 |
+| 20 mm | 0.4534 | 0.3753 | 0.1264 | +0.1061 |
+
+**There is no middle ground: the penalty starts at the first ring.** The bias flips from -0.039
+to +0.094 at 4 mm -- one ring overshoots by more than the original undershoot, because a 4 mm
+sphere asserts the indicator at seven voxels instead of one. Paired p < 0.0001 in the quiet
+stratum at every radius.
+
+The two probes agree, and that is the useful part: the report limb is correctly weighted at
+`alpha = 1` and correctly extended at 0 mm, so **the shipped configuration is the joint optimum
+of a two-parameter family** rather than an arbitrary choice. The mechanism in (2) is real; the
+likelihood is simply far more sensitive to asserting `|g| >= c` where it is false than to
+discarding an observation.
+
+So the -0.039 is not in the report limb. Remaining candidates, none tested: Hedges' variance as
+an inverse-variance weight (a known 2-3% downward pull, too small on its own), tau2 estimated
+about the naive mean and so biased low (measured to move `g` from 0.883 to 0.822 at a true 0.8
+when alternated), and the stratum definition itself -- 7 voxels at truth >= 0.25.
