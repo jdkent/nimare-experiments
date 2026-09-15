@@ -41,6 +41,7 @@ MASKER = NiftiMasker(MASK).fit()
 FOCI = [(-28, -28, 0), (28, -28, 0), (-28, 28, 0), (28, 28, 0)]
 EFFECTS = [0.2, 0.4, 0.6, 0.8]
 N_REPS = int(os.environ.get("NREPS", 20))
+ONLY = os.environ.get("ONLY", "")
 
 grid = np.stack(np.indices(SHAPE), -1) * ZOOMS - ZOOMS * HALF
 sd = BLOB / (2 * np.sqrt(2 * np.log(2)))
@@ -67,6 +68,21 @@ ARMS = [
     # coordinate-only studies, so the reporting indicator is structurally empty and the only
     # difference from A is that the prevalence is fitted and profiled out.
     ("D 20 images, zero-inflated", dict(n_images=20), dict()),
+    # E and F isolate the estimated between-study variance. The "tau = 0.3" arm elsewhere does
+    # not exclude it: changing the *true* tau moves the spread and the error together, so the
+    # ratio is blind to it. What is suspect is the DerSimonian-Laird estimate itself, taken from
+    # two studies, where it is noisy and upward-biased -- and it enters the se directly.
+    ("E shipped, tau2 off", dict(n_images=2), dict(tau2_method="none")),
+    ("F images only, tau2 off", dict(n_images=2),
+     dict(selection_model="none", tau2_method="none")),
+    # Whether "prefer none" is advice or just a fact about k = 2. If the DerSimonian-Laird
+    # estimate is benign once there are a few more images, or once the true heterogeneity is
+    # large enough to be worth estimating, then the guidance is conditional rather than general.
+    ("G 5 images, tau2 dl", dict(n_images=5), dict()),
+    ("H 5 images, tau2 off", dict(n_images=5), dict(tau2_method="none")),
+    ("I 2 images, true tau 0.3, dl", dict(n_images=2, tau=0.3), dict()),
+    ("J 2 images, true tau 0.3, off", dict(n_images=2, tau=0.3),
+     dict(tau2_method="none")),
 ]
 
 if __name__ == "__main__":
@@ -79,10 +95,13 @@ if __name__ == "__main__":
             f"{'se':>7} {'se/sd':>6} {'se/sd|':>7} {'se/rmse':>8} {'cov':>5}")
     print(head)
     for label, build, options in ARMS:
+        if ONLY and not label.startswith(tuple(ONLY.split(","))):
+            continue
         gs, ses, dofs = [], [], []
         for rep in range(N_REPS):
             ss = create_effect_size_coordinate_studyset(
-                FOCI, effect_sizes=EFFECTS, n_studies=20, sample_size=(20, 40), tau=0.1,
+                FOCI, effect_sizes=EFFECTS, n_studies=20, sample_size=(20, 40),
+                tau=build.get("tau", 0.1),
                 seed=3000 + rep, simulate_field=True, n_image_studies=build["n_images"],
                 image_dir=tempfile.mkdtemp(), noise_extent=EXTENT, field_zooms=ZOOMS,
                 blob_fwhm=BLOB)

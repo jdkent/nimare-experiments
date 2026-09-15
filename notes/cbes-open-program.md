@@ -3868,3 +3868,46 @@ in the same direction, which is a small independent confirmation of the fix now 
 **Next, and it has to be at full scale:** implement the profile interval in the estimator and
 measure it on the field bed against the arm table above. The scalar bed has done the one thing it
 could do honestly, which was to rule itself out.
+
+### The DerSimonian-Laird `tau2` is part of the conservatism and still cannot be removed
+
+The scalar bed's biggest structural omission was `tau2`, so it was worth testing at full scale --
+and unlike the `tau = 0.3` arm, which changes the *truth* and so moves spread and error together,
+this changes what the estimator does. Four foci, 32 replications, `tau2_method="none"` against the
+default:
+
+| arm | null | g=0.2 | g=0.4 | g=0.6 | g=0.8 |
+|---|---|---|---|---|---|
+| B images only, tau2 dl | 1.22 | 1.30 | 1.05 | 1.22 | 1.23 |
+| F images only, tau2 off | **1.07** | 1.09 | 0.92 | 1.12 | 1.09 |
+| C shipped, tau2 dl | 2.03 | 1.60 | 1.28 | 1.39 | 1.29 |
+| E shipped, tau2 off | 1.81 | **1.02** | 1.14 | 1.28 | 1.16 |
+
+At two images and `tau = 0.1` that looks like most of the answer: the images-only baseline becomes
+calibrated (1.07, and 0.92 to 1.12 across the foci), and the shipped fit becomes nearly so
+everywhere except the quiet stratum. A DerSimonian-Laird estimate from *two* studies is noisy and
+upward-biased, and it enters the `se` directly while barely widening the estimator's own spread.
+
+**And it is not a lever, which is why the follow-up arms mattered.** Raise the true heterogeneity
+to `tau = 0.3` and keep everything else, and switching `tau2` off stops being conservative and
+starts being wrong:
+
+| arm (2 images, true tau 0.3) | g=0.2 se/sd | g=0.2 cov | g=0.4 cov | g=0.8 cov |
+|---|---|---|---|---|
+| I tau2 dl | 0.99 | 0.86 | 1.00 | 0.94 |
+| J tau2 off | 0.52 | **0.45** | 0.88 | 0.94 |
+
+Coverage at the weakest focus falls to 0.45 -- an interval that misses the truth more often than
+it catches it. At five images the picture is mixed rather than favourable (quiet 2.51 with `tau2`
+off against 2.28 with it, `g=0.4` 1.40 against 1.69). So the correct reading is not "prefer none"
+but:
+
+**The estimated `tau2` contributes to the conservatism at small k and low heterogeneity, and it
+is buying real protection at the same time.** Removing it trades a 1.3x-too-wide interval for a
+0.45-coverage one. The lever is tested and closed; it belongs on the list of things that look
+like the fix and are not, next to the RFT route and the constant `q`.
+
+One thing to follow up separately: arm I under-covers at the weakest focus even *with* `tau2`
+(0.86 at `g=0.2`, se/sd 0.99, bias -0.047 on a spread of 0.37). Conservative at low heterogeneity
+and anti-conservative at high, at the same voxel -- which is a different failure from the one this
+section is about.
