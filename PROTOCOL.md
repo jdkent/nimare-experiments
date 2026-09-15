@@ -45,3 +45,27 @@ Split the studies: one half is reduced to coordinates, the other half forms the 
 one map per study there is nothing to split within a study, so a same-map reference conditions
 the comparison on the noise that produced the peaks. Held-out subjects are better still where
 per-subject maps exist.
+
+## Waiting on a background job: never `pgrep -f <script-name>`
+
+A waiter of the form
+
+    until ! pgrep -f "myjob.py" >/dev/null; do sleep 20; done
+
+matches **its own command line**, because the waiting shell's argv contains the pattern. It
+therefore waits on itself and never exits. This cost three queued experiments a full half hour of
+silence in which everything looked like it was running -- and the failure is invisible, because
+"still waiting" and "waiting forever" print the same thing.
+
+Use one of these instead:
+
+- **Just run the jobs in sequence** in one background script. No polling, no pattern, nothing to
+  get wrong. This is almost always the right answer.
+- If a wait is genuinely needed, wait on a **PID**, not a pattern: record `$!` when launching and
+  use `wait "$pid"` (same shell) or `kill -0 "$pid"` in a loop.
+- If a pattern is unavoidable, exclude self: `pgrep -f "myjob.py" | grep -qv "^$$\$"`, and check
+  it actually distinguishes before trusting it.
+
+The general rule this belongs to: **a wait that cannot fail loudly will eventually fail
+silently.** Before arming any waiter, ask what it would print if the thing it waits for never
+started -- and if the answer is "nothing", fix the waiter.
