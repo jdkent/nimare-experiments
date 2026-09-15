@@ -32,9 +32,12 @@ Four numbers are reported, because coverage alone cannot distinguish the failure
   se / sd      the reported width against the estimator's own variability across replications.
                Under 1 the interval is too narrow; well over 1 it overstates uncertainty.
   coverage     of g +/- 1.96*se. What a user experiences.
-  half / truth the interval's half-width as a fraction of the effect. An interval wide enough
-               to cover everything covers, and says nothing; coverage without this is a metric
-               that lies.
+  half_t / eff the interval's half-width as a fraction of the effect, for the interval the
+               docstring recommends -- `t` on the fit's own `dof`, not 1.96. An interval wide
+               enough to cover everything covers, and says nothing; coverage without this is a
+               metric that lies. This column is the reason the `t` correction is not simply good
+               news: `dof` came out 4.46 on a twelve-study fit, so the critical value is 2.67
+               rather than 1.96 and the interval that now covers may span most of the effect.
 
 Heterogeneity is varied because the estimator holds tau2 fixed at a value earlier work found
 low-biased: if that matters, coverage should fall when the studies genuinely disagree.
@@ -212,7 +215,7 @@ if __name__ == "__main__":
     print(f"truth at the read-out voxel: g = {TRUE_G:.3f}; prevalence 1 at every site")
     print(f"{N_SIMS} replications per arm; interval is g +/- 1.96*se\n")
     print(f"{'arm':34s} {'mean g':>7s} {'bias':>7s} {'mean se':>8s} {'sd of g':>8s} "
-          f"{'se/sd':>6s} {'cov(z)':>6s} {'cov(t)':>6s} {'dof':>5s} {'half/truth':>10s} "
+          f"{'se/sd':>6s} {'cov(z)':>6s} {'cov(t)':>6s} {'dof':>5s} {'half_t/eff':>10s} "
           f"{'mean pi':>8s} {'report':>7s}")
     for label, ns, ni, tau, pb, pbs, width in ARMS:
         rows = Parallel(n_jobs=8)(delayed(one)(s, ns, ni, tau, pb, width, pbs)
@@ -239,7 +242,7 @@ if __name__ == "__main__":
         print(f"{label:34s} {g[ok].mean():7.3f} {g[ok].mean()-TRUE_G:+7.3f} {se[ok].mean():8.3f} "
               f"{sd:8.3f} {se[ok].mean()/max(sd,1e-9):6.2f} {cover:6.2f} {cover_t:6.2f} "
               f"{np.nanmedian(dof):5.1f} "
-              f"{1.96*se[ok].mean()/TRUE_G:10.2f} {np.nanmean(pi):8.3f} "
+              f"{np.mean(crit * se[ok])/TRUE_G:10.2f} {np.nanmean(pi):8.3f} "
               f"{rep.mean()/ns:7.2f}   (n={ok.sum()}, {refused} refused)", flush=True)
     print("\nse/sd near 1 means the width matches the estimator's real variability.")
     print("coverage near 0.95 with half/truth well under 1 is the only combination that works:")
