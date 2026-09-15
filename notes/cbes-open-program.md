@@ -4047,3 +4047,43 @@ explain (prevalence, statistic, tau2, reference construction). The HCP bed was b
 *equal-sized* synthetic studies; the NIDM pain collection has real, widely varying sample sizes.
 That is a testable prediction rather than a story, and it is the next thing to check: re-run the
 HCP comparison with sample sizes spread over the same range as pain's.
+
+### Prediction falsified: HCP is not in the unidentified regime, so spread cannot rescue it
+
+The prediction at the end of the last section was that HCP's verdict is a property of its
+equal-sized studies. Tested with the subject budget, the study count, the held-out truth and the
+*image studies' sizes* all held fixed, so only the tables' heterogeneity changes and the
+images-only baseline is identical by construction. MOTOR_LH, 2 image studies of 30 plus 14 tables
+sharing 420 subjects, 3 splits:
+
+| arm | table sizes | bounded (top decile) | fitted pi | CBES ratio | images-only ratio |
+|---|---|---|---|---|---|
+| uniform | 14 x 30 | 0.972 | 0.675 | 0.680 | 0.921 |
+| spread | 9 to 70 | 0.970 | 0.660 | 0.671 | 0.921 |
+
+`r` and AUC are identical to three decimals in both arms (0.844/0.848, 0.968/0.969). **Spread
+does nothing here, and the reason is visible in the `bounded` column: it is 0.97 in both arms.**
+HCP's motor signal is strong enough that `pi = 0` is decisively rejected at the voxels being
+scored, so `mu` is already identified and there was no deficit for heterogeneity to repair.
+
+Two things follow, and both matter more than the failed prediction.
+
+**The identifiability result is unharmed but its scope is now known.** It was derived and
+confirmed on a bed whose foci run 0.2 to 0.8, where the bounded fraction near signal is 0.42 and
+heterogeneity lifts it to 0.69. On a collection with a large effect and ~14 peaks per table the
+fraction is already 0.97 and the derivation predicts, correctly, that spread then buys nothing.
+Identifiability is necessary, not sufficient.
+
+**HCP's shortfall is a genuine bias, not a ridge artifact.** That is the useful half. With `mu`
+identified at 97% of the scored voxels, CBES still recovers 0.68 of the truth where images-only
+recovers 0.92, and still fits `pi = 0.66` against a true 1.000. A flat likelihood cannot be
+blamed for either. So the over-shrinkage at the window and the under-estimated prevalence are
+properties of the censoring term's *specification* -- what it assumes a silence means -- rather
+than of what the data can support.
+
+**That is now five dials tested and rejected** for the pain-versus-HCP disagreement: prevalence,
+the reported statistic, `tau2`, reference construction (2 of 22 points), and sample-size spread.
+The remaining structural difference between the two collections that has never been isolated is
+the one in #37: pain's tables were *transcribed from papers* while HCP's are extracted by
+`reporting.py` from maps. Different peak-selection processes, not different statistics -- and it
+is the last candidate standing.
