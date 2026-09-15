@@ -50,6 +50,31 @@ docstring already claims (it corrects the between-study part, not the common sca
 number on it: the between-study part is negligible. Advice that stops at "use `peak_bias`" is
 advice to do nothing.
 
+## The biggest single finding: the default threshold inference is what miscalibrates `prevalence`
+
+Under cluster-extent reporting — the commonest scheme in the literature — the smallest value a
+study reports is its smallest cluster **maximum**, not its threshold. So `threshold="study-min"`
+(the default) infers a cut ~0.9 z too high, and since `prevalence` is governed by where the
+fitted magnitude sits relative to the assumed cut, it inflates badly. Mean absolute error over
+four sites at true prevalence 0.25/0.50/0.75/1.00:
+
+| threshold setting | median cut | prevalence | g | g_marginal |
+| --- | --- | --- | --- | --- |
+| `study-min` (default) | 4.015 | 0.201 | **0.173** | 0.270 |
+| `pooled-min` | 3.532 | 0.056 | 0.211 | 0.166 |
+| the true forming cut | 3.090 | 0.037 | 0.251 | **0.116** |
+| the library constant 3.2905 | 3.291 | **0.008** | 0.235 | 0.132 |
+
+With the library's own constant, prevalence comes back **0.248 / 0.501 / 0.752 / 0.972** against
+a truth of 0.25 / 0.50 / 0.75 / 1.00. With the default: 0.482 / 0.860 / 0.961 / 0.998. So the
+documented compression — "a true 0.25 comes back as 0.49 to 0.60" — is largely this default, not
+the censored likelihood.
+
+`g` prefers the default, for a bad reason: it's biased high by peak selection, and a cut assumed
+too high makes the censoring term pull it down. That's one error cancelling another, and `g` stays
+contaminated by prevalence at every setting. Recommendation with evidence attached in task #53:
+supply a plausible fixed threshold; keep `study-min` only for voxelwise-height tables.
+
 ## The three findings I'd stand behind
 
 **1. What `prevalence` actually computes.** Measured on the estimator's own EM with 6 reporting and
@@ -77,6 +102,10 @@ both estimators. The naive count is `(studies with a focus within 15 mm) / (stud
 | CBES prevalence, effect 0.5 | **0.129** | +0.570 | 22% |
 | naive count, effect 0.5 | 0.414 | **+0.877** | **60%** |
 
+(measured at the default threshold and on the old statistic convention; being re-run. The bias
+column should improve for CBES with a supplied threshold — the ordering column will not, since
+ordering is threshold-independent.)
+
 The censored likelihood does what it was built for — it corrects the count's downward bias, by a
 factor of three — and loses decisively on ordering, which is the only reading the documentation
 endorses. That combination isn't tenable: either stand behind the level and retract "read it
@@ -89,6 +118,16 @@ with that study's own mean reported height — destroying within-study variation
 entirely costs nothing measurable (−0.015, p 0.67). The within-study spread of reported heights
 carries *negative* information, which is what the winner's curse implies: the differences between
 one study's peaks are differences in how far each overshot its own threshold.
+
+## A second retraction: the ordering numbers I shipped were too generous
+
+I documented the prevalence ordering caveat with numbers from the buggy statistic convention. On
+the corrected convention it is worse: the four-site ranking is exactly right in **19%** of maps at
+a strong effect (not 50%) and **6%** at a weak one (not 12%), with rank correlations +0.76 and
++0.33 (not +0.86 and +0.59). The docstring has been updated. The ordering is *threshold*-
+independent — identical to three decimals under both settings — because a change of cutoff
+applies a roughly common inflation across voxels, so this stands on its own and is not fixed by
+task #53.
 
 ## Theory that held up
 
@@ -140,6 +179,8 @@ CI green on every push. 100 tests pass.
 
 ## What needs your decision
 
+- **#53** Should `threshold="study-min"` stop being the default? It costs 0.20 of prevalence
+  accuracy on cluster-extent tables where a fixed constant costs 0.008.
 - **#51** The naive count vs fitted prevalence: stand behind the level, or emit both?
 - **#47** The images-only refusal is inconsistent with the all-donor path, and its stated reason
   ("no foci to permute") is now false since `_permute_image_values` exists. Allow both, or refuse
