@@ -108,7 +108,8 @@ def study_fields(rng, n, tau):
     return g_flat.reshape(SHAPE), var_flat.reshape(SHAPE), t_map
 
 
-def one(seed, n_studies, n_image, tau, peak_bias=None, fwhm=10.0):
+def one(seed, n_studies, n_image, tau, peak_bias=None, fwhm=10.0,
+        peak_bias_scale=1.0):
     """Every study publishes a coordinate table; the first `n_image` also supply images.
 
     CBES refuses a collection with images and no coordinates, so an images-only arm does not
@@ -144,7 +145,7 @@ def one(seed, n_studies, n_image, tau, peak_bias=None, fwhm=10.0):
         return None
     ss = Studyset({"id": "cov", "name": "cov", "studies": studies}, target=None, mask=MASK)
     est = CBES(fwhm=fwhm, mask=MASK, null_method="none", use_images=n_image > 0,
-               peak_bias=peak_bias)
+               peak_bias=peak_bias, peak_bias_scale=peak_bias_scale)
     res = est.fit(ss)
     pos = int(np.ravel_multi_index(READ_AT, SHAPE))
     pi = (float(res.get_map("prevalence", return_type="array").ravel()[pos])
@@ -158,6 +159,13 @@ def one(seed, n_studies, n_image, tau, peak_bias=None, fwhm=10.0):
 #: note in cbes-open-program); whether it also repairs the *interval* is a separate question,
 #: since the coverage failure here is entirely bias rather than width.
 FWHM_SWEEP = (10.0, 16.0, 24.0)
+
+#: The configuration the docstring recommends for a mixed collection: the per-study correction
+#: with its overall scale read off the image studies. Every arm below with `peak_bias=None`
+#: measures only the *dilution* effect of images -- them contributing unbiased values alongside
+#: the coordinates -- and not the *calibration* effect, where they pin the coordinate arm's own
+#: scale. Those are different mechanisms and the weight-share model describes only the first.
+CALIBRATED = ("per-study", "images")
 
 #: (label, studies, of which supplying images, tau, peak_bias)
 #: The `per-study` rows test the remedy the docstring itself recommends when no images are
@@ -189,11 +197,16 @@ if __name__ == "__main__":
     print(f"{N_SIMS} replications per arm; interval is g +/- 1.96*se\n")
     print(f"{'arm':34s} {'mean g':>7s} {'bias':>7s} {'mean se':>8s} {'sd of g':>8s} "
           f"{'se/sd':>6s} {'cover':>6s} {'half/truth':>10s} {'mean pi':>8s} {'report':>7s}")
-    arms = [(f"{lab} @ fwhm {w:.0f}" if w != 10.0 else lab, ns, ni, tau, pb, w)
+    arms = [(f"{lab} @ fwhm {w:.0f}" if w != 10.0 else lab, ns, ni, tau, pb, w, 1.0)
             for lab, ns, ni, tau, pb in ARMS
             for w in (FWHM_SWEEP if (ni == 0 and tau == 0.0 and pb is None) else (10.0,))]
-    for label, ns, ni, tau, pb, width in arms:
-        rows = Parallel(n_jobs=8)(delayed(one)(s, ns, ni, tau, pb, width)
+    # The recommended mixed configuration, on the arms where it can do anything: it needs both
+    # images to read the scale off and coordinates for that scale to apply to.
+    arms += [(f"{ns} studies, {ni:2d} images, calibrated", ns, ni, 0.0,
+              CALIBRATED[0], 10.0, CALIBRATED[1])
+             for ns, ni in ((12, 2), (12, 6), (24, 6))]
+    for label, ns, ni, tau, pb, width, pbs in arms:
+        rows = Parallel(n_jobs=8)(delayed(one)(s, ns, ni, tau, pb, width, pbs)
                                   for s in range(N_SIMS))
         refused = sum(r is None for r in rows)
         rows = [r for r in rows if r is not None]

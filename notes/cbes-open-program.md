@@ -1663,3 +1663,37 @@ better for the map and worse for the interval, and the reason the interval looks
 is that a bias it cannot see is hidden by a width it did not earn. What would actually fix the
 interval is removing the bias, which needs images -- and at 6 of 12 images the bias is +0.013 and
 coverage 0.99 at the default kernel already.
+
+## A gap in the coverage table I should have caught: it never used the recommended configuration
+
+Every arm of the coverage table ran with `peak_bias=None`. The docstring's recommendation for a
+collection with both kinds of study is `peak_bias="per-study"` with `peak_bias_scale="images"`,
+and `do_coordinates_help.py` even carries a note from an earlier session saying that judging
+mixing without it "tests a configuration the code tells you not to use".
+
+The two settings work by different mechanisms and that is why it matters:
+
+- **`peak_bias=None` (what I measured).** Images enter as extra unbiased contributions alongside
+  the coordinates. The coordinate values are untouched, so the bias falls only because the
+  coordinate channel's share of the pooling weight falls. That is exactly the weight-share model,
+  `bias(f) = b0 (1-f) / ((1-f) + r f)`, and it fitted to a maximum residual of 0.022 -- because it
+  is the right model *for this configuration*.
+- **`peak_bias="per-study"`, `peak_bias_scale="images"` (the recommendation).** The images are
+  additionally used to read off the scale constant that the coordinate arm's own values are then
+  divided by. The coordinate contributions are *corrected* rather than merely outvoted.
+
+So the headline I have been reporting -- that the coordinate channel is "diluted, never
+corrected" -- may be a property of the configuration I chose rather than of the method. If the
+calibrated setting corrects it, then at a low image fraction it should do much better than
+dilution predicts, which is precisely the regime that matters: two images among twenty studies is
+where the weight-share model says +0.16 of bias survives.
+
+Recorded before the numbers: if calibration works, the calibrated arms should beat their
+`peak_bias=None` counterparts at 2 of 12 images by well more than the seed noise, and the
+weight-share fit should not describe them. If they come out the same, the scale calibration is not
+doing anything the dilution does not already do, and the "diluted, never corrected" framing stands
+for both settings.
+
+Either way this is a gap in how I set the bed up, not a discovery: the recommended configuration
+was documented and I did not use it. The habit it argues for is to run the configuration the
+docstring recommends *first*, and treat anything else as the variant.
