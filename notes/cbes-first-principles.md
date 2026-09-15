@@ -533,3 +533,38 @@ What survives against a method that takes reported peak values at face value is 
 still stands: those values carry a shared bias of about +1.45 against 0.6 of noise, which does not
 average down. The remedy is to model the selection rather than the value, which is what the
 intensity formulation does.
+
+## 15. The exchange rate, and two checks that should have come first
+
+### One image is worth about fifteen coordinate studies
+
+Correlation with the truth, spread across three seeds in brackets, basis ceiling 0.954:
+
+| | 0 coords | 5 coords | 15 coords | 40 coords |
+| --- | --- | --- | --- | --- |
+| **0 images** | -- | 0.890 [0.012] | 0.927 [0.009] | 0.933 [0.002] |
+| **1 image** | 0.926 [0.017] | 0.930 [0.016] | 0.932 [0.020] | **0.945 [0.006]** |
+
+One image alone reaches 0.926; fifteen coordinate studies alone reach 0.927. That is the number a
+user actually needs, and it says chasing one shared map is worth roughly fifteen table-harvests --
+a different research strategy from the one "coordinates are contaminating" would suggest.
+
+**At one image, coordinates clearly help.** Adding forty takes the correlation from 0.926 to 0.945
+and tightens the seed spread from 0.017 to 0.006, three times more stable. That is the precision
+benefit predicted to be hiding outside the point-estimate measures, and it is the first time the
+joint has beaten a component on anything.
+
+It also explains why T6 saw nothing: it used two and five images, which is past the point where
+the benefit has saturated. **Coordinates help in proportion to how few images there are**, which
+is the practically relevant regime, since most collections have none to three.
+
+### The null-field check, which should have been first
+
+Every test of this model had been handed real signal. On a field of pure noise it returns a mean
+of 0.052 and a maximum of 0.173, against a signal field whose mean is near 0.35. With a
+deliberately misspecified rate law, 0.060 and 0.185.
+
+So it does not hallucinate, with either rate law. There is a small positive floor near 0.05,
+which is expected -- six or seven noise peaks per study are still reported and the model must
+explain them with something -- but it sits an order of magnitude below real signal. This was the
+cheapest possible check and it came after every celebratory result rather than before them.
