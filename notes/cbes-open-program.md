@@ -4125,3 +4125,53 @@ Also note what pain's sample sizes are: 9, 9, 9, 12, 12, 12, 12, 12, 12, 13, 14,
 20, 20, 24, 25, 25, 32. A 3.5-fold spread, all small. Under the identifiability result that is a
 *partially* identified regime, which is consistent with HCP (uniform 30) sitting at 0.97 bounded
 while the synthetic 0.2-to-0.8 bed sat at 0.42 -- pain has not been measured on that axis at all.
+
+## The extraction is NOT a faithful proxy for published tables, and `cluster` is the worst offender
+
+First audit of the assumption under every real-data result here. NIDM pain carries 267
+transcribed peaks across 21 studies *and* their z maps, so `reporting.py` can be compared
+against what the papers actually printed.
+
+| scheme | studies extracting | peaks total (published 267) | median per study (published 12) | median published-to-nearest-extracted | within 8 mm | within 20 mm |
+|---|---|---|---|---|---|---|
+| **cluster** | 21/21 | **119** | 5 | **23.2 mm** | **0.23** | **0.42** |
+| fdr | 16/21 | 1764 | 110 | 7.5 mm | 0.47 | 0.84 |
+| fwe | 16/21 | 273 | 6 | 48.1 mm | 0.21 | 0.33 |
+
+**The positive control is the `fdr` row, and it is what licenses reading the rest.** If study
+ids had been mismatched -- each paper's peaks compared against another study's map -- no scheme
+could recover 84% of published peaks within 20 mm. It does, so the coordinates genuinely
+correspond to these maps and the failures below are properties of the scheme rather than of the
+harness. (The id matching was checked directly as well: the images frame has an integer index, so
+the study id comes from the `study_id` column.)
+
+Three things, in order of how much they hurt.
+
+**`cluster` -- the scheme behind essentially every real-data number in this program -- recovers
+23% of published peaks within 8 mm and 42% within 20 mm.** So a *majority of published peaks lie
+outside even the coverage radius a silence asserts over*. Those are fabricated silences: the
+model is told "no study reported near here" at voxels where a paper did report. It also finds 119
+peaks where the papers printed 267, and 5 per study where they printed 12.
+
+**`fwe` matches the count almost exactly and the locations not at all.** 273 extracted against
+267 published, which looks like a bullseye, while the median published peak sits 48 mm from
+anything it found and only 21% land within 8 mm. Count agreement is no evidence of fidelity, and
+I would have accepted it as such.
+
+**`fdr` is spatially closest and quantitatively absurd**, at 110 peaks per study against a
+published 12 -- and it silences 5 of 21 studies entirely, which `cluster` does not.
+
+So no scheme reproduces published tables. What this does and does not invalidate:
+
+  * It does **not** invalidate comparisons *between arms* -- CBES against images-only against
+    SDM-PSI all saw the same extracted tables, so the rankings stand as measured.
+  * It does mean **none of those results describes what CBES would do on a transcribed
+    literature**, which is what a user would actually hand it. The headline pain result -- rmse
+    0.210 against images' 0.269 -- was measured on tables bearing this much resemblance to the
+    papers it came from.
+  * It does not explain the pain-versus-HCP disagreement, since both used `cluster`.
+
+**The next run is therefore the important one**, and it is now cheap: re-run the pain split-half
+with pain's *published* tables, `clamp_threshold` supplying the height bound from the smallest
+reported statistic, against the same reference. If the -22% rmse survives on real tables, the
+claim is about the estimator. If it does not, it was about `report_peaks`.
