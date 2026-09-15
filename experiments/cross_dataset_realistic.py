@@ -8,10 +8,17 @@ signal. This redoes the measurement through :mod:`reporting`, which corrects for
 keeps every local maximum 8 mm apart that survives, and caps nothing.
 
 Three reporting schemes, because real papers do not agree on one: voxelwise FDR at q = 0.05,
-voxelwise family-wise error by Bonferroni, and a p < 0.001 cluster-forming cut kept only where
-the cluster reaches ten voxels. A study whose map has nothing surviving reports nothing and
-drops out of the meta-analysis, which is what happens in practice and which the capped
-extraction could never produce.
+voxelwise family-wise error by Bonferroni, and a p < 0.001 cluster-forming cut with a family-wise
+extent test whose critical size comes from random field theory. A study whose map has nothing
+surviving reports nothing and drops out of the meta-analysis, which is what happens in practice
+and which the capped extraction could never produce.
+
+Each scheme is run twice, once reporting each surviving cluster by its strongest voxel and once
+by its centre of mass. That contrast isolates one of the estimator's assumptions. A maximum is
+selected for being extreme, so its value carries the winner's curse the whole ``peak_bias``
+machinery exists to fight; a centre of mass is not selected at all and is closer to an interior
+sample of the cluster. If the magnitude's compression against the truth is driven by peak
+selection, the centre-of-mass rows should be visibly less compressed.
 
 The real height threshold is handed to the estimator as metadata rather than inferred from the
 smallest reported value, so ``prevalence`` is read under the conditions its documentation asks
@@ -36,6 +43,7 @@ from load_pain import load_pain
 from reporting import report_peaks
 
 SCHEMES = ("fdr", "fwe", "cluster")
+FOCUS_MODES = ("max", "com")
 N_SPLITS = 6
 MIN_HALF = 5
 CACHE = "/tmp/claude-0/paradigms/nii"
@@ -59,13 +67,13 @@ def pooled_truth(maps, sizes):
     return np.sum(g_stack * weights, axis=0) / np.maximum(weights.sum(axis=0), 1e-12)
 
 
-def fit(maps, sizes, scheme, selection="zero-inflated"):
+def fit(maps, sizes, scheme, focus, selection="zero-inflated"):
     """Coordinates the way a paper would print them, then CBES on nothing else."""
     studies, counts, heights = [], [], []
     for k, (z, n) in enumerate(zip(maps, sizes)):
-        found, height = report_peaks(z, mask_bool, shape, zooms, scheme=scheme)
+        found, height = report_peaks(z, mask_bool, shape, zooms, scheme=scheme, focus=focus)
         counts.append(len(found))
-        if len(found) < 2:
+        if len(found) < 1:
             continue           # nothing survived: this paper reports no table
         heights.append(height)
         meta = {"sample_sizes": [int(n)], "reporting_threshold": float(height)}
@@ -86,8 +94,8 @@ def fit(maps, sizes, scheme, selection="zero-inflated"):
           if "prevalence" in res.maps else np.ones_like(g))
     covered = res.get_map("n_studies", return_type="array").ravel() > 0
     return {"g": g, "pi": pi, "covered": covered, "n_studies": len(studies),
-            "peaks": float(np.mean([c for c in counts if c >= 2]) if studies else 0),
-            "silent": int(sum(c < 2 for c in counts)),
+            "peaks": float(np.mean([c for c in counts if c >= 1]) if studies else 0),
+            "silent": int(sum(c < 1 for c in counts)),
             "height": float(np.median(heights))}
 
 
@@ -98,57 +106,59 @@ def report(label, maps, sizes, rng):
         print(f"{label}: {n} studies, too few to split\n", flush=True)
         return
     for scheme in SCHEMES:
-        acc = {k: [] for k in ("truth", "g", "marg", "r_g", "r_marg", "strata",
-                               "kept", "peaks", "silent", "height")}
-        for _ in range(N_SPLITS):
-            order = rng.permutation(n)
-            lo, hi = order[: n // 2], order[n // 2:]
-            truth = np.abs(pooled_truth([maps[i] for i in hi], sizes[hi]))
-            got = fit([maps[i] for i in lo], sizes[lo], scheme)
-            if got is None:
-                continue
-            g, pi, use = got["g"], got["pi"], got["covered"]
-            use = use & np.isfinite(g) & (g > 0)
-            if use.sum() < 100:
-                continue
-            marg = pi * g
-            for key, value in (("kept", got["n_studies"]), ("peaks", got["peaks"]),
-                               ("silent", got["silent"]), ("height", got["height"])):
-                acc[key].append(value)
-            acc["truth"].append(truth[use].mean())
-            acc["g"].append(g[use].mean())
-            acc["marg"].append(marg[use].mean())
-            acc["r_g"].append(stats.pearsonr(g[use], truth[use])[0])
-            acc["r_marg"].append(stats.pearsonr(marg[use], truth[use])[0])
-            cells = []
-            for a, b in ((0, 50), (50, 75), (75, 90), (90, 99), (99, 100)):
-                band = (truth >= np.percentile(truth, a)) & (
-                    truth < np.percentile(truth, b) if b < 100 else np.ones_like(truth, bool))
-                pick = use & band
-                ok = pick.sum() >= 30
-                cells.append((truth[pick].mean() if ok else np.nan,
-                              g[pick].mean() if ok else np.nan,
-                              marg[pick].mean() if ok else np.nan))
-            acc["strata"].append(cells)
-        if not acc["truth"]:
-            print(f"{label} / {scheme}: no usable split\n", flush=True)
-            continue
-        print(f"--- {label} / {scheme} ({n} studies, {np.mean(acc['kept']):.0f} with a table, "
-              f"{np.mean(acc['silent']):.1f} reporting nothing, "
-              f"{np.mean(acc['peaks']):.0f} peaks each, "
-              f"median height z = {np.mean(acc['height']):.2f}) ---")
-        print(f"  {'truth stratum':>16} {'truth g':>9} {'CBES g':>9} {'ratio':>7} "
-              f"{'pi*g':>8} {'ratio':>7}")
-        block = np.array(acc["strata"], dtype=float)
-        for j, name in enumerate(("0-50%", "50-75%", "75-90%", "90-99%", "99-100%")):
-            t, g_, m = (np.nanmean(block[:, j, c]) for c in range(3))
-            print(f"  {name:>16} {t:9.3f} {g_:9.3f} {g_ / max(t, 1e-9):7.2f} "
-                  f"{m:8.3f} {m / max(t, 1e-9):7.2f}")
-        t, g_, m = np.mean(acc["truth"]), np.mean(acc["g"]), np.mean(acc["marg"])
-        print(f"  {'all covered':>16} {t:9.3f} {g_:9.3f} {g_ / max(t, 1e-9):7.2f} "
-              f"{m:8.3f} {m / max(t, 1e-9):7.2f}")
-        print(f"  correlation with the truth: g {np.mean(acc['r_g']):+.3f}, "
-              f"pi*g {np.mean(acc['r_marg']):+.3f}\n", flush=True)
+      for focus in FOCUS_MODES:
+          acc = {k: [] for k in ("truth", "g", "marg", "r_g", "r_marg", "strata",
+                                 "kept", "peaks", "silent", "height")}
+          for _ in range(N_SPLITS):
+              order = rng.permutation(n)
+              lo, hi = order[: n // 2], order[n // 2:]
+              truth = np.abs(pooled_truth([maps[i] for i in hi], sizes[hi]))
+              got = fit([maps[i] for i in lo], sizes[lo], scheme, focus)
+              if got is None:
+                  continue
+              g, pi, use = got["g"], got["pi"], got["covered"]
+              use = use & np.isfinite(g) & (g > 0)
+              if use.sum() < 100:
+                  continue
+              marg = pi * g
+              for key, value in (("kept", got["n_studies"]), ("peaks", got["peaks"]),
+                                 ("silent", got["silent"]), ("height", got["height"])):
+                  acc[key].append(value)
+              acc["truth"].append(truth[use].mean())
+              acc["g"].append(g[use].mean())
+              acc["marg"].append(marg[use].mean())
+              acc["r_g"].append(stats.pearsonr(g[use], truth[use])[0])
+              acc["r_marg"].append(stats.pearsonr(marg[use], truth[use])[0])
+              cells = []
+              for a, b in ((0, 50), (50, 75), (75, 90), (90, 99), (99, 100)):
+                  band = (truth >= np.percentile(truth, a)) & (
+                      truth < np.percentile(truth, b) if b < 100 else np.ones_like(truth, bool))
+                  pick = use & band
+                  ok = pick.sum() >= 30
+                  cells.append((truth[pick].mean() if ok else np.nan,
+                                g[pick].mean() if ok else np.nan,
+                                marg[pick].mean() if ok else np.nan))
+              acc["strata"].append(cells)
+          if not acc["truth"]:
+              print(f"{label} / {scheme} / {focus}: no usable split\n", flush=True)
+              continue
+          print(f"--- {label} / {scheme} / focus={focus} "
+                f"({n} studies, {np.mean(acc['kept']):.0f} with a table, "
+                f"{np.mean(acc['silent']):.1f} reporting nothing, "
+                f"{np.mean(acc['peaks']):.0f} foci each, "
+                f"median height z = {np.mean(acc['height']):.2f}) ---")
+          print(f"  {'truth stratum':>16} {'truth g':>9} {'CBES g':>9} {'ratio':>7} "
+                f"{'pi*g':>8} {'ratio':>7}")
+          block = np.array(acc["strata"], dtype=float)
+          for j, name in enumerate(("0-50%", "50-75%", "75-90%", "90-99%", "99-100%")):
+              t, g_, m = (np.nanmean(block[:, j, c]) for c in range(3))
+              print(f"  {name:>16} {t:9.3f} {g_:9.3f} {g_ / max(t, 1e-9):7.2f} "
+                    f"{m:8.3f} {m / max(t, 1e-9):7.2f}")
+          t, g_, m = np.mean(acc["truth"]), np.mean(acc["g"]), np.mean(acc["marg"])
+          print(f"  {'all covered':>16} {t:9.3f} {g_:9.3f} {g_ / max(t, 1e-9):7.2f} "
+                f"{m:8.3f} {m / max(t, 1e-9):7.2f}")
+          print(f"  correlation with the truth: g {np.mean(acc['r_g']):+.3f}, "
+                f"pi*g {np.mean(acc['r_marg']):+.3f}\n", flush=True)
 
 
 if __name__ == "__main__":
