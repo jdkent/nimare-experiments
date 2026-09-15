@@ -2143,3 +2143,37 @@ the all-image arm's downward bias is this, not CBES. It also means the -0.032 re
 above to the calibrated coordinate channel is measured against a floor that has a known and
 separable cause, so the corrected channel's own residual is nearer -0.01 than -0.032 once the
 weighting bias is removed from both sides.
+
+### Coverage erosion with collection size, tested at a size never otherwise measured
+
+The prediction from the bias-to-width model was that coverage falls as a collection grows, since
+`se` shrinks as roughly `1/sqrt(studies)` and the bias does not shrink at all. The table's own
+evidence for it was mixed: the coordinates-only rows are clean (share fixed at zero, bias constant
+at +0.25, coverage 0.75 -> 0.35), but the two-donor rows are not, because between them the donors'
+share of the pooling weight *halved*, so dilution is mixed in with the study count.
+
+Grown with the weight share held fixed at one donor per twelve studies, 40 replications per row:
+
+```
+studies  images   mean g     bias  mean se      sd  se/sd  cover  predicted
+     12       1    0.746   -0.054    0.120   0.095   1.27   0.97       0.97
+     24       2    0.738   -0.062    0.081   0.056   1.44   0.97       0.96
+     48       4    0.725   -0.075    0.054   0.035   1.53   0.72       0.81
+```
+
+The erosion is real and this is the first time it has been seen at forty-eight studies. But it
+takes hold much later than the twelve-to-twenty-four step suggested -- flat across that doubling,
+then falling sharply -- for a reason worth keeping: **`se/sd` rises with study count** (1.27, 1.44,
+1.53), so the reported interval shrinks more slowly than the estimator's actual spread and partly
+offsets the constant bias. The model's own prediction at forty-eight is 0.81 against 0.72
+measured, about 1.3 standard errors at this replication count.
+
+Two smaller things fall out. The bias *grows* slowly with study count at fixed share (-0.054,
+-0.062, -0.075), which the dilution model does not explain and which is the same residual drift as
+#58. And the extrapolation I wrote down before running this -- "48 studies near 0.85 and 96 near
+0.75" -- was roughly right at 48 by luck: it assumed `se/sd` constant, which it is not, and got a
+similar answer because the bias also grew.
+
+So the claim survives its own test and the mechanism I first gave for it was incomplete. That is
+the second time today that stating a claim, naming the measurement that would break it, and
+running that measurement changed the claim rather than confirming it.
