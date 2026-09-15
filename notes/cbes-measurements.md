@@ -267,3 +267,63 @@ prevalence is 1 by construction.
 `pi * mu` -- the `g_marginal` map that was removed -- is uniformly the better estimate of the
 held-out truth on pain: correlation +0.34 against +0.22 for `g`, and a top-stratum ratio of 1.21
 against 1.89. It does not rescue the NeuroVault groups, where nothing does.
+
+## Redone with realistic reporting: the level moves with the convention, the shape never moves
+
+The measurements above extracted peaks at a fixed uncorrected cut and kept the strongest ten per
+study. Both are wrong, and the second is wrong in a way that had already invalidated two earlier
+results: a cap fixes the count and lets the effective threshold float to the study's tenth
+strongest peak, which is a function of its signal. `reporting.py` replaces it -- corrected
+thresholds, only surviving clusters, one row per cluster, nothing capped -- and every corpus was
+re-run through it.
+
+NIDM pain, 21 studies, split half so the reference comes from studies the coordinates did not:
+
+| scheme | focus | foci/study | ratio of g | top stratum | r(g) | r(pi*g) |
+| --- | --- | --- | --- | --- | --- | --- |
+| FDR q=0.05 | max | 108 | 3.23 | 1.49 | +0.331 | +0.194 |
+| FDR q=0.05 | centre of mass | 112 | 2.52 | 0.82 | +0.236 | +0.146 |
+| voxelwise FWE | max | 13 | 3.53 | 1.81 | +0.238 | +0.095 |
+| voxelwise FWE | centre of mass | 14 | 3.19 | 1.61 | +0.164 | +0.227 |
+| cluster extent | max | 6 | 4.58 | 2.29 | +0.277 | +0.483 |
+| cluster extent | centre of mass | 6 | 2.49 | 1.15 | +0.135 | +0.320 |
+
+Reporting the coordinates properly is worth a lot: r for `g` under FDR rises from +0.217 under
+the capped extraction to +0.331, so the earlier protocol was penalising the estimator rather
+than exposing it.
+
+Two things follow, and they point in opposite directions.
+
+**The level is a property of the reporting convention, not of the effect.** Across the six rows
+the truth in the top stratum is essentially constant -- 0.92 to 1.02 -- while `g` there reads
+0.82 to 2.29. Cluster extent with a centre-of-mass focus, which is both the most common practice
+and the one that produces a plausible six-row table, happens to land at 1.15. That is the
+closest to unbiased anything has reached against an independent reference, and it is a
+coincidence of convention: change the convention and the same data give 2.29.
+
+**The shape never improves.** Under cluster extent with centre of mass the held-out truth spans
+0.083 to 0.935 across its strata, an eleven-fold range, and `g` spans 0.894 to 1.076, a
+1.2-fold one. Every other row is the same. No reporting scheme, no focus convention, no
+selection model and no `peak_bias` setting has moved that compression.
+
+A centre-of-mass focus is not selected for being extreme, so it should carry no winner's curse,
+and it does measurably reduce the level -- 4.58 to 2.49 under cluster extent. It does not touch
+the compression. Whatever flattens the map is therefore not peak selection.
+
+### What the realistic pipeline does to the model's assumptions
+
+It repairs one and breaks two.
+
+*Repaired.* One focus per cluster makes a coordinate a sparse region marker, which is what the
+20 mm coverage design assumes it is, instead of one of a hundred near-duplicate maxima.
+
+*Broken.* The censoring term's selection event is `|g| >= c` at a height threshold. Under cluster
+extent the event is "this cluster was large enough", and the cluster-forming cut of 3.09 is
+nowhere near the smallest value that actually appears. Told 3.09, the model believes small values
+were reportable and under-corrects; left to infer the cut from the smallest reported value, that
+cut floats with the signal -- the capping problem again, produced by nature this time.
+
+*Broken, and the likely mechanism for the compression.* A large cluster yields one focus, and
+everything in it beyond the coverage radius is entered as the study having been *silent* there.
+A bigger true effect makes a bigger cluster and so a larger misread fraction, which pushes the
+estimate down hardest exactly where the effect is largest. `silence_misread.py` measures it.
