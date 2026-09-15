@@ -108,7 +108,7 @@ def study_fields(rng, n, tau):
     return g_flat.reshape(SHAPE), var_flat.reshape(SHAPE), t_map
 
 
-def one(seed, n_studies, n_image, tau, peak_bias=None):
+def one(seed, n_studies, n_image, tau, peak_bias=None, fwhm=10.0):
     """Every study publishes a coordinate table; the first `n_image` also supply images.
 
     CBES refuses a collection with images and no coordinates, so an images-only arm does not
@@ -143,7 +143,7 @@ def one(seed, n_studies, n_image, tau, peak_bias=None):
     if reported < 2:
         return None
     ss = Studyset({"id": "cov", "name": "cov", "studies": studies}, target=None, mask=MASK)
-    est = CBES(fwhm=10.0, mask=MASK, null_method="none", use_images=n_image > 0,
+    est = CBES(fwhm=fwhm, mask=MASK, null_method="none", use_images=n_image > 0,
                peak_bias=peak_bias)
     res = est.fit(ss)
     pos = int(np.ravel_multi_index(READ_AT, SHAPE))
@@ -152,6 +152,12 @@ def one(seed, n_studies, n_image, tau, peak_bias=None):
     return (float(res.get_map("g", return_type="array").ravel()[pos]),
             float(res.get_map("se", return_type="array").ravel()[pos]), pi, reported)
 
+
+#: Kernel widths to sweep in the coordinates-only arm. Widening the kernel was measured on real
+#: data to improve both the accuracy of the estimate and its spatial extent (see the kernel-width
+#: note in cbes-open-program); whether it also repairs the *interval* is a separate question,
+#: since the coverage failure here is entirely bias rather than width.
+FWHM_SWEEP = (10.0, 16.0, 24.0)
 
 #: (label, studies, of which supplying images, tau, peak_bias)
 #: The `per-study` rows test the remedy the docstring itself recommends when no images are
@@ -181,21 +187,25 @@ if __name__ == "__main__":
     print("statistic convention check passed: studies report a t on n - 1 degrees of freedom")
     print(f"truth at the read-out voxel: g = {TRUE_G:.3f}; prevalence 1 at every site")
     print(f"{N_SIMS} replications per arm; interval is g +/- 1.96*se\n")
-    print(f"{'arm':32s} {'mean g':>7s} {'bias':>7s} {'mean se':>8s} {'sd of g':>8s} "
+    print(f"{'arm':34s} {'mean g':>7s} {'bias':>7s} {'mean se':>8s} {'sd of g':>8s} "
           f"{'se/sd':>6s} {'cover':>6s} {'half/truth':>10s} {'mean pi':>8s} {'report':>7s}")
-    for label, ns, ni, tau, pb in ARMS:
-        rows = Parallel(n_jobs=8)(delayed(one)(s, ns, ni, tau, pb) for s in range(N_SIMS))
+    arms = [(f"{lab} @ fwhm {w:.0f}" if w != 10.0 else lab, ns, ni, tau, pb, w)
+            for lab, ns, ni, tau, pb in ARMS
+            for w in (FWHM_SWEEP if (ni == 0 and tau == 0.0 and pb is None) else (10.0,))]
+    for label, ns, ni, tau, pb, width in arms:
+        rows = Parallel(n_jobs=8)(delayed(one)(s, ns, ni, tau, pb, width)
+                                  for s in range(N_SIMS))
         refused = sum(r is None for r in rows)
         rows = [r for r in rows if r is not None]
         if not rows:
-            print(f"{label:32s}   no usable fits ({refused} refused)")
+            print(f"{label:34s}   no usable fits ({refused} refused)")
             continue
         g = np.array([r[0] for r in rows]); se = np.array([r[1] for r in rows])
         pi = np.array([r[2] for r in rows]); rep = np.array([r[3] for r in rows])
         ok = np.isfinite(g) & np.isfinite(se) & (se > 0)
         cover = np.mean((g[ok] - 1.96 * se[ok] <= TRUE_G) & (TRUE_G <= g[ok] + 1.96 * se[ok]))
         sd = g[ok].std(ddof=1)
-        print(f"{label:32s} {g[ok].mean():7.3f} {g[ok].mean()-TRUE_G:+7.3f} {se[ok].mean():8.3f} "
+        print(f"{label:34s} {g[ok].mean():7.3f} {g[ok].mean()-TRUE_G:+7.3f} {se[ok].mean():8.3f} "
               f"{sd:8.3f} {se[ok].mean()/max(sd,1e-9):6.2f} {cover:6.2f} "
               f"{1.96*se[ok].mean()/TRUE_G:10.2f} {np.nanmean(pi):8.3f} "
               f"{rep.mean()/ns:7.2f}   (n={ok.sum()}, {refused} refused)", flush=True)

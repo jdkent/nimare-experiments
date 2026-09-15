@@ -1626,3 +1626,40 @@ Monotone and still rising at 30 mm, consistent with the docstring's own note tha
 increases with this radius at every true value. The default is close to the best of these but not
 at it; the gain from 20 to 30 mm is 0.010, against 0.041 from widening the kernel from 10 to
 16 mm. So the kernel is the parameter that matters and the silence radius is second order.
+
+## The kernel width trades the map against the interval
+
+Directly on the uncertainty question, and it complicates the kernel recommendation. Coordinates
+only, 12 studies, truth 0.800, prevalence 1:
+
+```
+                        bias  mean se  sd of g  se/sd  coverage  half/truth
+fwhm 10 mm (default)  +0.233    0.163    0.041   3.99      1.00        0.40
+fwhm 16 mm            +0.232    0.109    0.038   2.85      0.17        0.27
+fwhm 24 mm            +0.245    0.085    0.033   2.56      0.00        0.21
+```
+
+**Widening the kernel does not touch the bias and shrinks the interval, so coverage collapses.**
+The bias is flat to within noise because it is a property of the reported heights, which the
+kernel does not alter. But a wider kernel pools more foci into each voxel, so the standard error
+falls by half, and an unchanged bias against a halved interval takes coverage from 1.00 to 0.00.
+
+Same signature as adding more studies -- a fixed bias with a shrinking interval -- and it means
+the two deliverables want opposite settings:
+
+| what you are using | what the kernel should be |
+| --- | --- |
+| the map: where the effect is and how extensive | **wider**; 16 mm beat 10 mm on both accuracy and extent on real data |
+| the interval: whether a voxel's magnitude is pinned | **narrower**; only the wide interval at 10 mm covers, and it covers by being wide |
+
+Neither is good on its own. The 10 mm interval covers at 1.00 against a nominal 0.95 with `se/sd`
+of 3.99 -- not calibrated, merely wide enough to contain a +0.23 bias, which is the
+metrics-that-lie pattern again. Widening the kernel strips away that accidental protection and
+exposes the bias, which is arguably the more honest state even though the coverage number looks
+worse.
+
+So the recommendation on task #56 has to be split rather than stated flatly: a wider kernel is
+better for the map and worse for the interval, and the reason the interval looks better at 10 mm
+is that a bias it cannot see is hidden by a width it did not earn. What would actually fix the
+interval is removing the bias, which needs images -- and at 6 of 12 images the bias is +0.013 and
+coverage 0.99 at the default kernel already.
