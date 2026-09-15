@@ -792,3 +792,65 @@ should rise as `n` and then `u` are allowed to vary. The marginal's slope should
 all three and change least. A *flat* fixed-roster slope would mean the height channel contributes
 nothing at all, which is stronger than anything measured so far and would be worth knowing; a
 fixed-roster slope already near 1 would kill the theory outright.
+
+## 19. An estimand that is identified, interpretable, and in the strong channel
+
+The audit has been negative for a while, so it is worth asking what a coordinate table *can*
+support, designed forward rather than patched.
+
+From section 18, the quantity the data directly measure is
+
+    P_k(v) = pi_v * D(mu_v, n_k, u_k)
+           = the probability that study k reports a focus within r of voxel v.
+
+This is the *reporting probability*, and it has properties none of the current outputs have.
+
+**It is identified.** It is the expectation of an observed Bernoulli. No scale constant, no image
+donor, no separation of prevalence from magnitude. Everything measured in this program that went
+wrong went wrong in factoring `P` into `pi` and `D`; `P` itself is what the counting gives you.
+
+**It is in the strong channel.** It is built from whether and where foci appear -- the channel
+that carries roughly ten times what the heights do (section 17).
+
+**It is interpretable without a convention.** "In a study of 30 subjects reporting at p < 0.001
+with cluster-extent correction, the probability of a focus within 10 mm of this voxel is 0.42."
+That is a sentence a reader can check against their own experience and a reviewer can argue with.
+Compare `g = 1.31` on a scale the coordinates cannot identify, or `prevalence = 0.47` that must be
+read ordinally and is right in half of maps.
+
+**It answers the question that was actually asked.** "How can I use this to power my next study?"
+has no good answer in terms of `g` or `pi`: power under zero inflation needs both factors
+separately, and both are badly estimated. It has a direct answer in terms of `P`: standardise to
+the planned design and read off the chance of reporting a focus there. And unlike a power
+calculation from `g`, it does not require the magnitude scale to be right -- it requires only that
+the detection function be interpolated over the range of `n` and `u` the collection contains.
+
+**Standardisation is the whole trick, and its limits are honest ones.** Fit `D` with `n_k` and
+`u_k` as covariates, then evaluate at a stated reference `(n0, u0)`. The map is then "reporting
+probability for a reference study", and the extrapolation is legitimate only across the range of
+power the collection actually spans -- which is the same heterogeneity that identifies the fit.
+A collection of twenty 20-subject studies at one threshold can report `P` at that design and
+should refuse to extrapolate to N = 100. That is a real restriction, and it is *stateable*, unlike
+"read it ordinally".
+
+**How it differs from ALE and MKDA.** Those produce a convergence statistic whose units are the
+kernel's, referred to a null. They answer "is there more agreement here than chance", which is a
+hypothesis test. `P` answers "how often would a study like mine find this", which is an estimate
+with a scale. The two are complementary, and the second is the one a reader wants when the answer
+to the first is yes. That is also the honest version of the claim the PR currently makes for `g`:
+an effect-size-like quantity on coordinates -- except this one is identified.
+
+**What it gives up.** It is not an effect size. It will not combine with an IBMA, it does not
+answer "how big is the effect", and it depends on the reporting conventions of the literature it
+was fitted to -- if the field's thresholds shift, `P` at a fixed reference shifts with them. Those
+are genuine losses. They are smaller than the loss of reporting a magnitude that is 40% high with
+an interval that covers 10% of the time.
+
+**Cheap test of the proposal, before believing any of it.** Simulate collections with known `pi`
+and `mu` and a spread of `(n, u)`; fit a logistic or complementary-log-log detection model for
+`P_k(v)` with `n` and `u` as covariates; evaluate at a reference design; compare against the
+simulated truth `P` at that design, computed exactly. Score calibration (does a predicted 0.4
+happen 40% of the time) and the standardisation error as the reference moves away from the
+collection's centre of mass. If that calibrates while `g` does not, the proposal is worth putting
+to the maintainer as an additional output -- not a replacement, since the null and the map
+machinery are already built and would carry it.
