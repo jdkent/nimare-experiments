@@ -25,98 +25,67 @@ is +0.043). Beds now generate a real t and assert their own convention before me
 The lesson is in `PROTOCOL.md`: name the one-minute check that the measurement is wrong, and run
 it before proposing a mechanism.
 
-## The definitive coverage table
+## The coverage table, scored against the interval the documentation recommends
 
-> **SUPERSEDED WHILE YOU WERE AWAY, and read this first.** Every arm below scores
-> `g +/- 1.96 se` -- a *normal* interval. The class docstring tells callers to refer `se` to a **t
-> on `dof`**, and `dof` is a Kish effective count that comes out near **4.5** on a twelve-study
-> fit, so the documented critical value is 2.67 and the documented interval is 36% wider than the
-> one measured here. Under it, at the default kernel, **every configuration covers 0.98 to 1.00 --
-> including coordinates-only, which reads 0.75 below.** Coverage stops discriminating between
-> configurations; only width does. The re-run is in flight and this section will be replaced by
-> it; the bias, `se/sd` and `dof` columns are unaffected and the conclusions that rest on those
-> still hold. The fuller account, including why `se/sd > 1` is the diagnostic that actually
-> matters, is in `notes/cbes-open-program.md`.
+Truth 0.800, prevalence 1 at every site, calibrated reporting regime, **100 replications per
+arm**, studies reporting a genuine *t*, every coordinate table produced by a cluster-forming
+threshold with no cap on the number of foci. `cov(z)` is `g +/- 1.96 se`; **`cov(t)` is the
+interval the class docstring recommends** -- a *t* on each fit's own `dof`, taken per replication
+because the critical value is nonlinear in `dof`. `width` is that interval's half-width as a
+fraction of the effect, because coverage without width is not a measurement.
 
-Truth 0.800, prevalence 1 at every site, calibrated reporting regime (every study reports, 3-4
-clusters each), **100 replications per arm**, studies reporting a genuine *t*, every coordinate
-table produced by a cluster-forming threshold with no cap on the number of foci. `half/truth` is
-the interval's half-width over the effect, because coverage without width is not a measurement.
+Three earlier versions are superseded: one with a mis-calibrated reporting regime, one that ran
+every arm at `peak_bias=None` rather than the documented configuration, and one that scored only
+the normal interval. Raw log in `results/coverage_both_intervals_21arm.log`.
 
-Two earlier versions of this table are superseded. The first had a mis-calibrated reporting
-regime (18% of studies reported anything). The second ran every arm at `peak_bias=None` rather
-than the configuration the docstring recommends, which is how a whole session's magnitude numbers
-came to describe a variant. **This one runs the documented configuration
-(`peak_bias="per-study"`, `peak_bias_scale="images"`) as the primary arm set, with
-`peak_bias=None` kept alongside as a labelled variant so the difference is visible.**
+| studies | images | configuration | bias | se/sd | dof | cov(z) | cov(t) | width |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 12 | 0 | — | +0.255 | 2.14 | 4.5 | 0.75 | **0.98** | 0.57 |
+| 12 | 0 | fwhm 16 | +0.248 | 1.70 | 7.8 | 0.28 | 0.52 | 0.32 |
+| 12 | 0 | fwhm 24 | +0.249 | 1.50 | 9.7 | 0.05 | **0.13** | 0.24 |
+| 12 | 2 | calibrated | −0.038 | 1.32 | 4.4 | 0.99 | 1.00 | 0.36 |
+| 12 | 2 | `peak_bias=None` | +0.127 | 1.36 | 4.4 | 0.87 | 0.99 | 0.45 |
+| 12 | 6 | calibrated | −0.026 | 1.26 | 7.0 | 0.98 | 1.00 | 0.25 |
+| 12 | 6 | `peak_bias=None` | +0.027 | 1.27 | 7.0 | 0.99 | 1.00 | 0.27 |
+| 12 | 12 | calibrated | −0.018 | 1.10 | 11.0 | 0.94 | 0.97 | 0.18 |
+| 24 | 0 | — | +0.246 | 2.01 | 9.1 | 0.35 | **0.56** | 0.33 |
+| 24 | 0 | fwhm 16 | +0.243 | 1.79 | 16.2 | 0.03 | 0.04 | 0.20 |
+| 24 | 0 | fwhm 24 | +0.244 | 1.59 | 20.2 | 0.00 | **0.00** | 0.16 |
+| 24 | 2 | calibrated | −0.064 | 1.35 | 8.6 | 0.91 | 0.96 | 0.22 |
+| 24 | 2 | `peak_bias=None` | +0.163 | 1.48 | 8.6 | 0.58 | 0.74 | 0.29 |
+| 24 | 6 | calibrated | −0.049 | 1.41 | 10.8 | 0.92 | 0.96 | 0.19 |
+| 24 | 6 | `peak_bias=None` | +0.073 | 1.38 | 10.8 | 0.89 | 0.93 | 0.22 |
+| 24 | 24 | calibrated | −0.022 | 1.11 | 23.0 | 0.97 | 0.97 | 0.12 |
+| 12 | 0 | τ 0.3 | +0.268 | 1.70 | 3.6 | 0.84 | 0.94 | **0.91** |
+| 12 | 6 | τ 0.3 | −0.048 | 1.06 | 6.7 | 0.92 | 0.94 | 0.43 |
+| 12 | 12 | τ 0.3 | −0.015 | 1.12 | 11.0 | 0.93 | 0.96 | 0.30 |
 
-| studies | images | configuration | bias | se/sd | coverage | half/truth |
-| --- | --- | --- | --- | --- | --- | --- |
-| 12 | 0 | — | +0.255 | 2.14 | 0.75 | 0.42 |
-| 12 | 0 | fwhm 16 | +0.248 | 1.70 | **0.28** | 0.27 |
-| 12 | 0 | fwhm 24 | +0.249 | 1.50 | **0.05** | 0.21 |
-| 12 | 2 | calibrated | −0.038 | 1.32 | 0.99 | 0.26 |
-| 12 | 2 | `peak_bias=None` | +0.127 | 1.36 | 0.87 | 0.33 |
-| 12 | 6 | calibrated | −0.026 | 1.26 | 0.98 | 0.20 |
-| 12 | 6 | `peak_bias=None` | +0.027 | 1.27 | 0.99 | 0.22 |
-| 12 | 12 | calibrated | −0.018 | 1.10 | 0.94 | 0.16 |
-| 24 | 0 | — | +0.246 | 2.01 | **0.35** | 0.29 |
-| 24 | 0 | fwhm 16 | +0.243 | 1.79 | **0.03** | 0.19 |
-| 24 | 0 | fwhm 24 | +0.244 | 1.59 | **0.00** | 0.15 |
-| 24 | 2 | calibrated | −0.064 | 1.35 | 0.91 | 0.19 |
-| 24 | 2 | `peak_bias=None` | +0.163 | 1.48 | **0.58** | 0.25 |
-| 24 | 6 | calibrated | −0.049 | 1.41 | 0.92 | 0.17 |
-| 24 | 6 | `peak_bias=None` | +0.073 | 1.38 | 0.89 | 0.20 |
-| 24 | 24 | calibrated | −0.022 | 1.11 | 0.97 | 0.11 |
-| 12 | 0 | τ 0.3 | +0.268 | 1.70 | 0.84 | 0.62 |
-| 12 | 6 | τ 0.3 | −0.048 | 1.06 | 0.92 | 0.35 |
-| 12 | 12 | τ 0.3 | −0.015 | 1.12 | 0.93 | 0.27 |
+(The `peak_bias=None` rows at 12-of-12 and 24-of-24 are identical to the calibrated ones to every
+digit, which is the behavioural check on the all-donor calibration fix rather than a measurement.)
 
-Six things this settles.
+**The headline, stated for the interval a user following the documentation would build.** With
+image donors the interval is usable: coverage 0.96 to 1.00 at half-widths of 0.12 to 0.36 of the
+effect, across every image share and study count measured. Coordinates-only it is not, but not for
+the reason I said earlier today. It *covers* at twelve studies (0.98) -- at a half-width of 0.57
+of the effect, an interval running [0.60, 1.51] for a truth of 0.80. At twenty-four studies it
+drops to 0.56. And under heterogeneity it covers 0.94 at a half-width of **0.91 of the effect**,
+which is the clearest case in the table of coverage meaning nothing on its own.
 
-**1. The interval works with donors and does not without them.** Every calibrated arm with two or
-more image donors covers 0.91 to 0.99 against a nominal 0.95. Every coordinates-only arm at the
-default kernel covers 0.35 to 0.84. The bias is what separates them: about +0.25 (31% of the
-effect) coordinates-only against −0.02 to −0.06 calibrated.
+**What actually discriminates is bias and width, and that is all.** The bias-to-width model
+predicts `cov(t)` across all twenty-one arms to a mean absolute error of **0.024** (0.036 for
+`cov(z)`), so there is no residual behaviour to explain. `se/sd` never falls below 1.06, so no
+interval is too narrow for the estimator's own variability and every shortfall is bias.
 
-**2. `se/sd` never drops below 1.06.** No interval in the table is too narrow for the estimator's
-own variability, so every coverage shortfall is bias. That kills "the standard error is wrong" as
-an explanation for anything here.
+**Widening the kernel is the one thing that breaks it outright**, and it breaks it twice over:
+`se` falls *and* `n_eff` rises toward the study count so the critical value shrinks too. Coverage
+runs 0.98 / 0.52 / 0.13 across fwhm 10 / 16 / 24 at twelve studies and 0.56 / 0.04 / 0.00 at
+twenty-four, on a bias that does not move. A wide kernel was measured on real data to improve both
+the accuracy of the map and its extent. One default cannot serve both.
 
-**3. All of it is one ratio.** A shifted normal on (bias, se, sd) predicts coverage across the
-sixteen τ=0 arms to a mean absolute error of 0.034, spanning measured coverage from 0.00 to 0.99.
-The interval fails exactly when and as much as the bias-to-width ratio says. Earlier descriptions
-of it as "too narrow" or "conservative" were restating `b/se` in words. On the τ=0.3 arm the
-prediction is off by +0.10, at the edge of that band — the model degrades under heterogeneity.
-
-**4. Coverage degrades as a collection grows, in every configuration.** `se` shrinks roughly as
-`1/sqrt(studies)` and the bias does not shrink at all: 0.75 → 0.35 coordinates-only, 0.99 → 0.91
-with two donors, 0.98 → 0.92 with six. A large coordinate-only collection gives a tighter
-interval around the wrong value. This inverts the usual reassurance and is now in the docstring.
-
-**5. Widening the kernel destroys the interval — which settles #56 as a genuine trade.** fwhm 16
-takes coverage to 0.28 and fwhm 24 to 0.05 at twelve studies (0.03 and 0.00 at twenty-four),
-because widening shrinks `se` by 40-50% and leaves the bias untouched. Widening was measured on
-real data to improve both the accuracy of the map and its spatial extent. So the two goals point
-opposite ways and a single default cannot serve both: **a wide kernel for the map, a narrow one
-for the interval.**
-
-**6. Neither `peak_bias` setting dominates, and they fail differently.** The calibrated one is
-*stable* — −0.018 to −0.064 across image shares from 0.08 to 1.00. The variant *swings* with the
-share — +0.163 at 2 of 24 down to −0.018 at 12 of 12 — so it wins at 6 of 12 (0.99 against 0.98,
-where its +0.027 happens to be smaller than the calibrated −0.026) and loses badly at 2 of 24
-(0.58 against 0.91). Stability across the share is the property worth having, because a real
-collection's share is not something the analyst chooses.
-
-And one oddity worth keeping: **heterogeneity improves coverage while making the point estimate
-worse.** Coordinates-only at τ=0.3 has a larger bias (+0.268 against +0.255) and better coverage
-(0.84 against 0.75), because it widens the interval more than it moves the estimate. The clearest
-case in the whole table that coverage alone is not a metric.
-
-Two arms are a behavioural check rather than a measurement: 12-of-12 and 24-of-24 give *identical*
-numbers under `calibrated` and `peak_bias=None`, to every digit. That is what the all-donor
-calibration fix should do — with every study imaged there is no coordinate value for a scale to
-act on, so it returns 1.0 and the two paths become arithmetically the same fit.
+**Neither `peak_bias` setting dominates and they fail differently.** The calibrated one is stable
+across the image share (−0.018 to −0.064 from f = 0.08 to 1.00); the variant swings with it
+(+0.163 at 2 of 24 down to −0.018 at 12 of 12). So the variant wins at 6 of 12 and loses badly at
+2 of 24, and stability is the property worth having because the share is not the analyst's choice.
 
 ## Ledger: what stands, what was retracted
 

@@ -2548,3 +2548,49 @@ smoothness-dependent factor then a smoothness metadata field could pin the scale
 donor at all, which is the thing four other remedies failed to do. Testable by sweeping the bed's
 own smoothness and checking whether the bias tracks it the way random-field theory says it should.
 Recorded as a direction rather than a result.
+
+### The complete table, and the one row that makes the point
+
+All 21 arms, scored against both intervals. Raw log in
+`results/coverage_both_intervals_21arm.log`.
+
+```
+arm                                     bias  se/sd   dof cov(z) cov(t)  width_t
+12 studies,  0 images                 +0.255   2.14   4.5   0.75   0.98     0.57
+12 studies,  0 images @ fwhm 16       +0.248   1.70   7.8   0.28   0.52     0.32
+12 studies,  0 images @ fwhm 24       +0.249   1.50   9.7   0.05   0.13     0.24
+12 studies,  2 images, calibrated     -0.038   1.32   4.4   0.99   1.00     0.36
+12 studies,  2 images, peak_bias=None +0.127   1.36   4.4   0.87   0.99     0.45
+12 studies,  6 images, calibrated     -0.026   1.26   7.0   0.98   1.00     0.25
+12 studies,  6 images, peak_bias=None +0.027   1.27   7.0   0.99   1.00     0.27
+12 studies, 12 images, calibrated     -0.018   1.10  11.0   0.94   0.97     0.18
+24 studies,  0 images                 +0.246   2.01   9.1   0.35   0.56     0.33
+24 studies,  0 images @ fwhm 16       +0.243   1.79  16.2   0.03   0.04     0.20
+24 studies,  0 images @ fwhm 24       +0.244   1.59  20.2   0.00   0.00     0.16
+24 studies,  2 images, calibrated     -0.064   1.35   8.6   0.91   0.96     0.22
+24 studies,  2 images, peak_bias=None +0.163   1.48   8.6   0.58   0.74     0.29
+24 studies,  6 images, calibrated     -0.049   1.41  10.8   0.92   0.96     0.19
+24 studies,  6 images, peak_bias=None +0.073   1.38  10.8   0.89   0.93     0.22
+24 studies, 24 images, calibrated     -0.022   1.11  23.0   0.97   0.97     0.12
+12 studies,  0 images, tau 0.3        +0.268   1.70   3.6   0.84   0.94     0.91
+12 studies,  6 images, tau 0.3        -0.048   1.06   6.7   0.92   0.94     0.43
+12 studies, 12 images, tau 0.3        -0.015   1.12  11.0   0.93   0.96     0.30
+```
+
+**The row to read first is the second from last.** Coordinates-only with real heterogeneity
+covers **0.94** -- nominal, to the eye -- with a half-width of **0.91 of the effect**. On a truth
+of 0.800 the interval runs from about 0.34 to 1.80. It covers because it admits almost any
+magnitude. Coverage alone cannot tell that row from `24 studies, 24 images` at 0.97 and a width
+of 0.12, and no amount of care about the critical value or the degrees of freedom changes which
+of those two a user should trust.
+
+That is the whole lesson of the last two hours, and it cost three superseded versions of this
+table to learn: the first had a mis-calibrated reporting regime, the second scored the wrong
+`peak_bias` configuration, the third scored the wrong interval. Each time the fix was to measure
+what the documentation describes -- the regime papers actually report in, the settings the
+docstring recommends, and finally the interval the docstring tells callers to build. And each
+time the correction changed a conclusion I had already written down.
+
+The bias-to-width model predicts `cov(t)` across all twenty-one arms to a mean absolute error of
+**0.024**, against 0.036 for `cov(z)`, so the median `dof` is a sufficient summary and there is no
+behaviour left unaccounted for. Two numbers describe the entire coverage column.
