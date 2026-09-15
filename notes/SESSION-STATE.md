@@ -25,70 +25,87 @@ is +0.043). Beds now generate a real t and assert their own convention before me
 The lesson is in `PROTOCOL.md`: name the one-minute check that the measurement is wrong, and run
 it before proposing a mechanism.
 
-## The corrected coverage picture
+## The definitive coverage table
 
-Truth 0.800, prevalence 1 at every site, calibrated reporting regime (every study reports, 3–4
-clusters each), 100 replications, studies reporting a genuine t. `half/truth` is the interval's
-half-width over the effect.
+Truth 0.800, prevalence 1 at every site, calibrated reporting regime (every study reports, 3-4
+clusters each), **100 replications per arm**, studies reporting a genuine *t*, every coordinate
+table produced by a cluster-forming threshold with no cap on the number of foci. `half/truth` is
+the interval's half-width over the effect, because coverage without width is not a measurement.
 
-**RETRACTED, and this is the important one: every arm used `peak_bias=None`, not the configuration
-the docstring recommends** (`peak_bias="per-study"` with `peak_bias_scale="images"`). Measured
-directly, at the image fraction that matters:
+Two earlier versions of this table are superseded. The first had a mis-calibrated reporting
+regime (18% of studies reported anything). The second ran every arm at `peak_bias=None` rather
+than the configuration the docstring recommends, which is how a whole session's magnitude numbers
+came to describe a variant. **This one runs the documented configuration
+(`peak_bias="per-study"`, `peak_bias_scale="images"`) as the primary arm set, with
+`peak_bias=None` kept alongside as a labelled variant so the difference is visible.**
 
-```
-truth 0.800, 12 studies, 40 reps               mean g    bias  mean se  cover
-2 of 12: peak_bias=None (my table)              0.904  +0.104    0.141   0.93
-2 of 12: per-study, scale read off the images    0.753  -0.047    0.109   1.00
-6 of 12: peak_bias=None (my table)              0.811  +0.011    0.092   1.00
-6 of 12: per-study, scale read off the images    0.759  -0.041    0.084   1.00
-```
+| studies | images | configuration | bias | se/sd | coverage | half/truth |
+| --- | --- | --- | --- | --- | --- | --- |
+| 12 | 0 | — | +0.255 | 2.14 | 0.75 | 0.42 |
+| 12 | 0 | fwhm 16 | +0.248 | 1.70 | **0.28** | 0.27 |
+| 12 | 0 | fwhm 24 | +0.249 | 1.50 | **0.05** | 0.21 |
+| 12 | 2 | calibrated | −0.038 | 1.32 | 0.99 | 0.26 |
+| 12 | 2 | `peak_bias=None` | +0.127 | 1.36 | 0.87 | 0.33 |
+| 12 | 6 | calibrated | −0.026 | 1.26 | 0.98 | 0.20 |
+| 12 | 6 | `peak_bias=None` | +0.027 | 1.27 | 0.99 | 0.22 |
+| 12 | 12 | calibrated | −0.018 | 1.10 | 0.94 | 0.16 |
+| 24 | 0 | — | +0.246 | 2.01 | **0.35** | 0.29 |
+| 24 | 0 | fwhm 16 | +0.243 | 1.79 | **0.03** | 0.19 |
+| 24 | 0 | fwhm 24 | +0.244 | 1.59 | **0.00** | 0.15 |
+| 24 | 2 | calibrated | −0.064 | 1.35 | 0.91 | 0.19 |
+| 24 | 2 | `peak_bias=None` | +0.163 | 1.48 | **0.58** | 0.25 |
+| 24 | 6 | calibrated | −0.049 | 1.41 | 0.92 | 0.17 |
+| 24 | 6 | `peak_bias=None` | +0.073 | 1.38 | 0.89 | 0.20 |
+| 24 | 24 | calibrated | −0.022 | 1.11 | 0.97 | 0.11 |
+| 12 | 0 | τ 0.3 | +0.268 | 1.70 | 0.84 | 0.62 |
+| 12 | 6 | τ 0.3 | −0.048 | 1.06 | 0.92 | 0.35 |
+| 12 | 12 | τ 0.3 | −0.015 | 1.12 | 0.93 | 0.27 |
 
-So the coordinate values **are** corrected, not merely outvoted, and "the coordinate channel is
-diluted, never corrected" — which I reported twice — is false of the estimator. It is true only of
-`peak_bias=None`.
+Six things this settles.
 
-The two settings aren't ranked; they fail differently, and the recommended one fails better.
-**Calibration pins the scale to about −5% whatever the donor count** (−0.047 at two, −0.041 at
-six) — a small stable over-correction that doesn't care how many images a literature happened to
-provide. **Dilution's accuracy depends entirely on the share** (+0.104 at two, +0.011 at six), so
-it wins only at six of twelve, where an IBMA on the images is available anyway.
+**1. The interval works with donors and does not without them.** Every calibrated arm with two or
+more image donors covers 0.91 to 0.99 against a nominal 0.95. Every coordinates-only arm at the
+default kernel covers 0.35 to 0.84. The bias is what separates them: about +0.25 (31% of the
+effect) coordinates-only against −0.02 to −0.06 calibrated.
 
-The weight-share model (`b0 = 0.260`, `r = 6.40`, max residual 0.022) is therefore a correct model
-of the variant, and every projection hung off it ("2 images of 20 studies leaves the magnitude 20%
-high") needs re-deriving before being quoted. The table below describes that variant, not the
-recommended use.
+**2. `se/sd` never drops below 1.06.** No interval in the table is too narrow for the estimator's
+own variability, so every coverage shortfall is bias. That kills "the standard error is wrong" as
+an explanation for anything here.
 
-| studies | images | bias | se/sd | coverage | half/truth |
-| --- | --- | --- | --- | --- | --- |
-| 12 | 0 | +0.259 | 2.19 | 0.72 | 0.40 |
-| 12 | 0, `peak_bias='per-study'` | +0.255 | 2.14 | 0.75 | 0.42 |
-| 12 | 2 | +0.127 | 1.36 | 0.87 | 0.33 |
-| 12 | 6 | +0.027 | 1.27 | 0.99 | 0.22 |
+**3. All of it is one ratio.** A shifted normal on (bias, se, sd) predicts coverage across the
+sixteen τ=0 arms to a mean absolute error of 0.034, spanning measured coverage from 0.00 to 0.99.
+The interval fails exactly when and as much as the bias-to-width ratio says. Earlier descriptions
+of it as "too narrow" or "conservative" were restating `b/se` in words. On the τ=0.3 arm the
+prediction is off by +0.10, at the edge of that band — the model degrades under heterogeneity.
 
-| 12 | 0, τ 0.3 | +0.302 | 1.58 | 0.80 | 0.61 |
-| 12 | 6, τ 0.3 | +0.012 | 1.16 | 0.96 | 0.36 |
-| 12 | 12, τ 0.3 | −0.015 | 1.12 | 0.93 | 0.27 |
-| 24 | 0 | +0.248 | 2.24 | **0.28** | 0.28 |
-| 24 | 6 | +0.073 | 1.38 | 0.89 | 0.20 |
-| 24 | 24 | −0.022 | 1.11 | 0.97 | 0.11 |
+**4. Coverage degrades as a collection grows, in every configuration.** `se` shrinks roughly as
+`1/sqrt(studies)` and the bias does not shrink at all: 0.75 → 0.35 coordinates-only, 0.99 → 0.91
+with two donors, 0.98 → 0.92 with six. A large coordinate-only collection gives a tighter
+interval around the wrong value. This inverts the usual reassurance and is now in the docstring.
 
-Coverage still degrades with more studies (0.72 → 0.28), the signature of a fixed bias with a
-shrinking interval. `se/RMSE` tracks coverage across the whole table (0.61 / 0.45 / 1.18 / 0.97
-against coverage 0.72 / 0.28 / 0.99 / 0.97) while `se/sd` ranks the same arms in the wrong
-order — the metrics-that-lie entry, confirmed. Weight-share refit on all six τ=0 arms:
-`b0 = 0.260`, `r = 6.40`, max residual 0.022; the same six donors give +0.027 at f=0.50 and
-+0.073 at f=0.25, so it is the share and not the count, a third time.
+**5. Widening the kernel destroys the interval — which settles #56 as a genuine trade.** fwhm 16
+takes coverage to 0.28 and fwhm 24 to 0.05 at twelve studies (0.03 and 0.00 at twenty-four),
+because widening shrinks `se` by 40-50% and leaves the bias untouched. Widening was measured on
+real data to improve both the accuracy of the map and its spatial extent. So the two goals point
+opposite ways and a single default cannot serve both: **a wide kernel for the map, a narrow one
+for the interval.**
 
-So: the coordinates-only magnitude runs about **32% high**, not 63%, and the interval covers 0.72
-against a nominal 0.95 — a real failure, not a collapse. Two images halves the bias; six
-essentially removes it. `se/sd` stays at or above 1 everywhere, so no interval is too narrow for
-the estimator's own variability: every coverage shortfall is bias.
+**6. Neither `peak_bias` setting dominates, and they fail differently.** The calibrated one is
+*stable* — −0.018 to −0.064 across image shares from 0.08 to 1.00. The variant *swings* with the
+share — +0.163 at 2 of 24 down to −0.018 at 12 of 12 — so it wins at 6 of 12 (0.99 against 0.98,
+where its +0.027 happens to be smaller than the calibrated −0.026) and loses badly at 2 of 24
+(0.58 against 0.91). Stability across the share is the property worth having, because a real
+collection's share is not something the analyst chooses.
 
-`peak_bias='per-study'` moves the bias from +0.259 to +0.255. That is consistent with what the
-docstring already claims (it corrects the between-study part, not the common scale), but it puts a
-number on it: the between-study part is negligible. Advice that stops at "use `peak_bias`" is
-advice to do nothing.
+And one oddity worth keeping: **heterogeneity improves coverage while making the point estimate
+worse.** Coordinates-only at τ=0.3 has a larger bias (+0.268 against +0.255) and better coverage
+(0.84 against 0.75), because it widens the interval more than it moves the estimate. The clearest
+case in the whole table that coverage alone is not a metric.
 
+Two arms are a behavioural check rather than a measurement: 12-of-12 and 24-of-24 give *identical*
+numbers under `calibrated` and `peak_bias=None`, to every digit. That is what the all-donor
+calibration fix should do — with every study imaged there is no coordinate value for a scale to
+act on, so it returns 1.0 and the two paths become arithmetically the same fit.
 
 ## Ledger: what stands, what was retracted
 
