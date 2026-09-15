@@ -12,6 +12,14 @@ has nothing to do with its width. Every study here has the effect at every site,
 is 1 and the two coincide. What a study *reports* is still selected by the threshold, which is
 the point; what it *has* is not.
 
+*Statistic convention.* Studies report a genuine **t**, built by ``reporting.study_t_field``
+and declared as ``"T"``. An earlier version of this bed reported ``(truth + noise/sqrt(n)) *
+sqrt(n)``, a normal statistic with known variance, while the estimator -- correctly for real
+data -- reads a reported statistic as a t on ``n - 1`` degrees of freedom. In the far tail where
+every reported peak lives that mismatch inflated the recovered effect size by about a third, and
+the inflation was read as a property of the estimator. The bed now asserts its own convention
+before measuring anything.
+
 *Regime.* The bed is calibrated first (`calibrate_coverage_bed`) to the regime coordinate
 meta-analysis draws from: ~100% of studies report something and a typical table lists 3-4
 clusters. A first attempt at this run, set up by guess, sat at 18% reporting -- a nominally
@@ -39,6 +47,7 @@ from pathlib import Path
 from scipy import ndimage
 from joblib import Parallel, delayed
 from nimare.meta.cbma import CBES
+from nimare.meta.cbma.effectsize import peak_stat_to_hedges_g
 from nimare.studyset import Studyset
 import reporting
 
@@ -76,13 +85,27 @@ TRUTH = truth_field()
 TRUE_G = float(TRUTH[READ_AT])
 
 
-def study_g_map(rng, n, tau):
-    """One study's observed g map: the common truth, a study-level shift, and sampling noise."""
+def study_fields(rng, n, tau):
+    """One study's ``(g map, var map, t map)``: the image it would share and the table it prints.
+
+    The image is on the effect-size scale, which is what a shared ``g``/``g_var`` pair carries.
+    The statistic is a genuine t on ``n - 1`` degrees of freedom, which is what a paper prints
+    and what the estimator's conversion assumes. Both come from the same study-level truth, so
+    a donor's image and its table describe the same study.
+    """
     shift = rng.normal(0.0, tau) if tau > 0 else 0.0
     field = TRUTH * (1.0 + shift / PEAK_G)      # the whole pattern scales, keeping zeros zero
-    noise = ndimage.gaussian_filter(rng.standard_normal(SHAPE), SMOOTH_VOX)
-    noise *= 1.0 / (noise.std() + 1e-12)
-    return field + noise / np.sqrt(n)
+    t_map = reporting.study_t_field(field, n, SMOOTH_VOX, rng, shape=SHAPE)
+    # The image the same study would share is the effect-size map implied by its own t, through
+    # the estimator's own conversion -- so the image arm and the coordinate arm are on exactly
+    # one convention and the two are not independent draws of the same study. Building it as
+    # `t / sqrt(n)` instead is Cohen's d, which is high by the Hedges factor (2.6% at n = 30)
+    # and showed up as a residual bias in the all-donor reference arm.
+    flat = t_map.ravel()
+    g_flat, var_flat = peak_stat_to_hedges_g(
+        flat, np.full(flat.size, float(n)), stat_type="t", design="one-sample"
+    )
+    return g_flat.reshape(SHAPE), var_flat.reshape(SHAPE), t_map
 
 
 def one(seed, n_studies, n_image, tau, peak_bias=None):
@@ -97,20 +120,20 @@ def one(seed, n_studies, n_image, tau, peak_bias=None):
     studies, reported = [], 0
     for k in range(n_studies):
         n = int(rng.integers(20, 41))
-        gmap = study_g_map(rng, n, tau)
-        foci, _ = reporting.report_peaks((gmap * np.sqrt(n))[MASK_BOOL], MASK_BOOL, SHAPE,
+        gmap, var_map, t_map = study_fields(rng, n, tau)
+        foci, _ = reporting.report_peaks(t_map[MASK_BOOL], MASK_BOOL, SHAPE,
                                          ZOOMS, scheme="cluster", focus="max")
         reported += bool(foci)
         meta = {"sample_sizes": [n]}
         points = [{"space": "MNI",
                    "coordinates": [float(v) for v in nib.affines.apply_affine(AFF, ijk)],
-                   "values": [{"kind": "Z", "value": float(zv)}]} for ijk, zv in foci]
+                   "values": [{"kind": "T", "value": float(zv)}]} for ijk, zv in foci]
         analysis = {"id": f"s{k}-1", "name": "1", "metadata": meta, "points": points}
         if k < n_image:
             tag = f"{seed}_{n_studies}_{n_image}_{tau:.2f}_{k}"
             gp, vp = OUT / f"{tag}_g.nii.gz", OUT / f"{tag}_v.nii.gz"
             nib.save(nib.Nifti1Image(gmap.astype(np.float32), AFF), gp)
-            nib.save(nib.Nifti1Image(np.full(SHAPE, 1.0 / n, np.float32), AFF), vp)
+            nib.save(nib.Nifti1Image(var_map.astype(np.float32), AFF), vp)
             analysis["images"] = [
                 {"url": str(gp), "filename": "g.nii.gz", "space": "MNI", "value_type": "g"},
                 {"url": str(vp), "filename": "v.nii.gz", "space": "MNI", "value_type": "g_var"}]
@@ -150,6 +173,12 @@ ARMS = [
 ]
 
 if __name__ == "__main__":
+    # The convention check this bed exists to respect, run on a null field before anything is
+    # measured. A t reported as a z, or the reverse, shifts every magnitude by about a third.
+    _probe = reporting.study_t_field(np.zeros(SHAPE), 30, SMOOTH_VOX,
+                                     np.random.default_rng(12345), shape=SHAPE)
+    reporting.assert_statistic_convention(_probe, 30, "T")
+    print("statistic convention check passed: studies report a t on n - 1 degrees of freedom")
     print(f"truth at the read-out voxel: g = {TRUE_G:.3f}; prevalence 1 at every site")
     print(f"{N_SIMS} replications per arm; interval is g +/- 1.96*se\n")
     print(f"{'arm':32s} {'mean g':>7s} {'bias':>7s} {'mean se':>8s} {'sd of g':>8s} "

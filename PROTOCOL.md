@@ -69,3 +69,43 @@ Use one of these instead:
 The general rule this belongs to: **a wait that cannot fail loudly will eventually fail
 silently.** Before arming any waiter, ask what it would print if the thing it waits for never
 started -- and if the answer is "nothing", fix the waiter.
+
+## Every bed declares and checks its statistic convention
+
+A reported statistic means something specific, and the estimator acts on that meaning. CBES reads
+a reported value as a **t on n - 1 degrees of freedom** (a reported z is treated as a
+p-value-preserving image of one) and maps it back before converting to an effect size. In the far
+tail, where every reported peak lives, that map is strongly expansive: at ``z = 5.33`` with
+``n = 30`` it turns ``d = 0.98`` into ``g = 1.25``.
+
+A bed that generates ``(truth + noise / sqrt(n)) * sqrt(n)`` is producing a **normal statistic
+with known variance** -- exactly ``d * sqrt(n)`` -- and feeding it in inflates every recovered
+effect size by about a third. Measured at the same foci with the same reporting pipeline:
+
+```
+known-variance z declared as Z    bias at the foci  +0.630
+proper t declared as T            bias at the foci  +0.296
+```
+
+This has now happened twice in this program: once in the field simulator (fixed), then again in a
+new bed, where it produced a large, stable, reproducible bias that I spent most of a session
+attributing to the estimator -- inventing a "pooling step" contribution and then a "conversion
+convexity" one before checking the input. It is the recurring failure mode, not a subtle one.
+
+So:
+
+- Build statistics with ``reporting.study_t_field`` and report them as ``"T"``.
+- Call ``reporting.assert_statistic_convention(null_field, n, "T")`` once, on a **null** field,
+  before reading any estimate out of the bed. Print that it passed.
+- Where a bed also supplies images, derive them from the same ``t`` through the estimator's own
+  ``peak_stat_to_hedges_g``, so the image arm and the coordinate arm share one convention. Using
+  ``t / sqrt(n)`` is Cohen's d and is high by the Hedges factor -- 2.6% at ``n = 30``, which is
+  enough to show up as a residual bias in an arm meant to be the unbiased reference.
+- Check the *tail*, not the variance. A t on 29 df has variance 1.074 against a normal's 1.000,
+  a 7% gap that sampling noise hides; the first version of the check duly passed a field whose t
+  had collapsed to a z. ``P(|T_29| > 3) = 0.0055`` against ``P(|Z| > 3) = 0.0027`` is a factor of
+  two and cannot be missed.
+- Do not make a variance field smooth by smoothing chi-square draws: that averages independent
+  variates, the denominator goes nearly constant, and the t collapses into a z -- the very
+  confusion being avoided. Use a probability integral transform of a smooth Gaussian field, which
+  keeps the marginal exact.

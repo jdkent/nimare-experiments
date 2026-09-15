@@ -164,3 +164,70 @@ def report_peaks(z_masked, mask_bool, shape, zooms, scheme="cluster", focus="max
             raise ValueError(f"unknown focus {focus!r}")
         foci.append((np.asarray(ijk, dtype=np.int64), float(volume[tuple(ijk)])))
     return foci, height
+
+
+def study_t_field(truth_g, n_subjects, smooth_vox, rng, shape=None):
+    """One study's observed t map: a genuine t statistic, not a known-variance z.
+
+    Every bed in this repository used to build a statistic as ``(truth + noise / sqrt(n)) *
+    sqrt(n)``, which is a *normal* statistic with known variance -- exactly ``d * sqrt(n)``. The
+    estimator, correctly for real data, reads a reported z as a p-value-preserving image of a t
+    on ``n - 1`` degrees of freedom and maps it back before converting to an effect size. In the
+    far tail, where every reported peak lives, that map is strongly expansive: at ``z = 5.33``
+    with ``n = 30`` it turns ``d = 0.98`` into ``g = 1.25``. Feeding a known-variance z into it
+    inflates the recovered effect size by about a third, and that inflation was mistaken for a
+    property of the estimator across a whole session's measurements.
+
+    So the statistic is built the way a one-sample group analysis produces one: an effect plus
+    smooth noise, over an independently drawn residual standard deviation on ``n - 1`` degrees
+    of freedom.
+
+    The variance field is made smooth by a probability integral transform of a smooth Gaussian
+    field, *not* by smoothing a chi-square field. Smoothing chi-square draws averages
+    independent variates, so the denominator becomes nearly constant and the t collapses back
+    into a z -- which is the very confusion this function exists to avoid, and which a first
+    version of it walked straight into. The transform keeps the marginal exactly
+    chi-square on ``n - 1`` degrees of freedom while giving it spatial structure.
+    """
+    shape = tuple(shape) if shape is not None else np.asarray(truth_g).shape
+    df = n_subjects - 1
+
+    numerator = ndimage.gaussian_filter(rng.standard_normal(shape), smooth_vox)
+    numerator *= 1.0 / (numerator.std() + 1e-12)
+    numerator = np.asarray(truth_g) * np.sqrt(n_subjects) + numerator
+
+    latent = ndimage.gaussian_filter(rng.standard_normal(shape), smooth_vox)
+    latent *= 1.0 / (latent.std() + 1e-12)
+    chi = stats.chi2.ppf(np.clip(stats.norm.cdf(latent), 1e-9, 1 - 1e-9), df)
+    return numerator / np.sqrt(chi / df)
+
+
+def assert_statistic_convention(stat, n_subjects, kind, threshold=3.0, tolerance=0.35):
+    """Fail loudly if a bed's statistic is not on the scale its ``kind`` claims.
+
+    The check every bed should run once, on a null field, before reading any estimate out of it.
+
+    It compares *tail* rates rather than variances. A t on 29 degrees of freedom has variance
+    1.074 against a standard normal's 1.000 -- a 7% difference that sampling noise hides, and a
+    first version of this check duly passed a field whose t had collapsed into a z. The tails
+    are not close: ``P(|T_29| > 3)`` is 0.0055 against ``P(|Z| > 3)`` of 0.0027, a factor of two,
+    and the gap widens further out. Since reported peaks live in exactly that tail, it is also
+    the discrepancy that matters.
+    """
+    values = np.abs(np.asarray(stat).ravel())
+    observed = float(np.mean(values > threshold))
+    df = n_subjects - 1
+    if kind.lower().startswith("t"):
+        expected = float(2.0 * stats.t.sf(threshold, df))
+    else:
+        expected = float(2.0 * stats.norm.sf(threshold))
+    # Binomial noise on the observed rate, so a small field is not failed for being small.
+    noise = 3.0 * np.sqrt(max(expected, 1e-9) * (1 - expected) / max(values.size, 1))
+    if abs(observed - expected) > tolerance * expected + noise:
+        raise AssertionError(
+            f"Statistic declared as {kind!r} exceeds {threshold} at rate {observed:.5f} against "
+            f"{expected:.5f} expected on {df} degrees of freedom. A bed that reports a "
+            f"known-variance z as a t -- or a t as a z -- shifts the recovered effect size by "
+            f"about a third, because the estimator maps a reported z back to a t on n - 1 "
+            f"degrees of freedom before converting it."
+        )
