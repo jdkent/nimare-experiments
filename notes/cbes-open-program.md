@@ -880,3 +880,59 @@ numbers were not.
 The qualitative points stand unchanged: the image *share* rather than the donor count is what
 matters, no correction inside the coordinate channel moves the bias (`peak_bias='per-study'`:
 +0.259 to +0.255), and the channel is diluted rather than corrected.
+
+## E5 — achievability as an output (answered)
+
+The user's question was "how can I use this estimand to power my next study?" My earlier answer
+was unsatisfying: power under zero inflation needs `pi` and `mu` separately, both are badly
+estimated, and there is a ceiling at `pi + (1-pi)*alpha`. Correct, and not usable.
+
+The reporting-probability framing (section 19) gives a usable answer, because the quantity a
+planner wants *is* the estimand. The chance that a planned study of `N` subjects reporting at
+threshold `u` produces a surviving cluster at this voxel is
+
+    P(N) = pi * D(mu, N, u)
+
+which is the same reporting probability, evaluated at the planned design rather than the
+collection's. And "produces a surviving cluster near here" is exactly what a replication counts
+as a hit, so this is not a proxy for the planning question -- it is the planning question.
+
+```
+   site (mu, pi)    N=20    N=30    N=50    N=80   N=150   N=400  ceiling
+    (0.80, 1.00)    0.61    0.86    0.99    1.00    1.00    1.00     1.00
+    (0.60, 0.75)    0.20    0.37    0.62    0.74    0.75    0.75     0.75
+    (0.45, 1.00)    0.10    0.20    0.46    0.77    0.99    1.00     1.00
+    (0.45, 0.40)    0.04    0.08    0.18    0.31    0.39    0.40     0.40
+    (0.25, 0.75)    0.01    0.02    0.05    0.11    0.31    0.72     0.75
+```
+
+Sample size for a target, where reachable:
+
+```
+  mu=0.80, pi=1.00   50%: N = 17    80%: N = 27
+  mu=0.60, pi=0.75   50%: N = 39    80%: unreachable (ceiling 75%)
+  mu=0.45, pi=1.00   50%: N = 54    80%: N = 85
+  mu=0.45, pi=0.40   50%: unreachable (ceiling 40%)
+```
+
+Three things worth saying about this as a deliverable.
+
+**The ceiling is `pi`, and it is the first thing a planner needs.** However large the study, it
+cannot report an effect that is not there in the population it samples. A site with prevalence
+0.40 caps at a 40% replication rate and no sample size fixes it. That is a qualitatively
+different answer from a power calculation, and giving it first would head off the commonest
+mistake -- planning N against an effect size as though detection were the only obstacle.
+
+**It reframes "failed replication".** A study that does not find a peak where a meta-analysis
+said one was is not necessarily underpowered or wrong; at `(mu 0.45, pi 0.40)` it had a 92% chance
+of missing at N = 30. A map of `P(N)` at the reader's own planned design turns that from a
+judgement into an expectation.
+
+**But it inherits the identification problem, and only partly.** `P` is identified where the
+factors are not (this is the whole point of section 19 -- the product is what the data pin down),
+so `P` at designs *inside* the collection's range of sample sizes is estimable to about 0.04. The
+ceiling, however, is `pi` alone -- and that is the badly identified factor, only separable inside
+the window of detectability. So the honest output is a graded one: `P` at designs the collection
+supports, reported confidently; the ceiling reported only where the collection's spread of power
+identifies `pi`, and refused elsewhere. That is exactly the diagnostic in task #49, arriving from
+a second direction, which is some reason to think it is the right diagnostic.
