@@ -36,17 +36,26 @@ the docstring recommends** (`peak_bias="per-study"` with `peak_bias_scale="image
 directly, at the image fraction that matters:
 
 ```
-2 of 12 images, truth 0.800    mean g    bias  mean se  cover
-  peak_bias=None (the table)    0.904  +0.104    0.141   0.93
-  per-study, scale from images   0.753  -0.047    0.109   1.00
+truth 0.800, 12 studies, 40 reps               mean g    bias  mean se  cover
+2 of 12: peak_bias=None (my table)              0.904  +0.104    0.141   0.93
+2 of 12: per-study, scale read off the images    0.753  -0.047    0.109   1.00
+6 of 12: peak_bias=None (my table)              0.811  +0.011    0.092   1.00
+6 of 12: per-study, scale read off the images    0.759  -0.041    0.084   1.00
 ```
 
 So the coordinate values **are** corrected, not merely outvoted, and "the coordinate channel is
 diluted, never corrected" — which I reported twice — is false of the estimator. It is true only of
-`peak_bias=None`. The weight-share model (`b0 = 0.260`, `r = 6.40`, max residual 0.022) is a
-correct model of the configuration the documentation tells users not to rely on, and every
-projection hung off it ("2 images of 20 studies leaves the magnitude 20% high") needs re-deriving
-from calibrated arms before being quoted. The table below therefore describes a variant, not the
+`peak_bias=None`.
+
+The two settings aren't ranked; they fail differently, and the recommended one fails better.
+**Calibration pins the scale to about −5% whatever the donor count** (−0.047 at two, −0.041 at
+six) — a small stable over-correction that doesn't care how many images a literature happened to
+provide. **Dilution's accuracy depends entirely on the share** (+0.104 at two, +0.011 at six), so
+it wins only at six of twelve, where an IBMA on the images is available anyway.
+
+The weight-share model (`b0 = 0.260`, `r = 6.40`, max residual 0.022) is therefore a correct model
+of the variant, and every projection hung off it ("2 images of 20 studies leaves the magnitude 20%
+high") needs re-deriving before being quoted. The table below describes that variant, not the
 recommended use.
 
 | studies | images | bias | se/sd | coverage | half/truth |
