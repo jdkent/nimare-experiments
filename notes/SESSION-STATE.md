@@ -321,7 +321,30 @@ degrades smoothly to 0.11 outside it.
   0.050, because two-focus studies admit 2^k arrangements while swapping two similar magnitudes
   moves the map's maximum hardly at all.
 
-CI green on every push. 101 tests pass.
+- **Three silent losses on the legacy `Dataset` conversion**, found by asking why a round-trip
+  changed the calibrated scale. `nimare.io`'s supported set omitted `g`/`g_var`, so a collection
+  carrying effect-size maps lost them at `to_dataset()`. Point values were dropped entirely --
+  `Point.values` is a dict keyed by column name and the converter only handled the raw-JSON
+  list-of-dicts shape, so `isinstance(..., dict)` rejected every one and every reported peak
+  height vanished. And `_statistic_column` quietly returned "images carry the fit; the
+  coordinates are unused" when no coordinate carried a statistic, which is the
+  images-without-coordinates case the estimator refuses by name elsewhere -- one decision made
+  two ways, with the quiet one reachable by accident. Any of the three turns a CBES fit into a
+  different estimator with no error and no warning. A fourth difference is recorded rather than
+  fixed: `to_dataset()` does not carry the mask, so the fit silently falls back to the default
+  MNI template, which moved the calibrated scale 0.933 to 1.138.
+- **Where the image channel's 2-3% downward bias comes from**, documented rather than corrected.
+  Inverse-variance pooling with Hedges' variance `1/n + g^2/(2(n-1))` computes the weight from the
+  observed effect, so a study that drew high gets less weight and the pooled estimate is pulled
+  toward zero. A `g_var` map converted from a test statistic carries the term; one from a
+  per-voxel mixed model does not; the estimator cannot tell which it was handed, so correcting it
+  would be wrong as often as right.
+- **The end-to-end coverage of the interval on `g`.** The only coverage number the docstring
+  carried was measured where the model is exactly true (94.5-98.4%). What a user gets is in the
+  table below, and the counterintuitive half is now stated: coverage *degrades* as a collection
+  grows, because `se` shrinks and the bias does not.
+
+CI green on every push. 104 tests pass.
 
 ## What needs your decision
 
@@ -335,6 +358,12 @@ CI green on every push. 101 tests pass.
   both? Evidence favours allowing.
 - **#49** Emit a per-voxel window-of-detectability diagnostic?
 - **#48** Should a simulation-derived bias number go in a warning, or only the mechanism?
+- **#57** The image-*fraction* framing looks wrong now. With `r` between 3 and 4.6 (one image
+  study carries three to five coordinate studies' worth of pooling weight, measured out of
+  sample) what matters is the weight share `r*n_img / (r*n_img + n_coord)`. That falls when
+  coordinate-only studies are added, so **adding coordinate studies to a mixed collection makes
+  the magnitude worse while narrowing the interval** -- both pushing coverage down. Should the
+  guidance be recast in those terms?
 - **#43** How to present scale uncertainty for `g_absolute` — second interval, combined, or
   documented multiplication?
 - **#36** Where `g` comes from when a collection has images.
