@@ -907,3 +907,39 @@ The first implementation attempt crashed inside `_resolve_peak_bias_scale`, whic
 coordinates alone to calibrate. That was informative rather than incidental: with the magnitudes
 discarded there is nothing to calibrate, so the arm belongs at `peak_bias=None` and should never
 reach that path.
+
+### Prediction: silence-only should survive at one image where the shipping mix collapses
+
+Asked whether the design works with a single image. Writing the reasoning down before running it.
+
+The two-image floor exists for one reason: `_MIN_SCALE_DONORS = 2`, because
+`peak_bias_scale="images"` reads the peak-height scale off the donors and one donor barely pins
+it. **In silence-only mode there is no scale to pin** -- the coordinate magnitudes are discarded,
+so `peak_bias` is off and the calibration path is never entered. The rationale for the floor
+evaporates with it.
+
+And the existing one-image numbers are where the shipping mix looks worst:
+
+```
+ images  estimate                       r  ratio   rmse
+      1  images only               +0.520   1.62  0.446
+      1  mixed, uncalibrated       +0.083   1.92  0.666
+      1  mixed, scaled to images   +0.320   1.66  0.506
+```
+
+A single image plus nine coordinate tables scores +0.083 -- below *both* of its parts, which the
+notes flagged as the one genuinely strange number in that table, and which the calibration only
+partly rescues (+0.320 against +0.520 for the image alone).
+
+So the prediction, in two parts:
+
+1. **Silence-only should not collapse at one image.** The collapse is attributed to a scale fitted
+   from a single donor, and there is no scale here.
+2. **The magnitude gain should be *larger* at one image than at two.** One image has a ratio of
+   1.62 and a mean error near +0.32, against 1.50 and +0.26 at two -- a noisier, more
+   upward-biased baseline for silence shrinkage to correct. At two images the top-decile error
+   went +0.221 to -0.020; at one it starts further from zero, so there is more to recover.
+
+The failure mode that would refute both: if the pattern correlation at one image falls toward the
+coordinates-only floor of +0.218, the silence geometry is carrying the map rather than the single
+image, and one image is not enough to anchor it. That is the thing to look at first.
