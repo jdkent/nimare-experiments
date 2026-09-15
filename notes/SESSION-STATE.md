@@ -338,3 +338,36 @@ CI green on every push. 101 tests pass.
 - **#43** How to present scale uncertainty for `g_absolute` — second interval, combined, or
   documented multiplication?
 - **#36** Where `g` comes from when a collection has images.
+
+## What the two root errors did and did not touch
+
+Worth separating, because the retractions cluster in one part of the work and leave another
+untouched.
+
+**The statistic-convention error and the configuration error both hit the *magnitude accuracy*
+numbers.** Every bias figure, the weight-share model, the scale-error ratios, the comparative
+localisation margins — those are the ones that moved, some of them twice.
+
+**They did not touch the estimand analysis**, which is what the mandate asked about, because that
+work did not depend on either:
+
+- `g` estimates a conditional magnitude and no image-based meta-analysis estimates it, so
+  `g_absolute` cannot be validated against one even in principle. An argument about what the
+  estimators target, not a measurement.
+- `g_marginal` shares an IBMA's estimand, `π·μ`. Same.
+- `prevalence` is the fraction of covering studies that reported, inflated by however much of the
+  silence the censoring term can explain. Measured on the estimator's own EM at a single voxel
+  with the reporting pattern held fixed — no simulated fields, no conversion, no `peak_bias`.
+- The window of detectability, and that prevalence and magnitude are separable only inside it.
+  Measured with an exact occupancy likelihood on exact detection records, which never passes
+  through CBES at all.
+- Reporting probability as an identified, standardisable estimand, and achievability as its value
+  at a planned design. Derivation plus an exact-model check.
+- `peak_information` is independently corroborated. It works on the z scale, where the convention
+  error never applied.
+
+So the picture of *what CBES can and cannot estimate* has held up through both corrections, while
+the picture of *how accurately it estimates it* has been rebuilt twice. That is a reassuring
+division in one way — the conceptual work was not resting on the broken harness — and a warning in
+another: the numbers are the part that will end up in a paper, and they are the part that kept
+being wrong.
