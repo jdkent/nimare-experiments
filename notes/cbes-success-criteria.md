@@ -134,6 +134,50 @@ These are preconditions. A number violating one is void, not weak.
 
 ---
 
+## What measure 6 was missing
+
+The first version of measure 6 said only that adding coordinates must not make measures 1 to 3
+worse. That is a floor that licenses *permitting* coordinates; it does not justify *building* a
+joint model. It would pass a joint fit scoring 0.948 against the images' 0.946 while saying
+nothing about whether the complexity was earned. Three additions.
+
+### 6a. The exchange rate
+
+**Measure.** Sweep images against coordinate studies and read the iso-accuracy contours: how many
+coordinate studies reach the accuracy of one more image.
+
+**Why.** This is the decision a user actually faces -- chase one more shared map, or harvest
+twenty more published tables. "Does the joint win" is not that question. The first estimate from
+the testbed is roughly one image to fifteen coordinate studies, from 30 coordinates reaching
+r 0.934 against 2 images at 0.946.
+
+### 6b. Uncertainty, not only accuracy
+
+**Measure.** Interval coverage and median interval width, alongside the point-estimate measures.
+
+**Threshold.** Coverage within [0.93, 0.97] of nominal 95%, with width reported.
+
+**Why.** Every measure above scores a point estimate. A second source may buy precision rather
+than accuracy -- thirty-two studies should give narrower intervals than two or thirty even at an
+identical point estimate -- and nothing here would see it. This is the most likely place for a
+joint model's real benefit to be hiding, and it is currently unmeasured.
+
+### 6c. Domain coverage
+
+**Measure.** The fraction of the analysis volume carrying a usable estimate, by source.
+
+**Why.** The one thing coordinates uniquely offer is territory no shared map reaches, and every
+simulation here gives all arms the same support, so that contribution scores exactly zero by
+construction.
+
+### And the framing underneath
+
+"Is the joint better" is a model-selection question and a correlation is not a model-selection
+metric. **Held-out predictive likelihood** prices accuracy and uncertainty together and penalises
+unearned complexity, and should be the arbiter when the point estimates are close.
+
+---
+
 ## What success would look like, in one sentence per claim
 
   * **As a localiser**: AUC above 0.9 against a held-out reference, beating a convergence count.
@@ -144,7 +188,8 @@ These are preconditions. A number violating one is void, not weak.
   * **As an inference procedure**: familywise rate within two standard errors of nominal in every
     null including clustered and heterogeneous ones, with power reported beside it.
   * **As an addition to an image-based meta-analysis**: measures 1 to 3 no worse than the images
-    alone.
+    alone, a stated exchange rate against images, narrower intervals at matched coverage, and a
+    better held-out predictive likelihood than either source by itself.
 
 The gap between the second and the third is the honest state of the field, not a defect peculiar
 to this estimator, and the criteria should be stated so that a method may pass as a relative map
