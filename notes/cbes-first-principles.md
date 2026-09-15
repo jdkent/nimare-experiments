@@ -167,3 +167,77 @@ within 10 mm reaches +0.604, against +0.427 for CBES's `g` and +0.542 for `pi * 
 design. The splits differ, so this is approximate, but the gap is large enough that a matched
 comparison is owed -- and if it holds, the magnitude map is being beaten by a convergence map on
 the very quantity it exists to estimate.
+
+---
+
+## 10. A one-dimensional testbed, and what it caught in three minutes
+
+`micro.py` puts the whole question on a 4096-point line: a latent effect field, twenty studies
+that each observe it with noise, threshold it and report maxima, and a truth that is known
+exactly rather than held out. Three tests run in under three seconds together. A whole-brain
+equivalent takes tens of minutes and needs HCP downloads.
+
+The loop immediately earned its keep by finding two defects **in the test code**, one of which
+was misdiagnosed first.
+
+*Defect one, real but not the culprit.* The noise was normalised by each realisation's own
+empirical standard deviation, which gives the field a Student-t marginal on the effective degrees
+of freedom. Harmless near the centre, wrong in the tail, and the tail is where every question
+here lives. Fixed by normalising with the filter's own coefficients. It did not change the
+calibration, so the first diagnosis was wrong.
+
+*Defect two, the actual culprit.* The truncated-normal check fed `|z|` into a likelihood written
+for signed values. At a true mean of 0.5 and a cut of 3.29, 2.8% of exceedances are negative and
+folding them onto the positive side shifts the observed mean by about 0.19; at a true 2.0 there
+are essentially none. That asymmetry was the entire discrepancy -- the estimator returned 0.80
+for a true 0.5 and 1.98 for a true 2.0. The equivalent 3-D script used signed values throughout,
+so its results stand.
+
+### Calibration: partial, and the failure is informative
+
+| true mean | cut | MLE on peaks | MLE on draws |
+| --- | --- | --- | --- |
+| 0.5 | 3.29 | 0.500 | 0.519 |
+| 2.0 | 3.29 | 2.466 | 2.009 |
+
+The draws recover the truth, so the likelihood and the field are right. The peaks over-estimate at
+high signal, as in 3-D. But 3-D gave **0.26** for a true 0.5 where this gives 0.50, so the
+under-estimation at low signal does not reproduce. A 1-D local maximum need only beat two
+neighbours; a 3-D one competes with twenty-six, so selection is far weaker here. Anything this
+testbed says about the low-signal regime is therefore unvalidated and should be checked in 3-D.
+
+### T1: it is cluster collapsing, not density
+
+| rule | cut | foci/study | r, height | r, count |
+| --- | --- | --- | --- | --- |
+| every maximum | 4.50 | 7.3 | **0.868** | 0.700 |
+| every maximum | 5.00 | 5.3 | 0.571 | **0.750** |
+| one per cluster | 3.50 | 9.4 | 0.794 | **0.859** |
+| one per cluster | 4.50 | 5.5 | 0.538 | **0.782** |
+| one per cluster | 5.00 | 4.1 | 0.590 | **0.859** |
+
+Reporting every maximum keeps the height informative as the cut rises. Collapsing each cluster to
+one representative destroys it -- 0.93 down to 0.59 -- while the count holds at 0.68 up to 0.86.
+This is the mechanism behind the 3-D flip, and it corrects section 9: density is a symptom, the
+reporting rule is the cause. A paper that tabulates one row per cluster has thrown away the
+magnitude channel before the meta-analysis ever sees it.
+
+### T3: the ecology claim, repeated too strongly, now measured
+
+Negative log-likelihood relative to the best scale, true scale 0.8:
+
+| data | a = 0.4 | a = 0.6 | a = 0.8 | a = 1.0 | a = 1.5 |
+| --- | --- | --- | --- | --- | --- |
+| coordinates only | 14.0 | **0.0** | 9.8 | 32.8 | 98.6 |
+| plus one image | 449.9 | 114.6 | **0.0** | 95.6 | 1204.8 |
+
+The coordinate-only profile is *not* flat, so the scale is not strictly unidentifiable -- the
+claim borrowed from the presence-only literature was too strong, as already suspected. But its
+minimum sits at 0.6 against a true 0.8, so it is identifiable and **biased**, and the curvature is
+shallow. One image moves the minimum onto the truth and sharpens it by roughly an order of
+magnitude.
+
+That is a better argument for the two-image scope than either version before it: images are not
+needed to make an unidentifiable problem identifiable, they are needed because the
+coordinate-only likelihood is biased and nearly flat, which is exactly what produces an estimate
+that tracks the reporting convention instead of the effect.
