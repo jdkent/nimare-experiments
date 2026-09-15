@@ -2856,3 +2856,38 @@ The "heights never reach the estimate" test scaled reported statistics by `3z + 
 monotone in `|z|`: it pulls negative peaks toward zero and *lowers* the smallest reported
 magnitude, which is now exactly the quantity the estimator reads. The test failed, the code was
 right. Use a pure scaling when the thing under test is a function of `|z|`.
+
+## The interval, re-measured after the fixes: the estimate improved and the interval got worse
+
+Task #67. Every previous se/sd figure was taken while the censoring term was inert (the cutoff
+was on the z scale), so none of them were measuring the coordinate channel at all.
+
+Field simulator, truth known exactly, 30 replications per arm, `threshold="reporting_threshold"`:
+
+| arm | bias quiet | se/sd quiet | bias effect | se/sd effect | cov(t) effect | width effect |
+|---|---|---|---|---|---|---|
+| 20 studies, 1 image | +0.114 | 2.71 | -0.081 | 1.55 | 0.98 | 0.99 |
+| 20 studies, 2 images | +0.093 | 3.17 | -0.082 | 1.78 | 0.99 | 0.92 |
+| 20 studies, 5 images | +0.076 | 3.67 | -0.039 | 1.00 | 1.00 | 0.59 |
+| 20 studies, 20 images | +0.045 | 3.74 | -0.021 | 1.64 | 0.99 | 0.35 |
+| 2 images, silence off | +0.101 | 2.05 | -0.034 | 1.29 | 1.00 | 5.71 |
+| 2 images, tau 0.3 | +0.093 | 3.17 | -0.088 | 2.15 | 0.98 | 1.62 |
+
+**se/sd is now 1.55 to 3.74, worse than the 1.1 to 2.1 recorded before.** And the excess is
+*located*, not inferred: switching the silence off drops it from 1.78 to 1.29 where the effect
+is. The same indicator that fixes the magnitude inflates the error. Coverage is 0.97 to 1.00
+everywhere and therefore says nothing -- at two images it covers with a half-width of 0.92 of the
+effect.
+
+The `silence off` width (5.71) is not comparable: with no censoring roster `dof` falls back to the
+Kish count over image weights, which at two images is 1, and t(1) has a critical value of 12.71.
+That is a correct statement about two studies, not a wider interval for the same information.
+
+Bias also drifts the other way across the strata: **positive where the truth is near zero, negative
+where the effect is**, at every image count. The absolute-value floor explains the first; the
+second is over-shrinkage that more images reduce (-0.081 at one image to -0.021 at twenty) but the
+silence does not.
+
+Next: #66, the peak-height survival. If P(report) is overstated because a reported peak is a local
+maximum rather than any exceedance, that is a candidate for both the negative bias at the effect
+and for why a too-low cutoff outperforms the true one.
