@@ -238,7 +238,78 @@ def identifiability():
           "\n  scale is 0.8. A flat row means the scale is not identifiable from that data.\n")
 
 
+
+
+# ------------------------------- T4: a fitted detection curve versus an assumed hard threshold
+def detection_curve():
+    """Does jointly estimating a soft detection curve beat inferring a hard cut?
+
+    The estimator infers each study's reporting threshold from its smallest reported value, which
+    is both a hard cut and a function of that study's signal. Seismology does not do this: Ogata
+    and Katsura write the observed magnitude distribution as the true law times a smooth detection
+    probability and estimate both together, so completeness is a derived quantity rather than an
+    input.
+
+    Here each study gets its own reporting behaviour drawn from one of three conventions, which is
+    what a real literature search returns. Three estimators of the common effect scale are
+    compared: one told the true per-study cut, one inferring it from the smallest reported value
+    as the estimator currently does, and one fitting a shared logistic detection curve jointly
+    with the scale. The question is which tracks the truth when the conventions are mixed.
+    """
+    print("T4: recovering the effect scale under mixed reporting conventions")
+    shape = truth_field()
+    shape = shape / shape.max()
+    a_true, n_subj, n_studies = 0.8, 25, 30
+
+    tables, true_cuts = [], []
+    for k in range(n_studies):
+        # Three conventions: a permissive cut, a strict one, and a cluster-extent-like rule that
+        # keeps only the top of each supra-threshold run at a low forming cut.
+        convention = k % 3
+        z = a_true * shape * np.sqrt(n_subj) + noise()[0]
+        if convention == 0:
+            cut, idx = 2.5, report(z, 2.5, per_cluster=False)
+        elif convention == 1:
+            cut, idx = 4.5, report(z, 4.5, per_cluster=False)
+        else:
+            cut, idx = 3.0, report(z, 3.0, per_cluster=True)
+        if idx.size:
+            tables.append((idx, np.abs(z[idx])))
+            true_cuts.append(cut)
+
+    def fit_scale(cuts, soft=None):
+        """Profile the Poisson intensity likelihood in the scale, at the given per-study cuts."""
+        def neg(a):
+            m = a * shape * np.sqrt(n_subj)
+            total = 0.0
+            for (idx, _), u in zip(tables, cuts):
+                if soft is None:
+                    rate = np.exp(-0.5 * np.maximum(u - m, 0.0) ** 2)
+                else:
+                    # Detection as a logistic in the statistic, shared across studies: the
+                    # reporting probability rises smoothly rather than switching at a cut.
+                    rate = np.exp(-0.5 * np.maximum(u - m, 0.0) ** 2)
+                    rate = rate / (1.0 + np.exp(-(m - u) / soft))
+                rate = rate / max(rate.sum(), 1e-12) + 1e-12
+                total += np.log(rate[idx]).sum()
+            return -total
+        return optimize.minimize_scalar(neg, bounds=(0.1, 2.0), method="bounded").x
+
+    inferred = [float(np.min(v)) for _, v in tables]
+    print(f"  {'estimator':>34} {'scale':>7} {'error':>7}")
+    for label, cuts, soft in (
+        ("true per-study cut, hard", true_cuts, None),
+        ("cut from smallest reported, hard", inferred, None),
+        ("cut from smallest reported, soft", inferred, 0.75),
+        ("true per-study cut, soft", true_cuts, 0.75),
+    ):
+        a = fit_scale(cuts, soft)
+        print(f"  {label:>34} {a:7.3f} {a - a_true:+7.3f}")
+    print(f"\n  true scale {a_true}. Mean true cut {np.mean(true_cuts):.2f}, "
+          f"mean inferred cut {np.mean(inferred):.2f}.\n")
+
+
 if __name__ == "__main__":
-    which = sys.argv[1:] or ["calibration", "channel_sweep", "identifiability"]
+    which = sys.argv[1:] or ["calibration", "channel_sweep", "identifiability", "detection_curve"]
     for name in which:
         globals()[name]()
