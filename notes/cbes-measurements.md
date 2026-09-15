@@ -662,8 +662,38 @@ recovering the truth's top decile:
 | 5 | images only | +0.829 | **+0.817** | **0.936** |
 | 5 | plus 5 coordinate studies | +0.697 | +0.742 | 0.914 |
 
-Images alone win on every measure at every count. The hypothesis that coordinates trade magnitude
-accuracy for localisation is refuted; they lose both, less badly for the map.
+Images alone win every column of *this* table at every count.
+
+**CORRECTED (later session), because the sentence that used to stand here over-claimed.** It read
+"they lose both, less badly for the map" -- concluding about magnitude from a table that contains
+no magnitude metric. `r`, `rank r` and `AUC` are all invariant to the scale and offset of the
+estimate: Pearson to any affine map, Spearman and AUC to any monotone one. Demonstrated by
+multiplying an estimate by 0.6 and adding 0.4, which destroys its magnitude and leaves all three
+identical to four decimals while `ratio` moves 1.378 to 1.606. So this table measures **spatial
+pattern and ordering only**, and is structurally incapable of rewarding or punishing the level.
+
+The magnitude columns are in the table above, and they split. Decomposing
+`rmse^2 = (mean error)^2 + var(error)` on a truth mean of 0.519:
+
+```
+ img                 estimate  ratio   rmse  mean err  sd of err
+   2              images only   1.50  0.346    +0.260      0.229
+   2  mixed, scaled to images   1.40  0.373    +0.208      0.310
+   3              images only   1.34  0.276    +0.176      0.212
+   3  mixed, scaled to images   1.29  0.331    +0.151      0.295
+   5              images only   1.22  0.210    +0.114      0.176
+   5  mixed, scaled to images   1.24  0.274    +0.125      0.244
+```
+
+At two and three images the mixture has the **smaller mean error** and the **larger spread**, so
+images win `rmse` because the variance penalty exceeds the bias gain -- not because the level is
+better. At five images the mixture loses both.
+
+So the accurate scoreboard: **images win pattern decisively at every count and total error at
+every count; the mixture wins the level at one to three images.** Which is what the sentence two
+paragraphs up already said -- "the only thing the tables improve is the level, and only slightly"
+-- and the summary sentence contradicted it. The lesson is narrow and worth keeping: a table of
+scale-invariant metrics cannot support a conclusion about scale, however many columns it has.
 
 **The design is the realistic one, which I nearly mis-stated.** The image arm takes `work[:k]` and
 the coordinate arm takes `work[k:]` -- *different* studies, with the truth from a third set never
