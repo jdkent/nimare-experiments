@@ -1928,3 +1928,56 @@ and a couple of donors, and I had been measuring the configuration without them.
 conclusion this session that was a property of my setup rather than of the estimator, and the
 count is itself the finding: when a result is negative, the first question should be whether the
 harness is configured the way a user would configure it.
+
+### The all-image floor, and two hypotheses eliminated
+
+Every calibrated row of the coverage table is read against the all-image arm, which sits at
+-0.018 with twelve studies and -0.022 with twenty-four on a truth of 0.800. Before quoting the
+calibrated rows as "the coordinate channel's residual" it was worth knowing what that floor is.
+
+**It is not the bed's own conversion.** The donor image is built from the study's t through
+`peak_stat_to_hedges_g`, the same conversion the estimator uses, so a Jensen term was the first
+suspect. Measured without CBES in the loop at all -- 400 draws at each of n = 20, 30, 40, 60,
+reading the donor's own g at the read-out voxel:
+
+```
+n= 20  mean donor g +0.8031  bias +0.0031
+n= 30  mean donor g +0.8034  bias +0.0034
+n= 40  mean donor g +0.8034  bias +0.0034
+n= 60  mean donor g +0.8032  bias +0.0032
+```
+
+Unbiased to +0.003, and *upward*. So the estimator introduces the shortfall.
+
+**It is not the spatial kernel.** The read-out voxel is a local maximum of the truth, so any
+spatial averaging pulls it down, which made peak attenuation the obvious candidate. Swept over
+four kernel widths on the all-image arm:
+
+```
+kernel   mean g     bias  mean se      sd  cover
+     4    0.762   -0.038    0.064   0.047   0.96
+     6    0.762   -0.038    0.064   0.047   0.96
+    10    0.762   -0.038    0.064   0.047   0.96
+    16    0.762   -0.038    0.064   0.047   0.96
+```
+
+Identical to four decimals at every width, which is the point: with every study donating an
+image the kernel has no foci to spread, so it is inert and the hypothesis was untestable this
+way rather than merely wrong. This is the second time today the "confirm the parameter moved the
+thing you are attributing to it" rule has caught a story before it was written down -- the first
+was sweeping `coverage_radius` and getting 0.089 at every radius from 8 to 45 mm.
+
+It also corrects a reading I had already made. At 24 replications the arm gives -0.038 and I
+briefly took that as "narrowing the kernel makes it worse than the -0.018 in the table". The
+table's -0.018 is 100 replications; 0.047/sqrt(24) = 0.0096, so the two differ by 2 standard
+errors of sampling and nothing else. Comparing a 24-rep number against a 100-rep number is the
+same class of error as comparing configurations, just cheaper to make.
+
+**What is left is the weighting.** Hedges' variance is `1/n + g^2 / (2(n-1))`, a function of the
+*observed* effect, so a voxel that drew high gets a larger variance and less inverse-variance
+weight than one that drew low -- a downward bias by construction. The order is right: at n = 30
+and g = 0.8 the g^2 term is 0.011 against 1/n = 0.033, so a third of the weight varies with the
+square of a noisy quantity. `experiments/image_floor.py` substitutes a draw-independent variance
+(`1/n` everywhere) and changes nothing else. If that removes the floor the mechanism is not a
+property of this bed: real `g_var` maps carry the g^2 term, so any image pooling that uses them
+inherits it.
