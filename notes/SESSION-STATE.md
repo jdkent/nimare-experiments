@@ -89,6 +89,54 @@ docstring already claims (it corrects the between-study part, not the common sca
 number on it: the between-study part is negligible. Advice that stops at "use `peak_bias`" is
 advice to do nothing.
 
+
+## Ledger: what stands, what was retracted
+
+I corrected myself a lot today. Two root causes account for most of it — a simulator that reported
+the wrong kind of statistic, and characterising the estimator in a configuration its own
+documentation warns against — and both were in the input path rather than in the model.
+
+### Stands
+
+| finding | evidence |
+| --- | --- |
+| The pooling and the observed-information SE are correct | all-donor arms: `se/sd` 1.00–1.11, coverage 0.94–0.97 against nominal 0.95 |
+| `se/RMSE` predicts coverage; `se/sd` does not | 0.61 / 0.45 / 1.18 / 0.97 against coverage 0.72 / 0.28 / 0.99 / 0.97, while `se/sd` ranks them backwards |
+| Coverage degrades as studies accumulate under a fixed bias | 0.72 at 12 studies → 0.28 at 24, coordinates only |
+| `prevalence` = reporting fraction inflated by explicable silence | fitted π runs 1.000 → 0.500 as the reported value moves from just above the cut to far above it, with the naive fraction fixed at 0.500 |
+| Threshold inference is badly wrong under cluster-extent reporting | `study-min` infers z = 4.0 against a true forming cut of 3.1; prevalence error 0.201 against 0.008 for a fixed constant |
+| Ordering within one map is unreliable | exactly right in 19% of maps at a strong effect, 6% at a weak one; threshold-independent |
+| A naive count beats fitted `prevalence` on ordering, loses on level | 82% vs 40% exact ordering; bias 0.148 vs 0.075 |
+| `g_marginal` beats convergence maps on CBES's support; `g` does not | +0.111 AUC, p 0.001 for the product; +0.001, p 0.980 for `g` |
+| The default kernel is too narrow against an IBMA-like reference | fwhm 16 covers 64% of the truth's top decile against 34%, and improves AUC on already-covered voxels too |
+| Kernel width trades the map against the interval | bias flat, `se` halves, coverage 1.00 → 0.00 across 10 → 24 mm |
+| The documented configuration pins the scale to ~5% regardless of donor count | −0.047 at two donors, −0.041 at six |
+| `peak_information` is independently corroborated | +0.17 to +0.23 z excess in a favourable bed, agreeing with a separate measurement by another route |
+| Prevalence/magnitude are separable only in a window of detectability | both recovered where `dD/dμ` is 1.9–2.2, neither where it is 0.0–0.5 |
+| Power spread identifies the split | fitted `g` swings 0.387–0.603 under a fixed roster where the truth is constant 0.6; flat at 0.55–0.60 once `n` and `u` vary |
+
+### Retracted
+
+| I said | actually |
+| --- | --- |
+| Coordinates-only bias is +0.51 (63%) | +0.26 (32%); the rest was my simulator reporting a known-variance z where the estimator assumes a t |
+| The pooling step adds as much bias as the winner's curse | it adds +0.001 |
+| A convex conversion amplifies the curse by +0.32 | that step *was* the convention bug; the genuine Jensen term is +0.043 |
+| Prevalence ordering is right in 50% / 12% of maps | 19% / 6% on the corrected convention — I was too generous |
+| Deleting reported heights improves the map by +0.284 | it costs 0.268 with a correct threshold, and drops AUC to chance on real data. Feature request withdrawn |
+| A couple of images does not distort the relative map | it does — U-shaped ratio spread 1.17× / 1.36× / 1.03×. My original prediction was right and I had retracted it on mis-instrumented evidence |
+| Over the whole brain ALE is best and every CBES map worst | true only at the default kernel; at 16 mm CBES beats MKDA, at 24 mm it beats ALE |
+| The coordinate channel is diluted, never corrected | false of the estimator; true only of `peak_bias=None`, which is what all my arms used |
+| A shared scratch directory dropped arms from a run | it cannot have — the dropped set includes an arm that writes no images. Cause unresolved |
+
+### The two habits these argue for
+
+1. **Name the one-minute check that the measurement is wrong, and run it before proposing a
+   mechanism.** Three separate errors were a surprising number, a mechanism sought in the
+   estimator because that is what I was studying, and a one-minute check skipped.
+2. **Make the documented default the first arm of every comparison.** Not "read the docs" — I had
+   read the warning and written it into these notes before ignoring it.
+
 ## The biggest single finding: the default threshold inference is what miscalibrates `prevalence`
 
 Under cluster-extent reporting — the commonest scheme in the literature — the smallest value a
