@@ -837,3 +837,46 @@ healthier once the statistic convention was fixed, since the convention error wa
 *recovered* magnitudes. It does not: the diagnostic works on the z scale, where the convention
 error never applied, so its verdict was never affected by my bug. That is a small piece of luck
 and a reason to trust it.
+
+## The weight-share model survives the convention correction, with the shape parameter intact
+
+Refitted on the corrected (t-convention) arms:
+
+```
+  image fraction  measured   model   resid
+            0.00     0.259   0.260  -0.001
+            0.17     0.127   0.121  +0.006
+            0.50     0.027   0.039  -0.012
+            1.00    -0.018   0.000  -0.018
+```
+
+```
+                   b0       r
+z convention     0.506    5.40
+t convention     0.260    5.74
+```
+
+This is the cleanest confirmation available that the *form* was right and the *constant* was
+corrupted. `b0` halves, exactly as the convention error predicts -- it is the raw coordinate bias,
+which is the quantity my simulator was inflating. `r` barely moves, 5.40 to 5.74: an image is
+worth about five and a half coordinate studies for magnitude, in both beds. A wrong functional
+form would not have separated that way; both parameters would have shifted to absorb the change.
+
+Revised projections onto shares real collections have:
+
+```
+  2 images of 20 studies (f=0.10)  bias 0.159  = 20% of a 0.80 effect
+  3 images of 20 studies (f=0.15)  bias 0.129  = 16%
+  2 images of 10 studies (f=0.20)  bias 0.107  = 13%
+  5 images of 20 studies (f=0.25)  bias 0.089  = 11%
+```
+
+Much less alarming than the 25-40% the uncorrected fit implied, and it changes the practical
+reading of the scoping decision. "At least 2 images" now leaves the magnitude 13-20% high at
+realistic collection sizes rather than 27-40%. That is a caveat rather than a disqualification,
+and it is in the range where a documented warning is a reasonable response -- which the earlier
+numbers were not.
+
+The qualitative points stand unchanged: the image *share* rather than the donor count is what
+matters, no correction inside the coordinate channel moves the bias (`peak_bias='per-study'`:
++0.259 to +0.255), and the channel is diluted rather than corrected.
