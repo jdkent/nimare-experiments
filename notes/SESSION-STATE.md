@@ -117,17 +117,17 @@ documentation warns against — and both were in the input path rather than in t
 
 | finding | evidence |
 | --- | --- |
-| The pooling and the observed-information SE are correct | all-donor arms: `se/sd` 1.00–1.11, coverage 0.94–0.97 against nominal 0.95 |
-| `se/RMSE` predicts coverage; `se/sd` does not | 0.61 / 0.45 / 1.18 / 0.97 against coverage 0.72 / 0.28 / 0.99 / 0.97, while `se/sd` ranks them backwards |
-| Coverage degrades as studies accumulate under a fixed bias | 0.72 at 12 studies → 0.28 at 24, coordinates only |
+| The pooling and the observed-information SE are correct | all-donor arms: `se/sd` 1.10–1.11, coverage 0.94–0.97 against nominal 0.95. Their −0.018 to −0.022 residual is now traced to inverse-variance weighting with a draw-dependent Hedges variance, not to the estimator: a draw-independent variance gives −0.002 and +0.001 |
+| Coverage is a deterministic function of the bias-to-width ratio | a shifted normal on (bias, `se`, `sd`) predicts all sixteen τ=0 arms to a mean absolute error of 0.034, over measured coverage from 0.00 to 0.99. Supersedes the earlier `se/RMSE` vs `se/sd` framing: `se/sd` ranks arms backwards because it omits the bias, which is the whole story |
+| Coverage degrades as studies accumulate under a fixed bias | 0.75 → 0.35 coordinates-only on doubling the studies (100 reps). At a *fixed* donor weight share it is slower: 0.97 / 0.97 / 0.72 at 12 / 24 / 48 studies, because `se/sd` rises (1.27 / 1.44 / 1.53) and offsets the shrinking interval |
 | `prevalence` = reporting fraction inflated by explicable silence | fitted π runs 1.000 → 0.500 as the reported value moves from just above the cut to far above it, with the naive fraction fixed at 0.500 |
 | Threshold inference is badly wrong under cluster-extent reporting | `study-min` infers z = 4.0 against a true forming cut of 3.1; prevalence error 0.201 against 0.008 for a fixed constant |
 | Ordering within one map is unreliable | exactly right in 19% of maps at a strong effect, 6% at a weak one; threshold-independent |
 | A naive count beats fitted `prevalence` on ordering, loses on level | 82% vs 40% exact ordering; bias 0.148 vs 0.075 |
 | `g_marginal` beats convergence maps on CBES's support; `g` does not | +0.111 AUC, p 0.001 for the product; +0.001, p 0.980 for `g` |
 | The default kernel is too narrow against an IBMA-like reference | fwhm 16 covers 64% of the truth's top decile against 34%, and improves AUC on already-covered voxels too |
-| Kernel width trades the map against the interval | bias flat, `se` halves, coverage 1.00 → 0.00 across 10 → 24 mm |
-| The documented configuration pins the scale to ~5% regardless of donor count | −0.047 at two donors, −0.041 at six |
+| Kernel width trades the map against the interval | bias flat (+0.255 / +0.248 / +0.249), `se` halves, coverage 0.75 → 0.28 → 0.05 across fwhm 10 → 16 → 24 at twelve studies and 0.35 → 0.03 → 0.00 at twenty-four |
+| The documented configuration's residual is small and *stable* across the image share | −0.038 / −0.026 / −0.018 at 2 / 6 / 12 of twelve studies and −0.064 / −0.049 / −0.022 at 2 / 6 / 24 of twenty-four, against +0.163 to −0.018 for `peak_bias=None` over the same range. Stability is the property worth having, since the share is not the analyst's choice |
 | `peak_information` is independently corroborated | +0.17 to +0.23 z excess in a favourable bed, agreeing with a separate measurement by another route |
 | Prevalence/magnitude are separable only in a window of detectability | both recovered where `dD/dμ` is 1.9–2.2, neither where it is 0.0–0.5 |
 | Power spread identifies the split | fitted `g` swings 0.387–0.603 under a fixed roster where the truth is constant 0.6; flat at 0.55–0.60 once `n` and `u` vary |
@@ -145,6 +145,10 @@ documentation warns against — and both were in the input path rather than in t
 | Over the whole brain ALE is best and every CBES map worst | true only at the default kernel; at 16 mm CBES beats MKDA, at 24 mm it beats ALE |
 | The coordinate channel is diluted, never corrected | false of the estimator; true only of `peak_bias=None`, which is what all my arms used |
 | A shared scratch directory dropped arms from a run | it cannot have — the dropped set includes an arm that writes no images. Cause unresolved |
+| The interval has no validated operating point | with the documented configuration and two donors it covers 0.91–0.99 across every image share measured |
+| The calibrated configuration overshoots twice what dilution predicts | about −0.008 of it is specific to the calibration; −0.005 is a drift present with no images at all |
+| `g_relative`'s interval covers 0.00 | my test, not the estimator: I normalised the truth over 27,000 mostly-zero voxels and the fit over its smoothed support, so the two quantiles differ sevenfold. `g_relative` has no external truth to be scored against |
+| Coverage degrades as a collection grows (citing the two-donor rows) | true, but those rows also halved the donors' weight share. At fixed share it is 0.97 / 0.97 / 0.72 at 12 / 24 / 48 studies — real, and slower than I implied |
 
 ### The two habits these argue for
 
