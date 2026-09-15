@@ -854,3 +854,86 @@ happen 40% of the time) and the standardisation error as the reference moves awa
 collection's centre of mass. If that calibrates while `g` does not, the proposal is worth putting
 to the maintainer as an additional output -- not a replacement, since the null and the map
 machinery are already built and would carry it.
+
+## 20. There is a window of detectability, and both factors are identified inside it
+
+Section 18 said the prevalence/magnitude split is identified by the spread of study power, and
+18a weakened that to "weakly identified". Both were too coarse. The measurement
+(`reporting_probability.py`: 200 collections, 24 studies each, `n ~ U(20,60)`, four thresholds,
+and an occupancy likelihood fitted on *exact* detection records with the *true* detection
+function -- so a best case, a ceiling on what CBES could do) says something sharper.
+
+```
+        true mu     0.00    0.20    0.40    0.60    0.80
+      median mu   -0.325   0.208   0.425   0.611   0.769
+        mean mu   -0.103   0.247   0.544   0.758   3.306
+   fits saturated    0.01    0.04    0.06    0.09    0.26
+        true pi     1.00    1.00    0.75    0.75    0.50
+      median pi    0.000   0.133   0.687   0.767   0.542
+   dD/dmu at truth   0.000   0.341   1.876   2.195   0.546
+```
+
+**Both factors are recovered well where the detection gradient is large.** At the three middle
+sites the medians are 0.425/0.611/0.769 against true 0.40/0.60/0.80 and 0.687/0.767/0.542 against
+true 0.75/0.75/0.50. That is not weak identification; that is a working estimator. And the
+failures line up exactly with `dD/dmu`, the slope of the detection probability in the magnitude:
+1.876 and 2.195 where it works, 0.000 / 0.341 / 0.546 where it does not.
+
+**The failures are at the two ends, for two different reasons.**
+
+- *Below the window*: at `mu = 0` there is nothing to detect and `pi` is genuinely unidentifiable
+  -- median `pi` comes back 0.000 for a true 1.00, which is the correct answer to an
+  ill-posed question, not an error. At `mu = 0.2` the gradient is 0.341 and `pi` reads 0.133.
+- *Above the window*: at `mu = 0.8` with `n ~ 40` the effect clears the cut almost always, so
+  detection saturates, `mu` is unidentified from above and runs away -- 26% of fits have it
+  pinned -- while `pi` absorbs the level. That is why the *mean* `mu` is 3.306 while the median
+  is 0.769.
+
+So: **prevalence and magnitude are separately identified in a window of detectability, roughly
+where `mu*sqrt(n)` is within about 1.5 of the reporting threshold.** A spread of sample sizes and
+thresholds widens the window, because different studies place the same `mu` at different points
+on their own detection curves -- which is the grain of truth in section 18, now with a
+mechanism and a location.
+
+**This explains CBES's prevalence behaviour, quantitatively and in one piece.** Every pathology
+recorded separately is a position relative to the window:
+
+| observed | position |
+| --- | --- |
+| floor near 0.2 at a true zero, and non-monotone at weak effects | below the window: no detection gradient, so the fit is driven by the likelihood's shape |
+| `prevalence` 0.994 at a site with peak z = 4.4 in the coverage bed | above the window: detection saturated, prevalence absorbs the level |
+| `prevalence` 0.68 for a true 1.0 on held-out HCP | inside or near the window, where it is merely compressed |
+| ordering right on average but exactly right in only half of maps | voxels within one map sit at different points, so they are not comparably identified |
+
+That last row is the important one for the docstring. A map spans magnitudes, so it spans the
+window -- some voxels are below it, some above, some inside. Comparing prevalence across voxels
+compares quantities that are identified to different degrees, which is why the ordering is
+reliable on average and unreliable in any one map. The fix is not calibration; it is a
+per-voxel statement of whether the voxel is in the window at all.
+
+**Correcting myself twice over.** I first read the mean `mu` of 3.306 against a true 0.8 as a
+likelihood ridge and checked whether `(0.80, 0.50)` and `(3.31, 0.585)` make the same predictions.
+They do not -- they differ by up to 0.28 over the design range, so the ridge story was wrong. The
+mean was simply a bad summary of a distribution with a 26% saturated tail. Two lessons, both
+mine: a heavy-tailed parameter should have been summarised by its median from the start, and
+"weakly identified" was a vague label that stopped me looking for the structure, which turned out
+to be a clean one.
+
+**And the proposal in section 19 survives its first test.** Reporting probability standardised to
+a reference design, estimated/true:
+
+```
+  ref N  in range   mu=0.2      mu=0.4      mu=0.6      mu=0.8
+     15        NO   0.01/0.01   0.05/0.03   0.17/0.13   0.25/0.21
+     30       yes   0.02/0.01   0.12/0.10   0.39/0.37   0.41/0.43
+     45       yes   0.03/0.03   0.20/0.20   0.56/0.58   0.50/0.49
+     60       yes   0.05/0.04   0.28/0.32   0.66/0.68   0.54/0.50
+    100        NO   0.10/0.10   0.46/0.57   0.75/0.75   0.58/0.50
+    200        NO   0.22/0.32   0.63/0.74   0.77/0.75   0.58/0.50
+```
+
+In range the largest error is 0.04. Out of range it degrades to 0.11 and does so smoothly and in
+a consistent direction (under-estimating at larger N, because the saturated fits cap at their own
+`pi`). That is the behaviour the proposal needed: right where the collection supports it, visibly
+and disclosably wrong outside. Note that the *product* is well estimated at `mu = 0.8` (0.41/0.43,
+0.50/0.49, 0.54/0.50) at exactly the site where the factors are worst -- which is the whole point.
