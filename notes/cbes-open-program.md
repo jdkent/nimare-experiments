@@ -2377,3 +2377,43 @@ the reporting process is realistic. `experiments/is_it_the_reporting_scheme.py` 
 foci are extracted -- cluster-forming cut versus voxelwise FDR versus Bonferroni -- while holding
 the estimator fixed, which is the one comparison that separates a bad model of reporting from a
 bad likelihood.
+
+### A second, separable reason the interval is too wide: `dof` counts fewer studies than `se` uses
+
+`n_eff` is Kish's `(sum w)^2 / sum w^2` over the kernel weights, and **only studies whose foci
+reach a voxel contribute a `w`**. The censored likelihood also uses the studies that reported
+nothing nearby -- their silence bounds `mu`, which is the entire point of the selection model. So
+the `se` draws on more studies than the `dof` counts, and referring that `se` to a `t` on
+`n_eff - 1` charges the interval for a smaller sample than it actually used.
+
+Measured on a twelve-study coordinates-only fit:
+
+```
+             at the read-out voxel   median over covered voxels
+n_studies                   10.00                         2.00
+n_eff                        4.76                         1.14
+dof                          3.76                         1.00
+```
+
+At the read-out voxel the likelihood is using ten studies (reports plus silences) and the
+interval is referred to 3.76 degrees of freedom. `t(0.975, 3.76) = 2.87` against
+`t(0.975, 9) = 2.26` -- **27% of extra width from the `dof` choice alone**, before anything about
+the `se` itself. Over the map as a whole it is far worse: a median `dof` of 1.00 gives a critical
+value of 12.71.
+
+So the over-wide interval has two separable causes, and they compound:
+
+1. the `se` is about twice the estimator's own spread, located in the censoring term
+   (`selection_model="none"` nearly halves it; `tau2` is exactly zero and irrelevant);
+2. the `dof` counts only the studies that spoke, while the `se` uses the studies that stayed
+   silent too.
+
+The second is an internal inconsistency rather than a modelling question -- the same quantity is
+being credited with information in the numerator and denied it in the denominator. But what the
+right `dof` is for a censored-likelihood observed information is a real statistical question, not
+a typo to patch: candidates are the censoring roster `n_studies`, a Kish count weighting silent
+studies by their censoring information, or abandoning the `t` reference altogether in favour of a
+profile-likelihood interval, which needs no `dof` at all. That last is the principled answer and
+the most work.
+
+Recording it rather than changing it, because it moves every interval the estimator reports.
