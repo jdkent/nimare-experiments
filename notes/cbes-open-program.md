@@ -2035,3 +2035,59 @@ specific to the calibration -- real, but a few standard errors at 100 replicatio
 different regime. The lesson is narrow and repeatable: when a model misses out of sample, check
 whether the misses are specific to the mechanism you are about to blame, by finding a row where
 that mechanism is switched off.
+
+### Coverage is nothing but the bias-to-width ratio, and that is bad news about large collections
+
+Sixteen arms of the calibrated table span coverage from 0.00 to 0.99. All of it is predicted by
+a shifted normal -- the estimate sitting `b` away from the truth with spread `sd`, judged against
+a half-width of `1.96 se`:
+
+```
+coverage = Phi((1.96 se - b) / sd) - Phi((-1.96 se - b) / sd)
+
+                           b/se  pred   actual
+12 st,  0 img              1.49  0.84     0.75
+12 st,  0 img fwhm 24      2.90  0.08     0.05
+12 st,  2 img cal         -0.36  0.98     0.99
+12 st, 12 img cal         -0.28  0.96     0.94
+24 st,  0 img              2.08  0.40     0.35
+24 st,  2 img cal         -0.83  0.94     0.91
+24 st,  2 img None         1.60  0.70     0.58
+24 st, 24 img cal         -0.49  0.94     0.97
+
+mean absolute error 0.034, maximum 0.124 over all sixteen arms
+```
+
+There is no residual pathology to explain. The interval fails exactly when, and exactly as much
+as, the bias-to-width ratio says it should. Every earlier attempt to characterise the interval as
+"too narrow" or "conservative" was describing `b/se` in words.
+
+The consequence is not comfortable. `se` falls roughly as `1/sqrt(studies)` and the bias does not
+fall at all, so **coverage decreases as a collection grows**, in every configuration measured:
+
+```
+coordinates only       0.75 at 12 studies  ->  0.35 at 24
+2 images, calibrated   0.99 at 12 studies  ->  0.91 at 24
+6 images, calibrated   0.98 at 12 studies  ->  0.92 at 24
+```
+
+So the usual reassurance is inverted here, and the calibrated configuration's good coverage may
+be a *small-collection* property rather than an operating point. The residual bias the
+calibration leaves is about 0.03 on a truth of 0.800 -- some 4% -- and the interval is honest
+only while `se` stays comfortably larger than that. Extrapolating the fitted model, 48 studies at
+the same weight share as the 2-of-24 arm lands near 0.85 and 96 near 0.75.
+
+That is an extrapolation, so it is being tested rather than asserted:
+`experiments/does_more_studies_hurt.py` holds the image fraction at 1/12 and grows the collection
+through 12, 24 and 48 studies. If coverage tracks the prediction, what the PR can claim about the
+interval is conditional on collection size and has to say so. If coverage holds up instead, the
+normal-shift model breaks between 24 and 48 studies -- which matters just as much, because it is
+the model every other coverage statement here is being read through.
+
+The reframing this suggests for #57 is worth stating separately. The guidance should not be about
+an image *fraction* at all: with `r` between 3 and 4.6, what matters is the weight share
+`r*n_img / (r*n_img + n_coord)`, and that falls when coordinate-only studies are added. Two
+images among ten coordinate tables hold about 29% of the weight; the same two among twenty-two
+hold 15%. **Adding coordinate-only studies to a mixed collection makes the magnitude estimate
+worse**, not better -- it dilutes the only thing correcting the peak-height inflation -- while
+simultaneously narrowing the interval. Both effects push coverage the same way.
