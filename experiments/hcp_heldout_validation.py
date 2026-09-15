@@ -48,7 +48,8 @@ CONTRAST = sys.argv[1] if len(sys.argv) > 1 else "MOTOR_LH"
 # then capped the table at the strongest few peaks, which is not what papers do and which lets
 # the effective cut float with the signal. :mod:`reporting` corrects for multiplicity, keeps
 # every surviving local maximum 8 mm apart, and caps nothing.
-SCHEMES = sys.argv[2:] or ["fdr", "fwe", "cluster"]
+SCHEMES = sys.argv[2:] or ["cluster", "fdr"]
+FOCUS_MODES = ("max", "com")
 DATA = f"/tmp/claude-0/hcp/{CONTRAST}"
 CACHE = f"/tmp/claude-0/hcp/{CONTRAST}_masked.npy"
 DESIGNS = ((20, 16), (30, 12), (40, 9))   # (subjects per study, number of studies)
@@ -95,69 +96,70 @@ S = load_all()
 print(f"\n{CONTRAST}: {S.shape[0]} subjects, {S.shape[1]} voxels at 4mm\n", flush=True)
 
 for SCHEME in SCHEMES:
-  for n_per_study, n_studies in DESIGNS:
-      need = n_per_study * n_studies
-      if need >= S.shape[0] - 100:
-          print(f"{n_per_study}x{n_studies}: not enough subjects, skipped")
-          continue
-      order = rng.permutation(S.shape[0])
-      used, held = order[:need], order[need:]
-      truth_g = hedges(S[held].mean(axis=0), S[held].std(axis=0, ddof=1), len(held))
+ for FOCUS in FOCUS_MODES:
+   for n_per_study, n_studies in DESIGNS:
+       need = n_per_study * n_studies
+       if need >= S.shape[0] - 100:
+           print(f"{n_per_study}x{n_studies}: not enough subjects, skipped")
+           continue
+       order = rng.permutation(S.shape[0])
+       used, held = order[:need], order[need:]
+       truth_g = hedges(S[held].mean(axis=0), S[held].std(axis=0, ddof=1), len(held))
 
-      studies, reported = [], 0
-      for k in range(n_studies):
-          block = S[used[k * n_per_study:(k + 1) * n_per_study]]
-          mean, sd = block.mean(axis=0), block.std(axis=0, ddof=1)
-          t = mean / np.maximum(sd / np.sqrt(n_per_study), 1e-9)
-          z = np.nan_to_num(t_to_z(t, dof=n_per_study - 1))
-          found, height = report_peaks(z, mask_bool, shape, ZOOMS, scheme=SCHEME)
-          if len(found) < 2:
-              continue
-          reported += len(found)
-          meta = {"sample_sizes": [n_per_study], "reporting_threshold": float(height)}
-          studies.append({"id": f"s{k}", "name": f"s{k}", "metadata": meta, "analyses": [
-              {"id": f"s{k}", "name": "1", "metadata": meta,
-               "points": [{"space": "MNI",
-                           "coordinates": [float(c) for c in nib.affines.apply_affine(
-                               affine, np.asarray(ijk, dtype=float))],
-                           "values": [{"kind": "Z", "value": value}]} for ijk, value in found]}]})
-      if len(studies) < 5:
-          print(f"{n_per_study}x{n_studies}: only {len(studies)} studies reported, skipped")
-          continue
+       studies, reported = [], 0
+       for k in range(n_studies):
+           block = S[used[k * n_per_study:(k + 1) * n_per_study]]
+           mean, sd = block.mean(axis=0), block.std(axis=0, ddof=1)
+           t = mean / np.maximum(sd / np.sqrt(n_per_study), 1e-9)
+           z = np.nan_to_num(t_to_z(t, dof=n_per_study - 1))
+           found, height = report_peaks(z, mask_bool, shape, ZOOMS, scheme=SCHEME, focus=FOCUS)
+           if len(found) < 2:
+               continue
+           reported += len(found)
+           meta = {"sample_sizes": [n_per_study], "reporting_threshold": float(height)}
+           studies.append({"id": f"s{k}", "name": f"s{k}", "metadata": meta, "analyses": [
+               {"id": f"s{k}", "name": "1", "metadata": meta,
+                "points": [{"space": "MNI",
+                            "coordinates": [float(c) for c in nib.affines.apply_affine(
+                                affine, np.asarray(ijk, dtype=float))],
+                            "values": [{"kind": "Z", "value": value}]} for ijk, value in found]}]})
+       if len(studies) < 5:
+           print(f"{n_per_study}x{n_studies}: only {len(studies)} studies reported, skipped")
+           continue
 
-      est = CBES(fwhm=10.0, mask=masker, peak_bias=None, null_method="none",
-                 threshold="reporting_threshold")
-      result = est.fit(Studyset({"id": "hcp", "name": "hcp", "studies": studies},
-                                target=None, mask=mask_img))
-      g = np.abs(result.get_map("g", return_type="array").ravel())
-      pi = (result.get_map("prevalence", return_type="array").ravel()
-            if "prevalence" in result.maps else np.ones_like(g))
-      marg = pi * g
-      covered = result.get_map("n_studies", return_type="array").ravel() > 0
-      truth = np.abs(truth_g)
-      used_cut = float(np.median(np.abs(est._cutoffs_z_.values)))
+       est = CBES(fwhm=10.0, mask=masker, peak_bias=None, null_method="none",
+                  threshold="reporting_threshold")
+       result = est.fit(Studyset({"id": "hcp", "name": "hcp", "studies": studies},
+                                 target=None, mask=mask_img))
+       g = np.abs(result.get_map("g", return_type="array").ravel())
+       pi = (result.get_map("prevalence", return_type="array").ravel()
+             if "prevalence" in result.maps else np.ones_like(g))
+       marg = pi * g
+       covered = result.get_map("n_studies", return_type="array").ravel() > 0
+       truth = np.abs(truth_g)
+       used_cut = float(np.median(np.abs(est._cutoffs_z_.values)))
 
-      print(f"--- {SCHEME}: {n_per_study} subjects x {n_studies} studies "
-            f"({len(studies)} reported, {reported / max(len(studies),1):.0f} peaks each, "
-            f"{len(held)} held out, height z = {used_cut:.2f}) ---")
-      print(f"  {'truth stratum':>18} {'vox':>7} {'truth g':>8} {'CBES g':>8} {'ratio':>7} "
-            f"{'pi*g':>8} {'ratio':>7} {'r':>7}")
-      for lo, hi in ((0, 50), (50, 75), (75, 90), (90, 99), (99, 100)):
-          band = (truth >= np.percentile(truth, lo)) & (
-              truth < np.percentile(truth, hi) if hi < 100 else np.ones_like(truth, bool))
-          use = covered & band & np.isfinite(g) & (g > 0)
-          if use.sum() < 50:
-              print(f"  {f'{lo}-{hi}%':>18} {int(use.sum()):>7}   too few")
-              continue
-          t = truth[use].mean()
-          print(f"  {f'{lo}-{hi}%':>18} {int(use.sum()):>7} {t:8.3f} "
-                f"{g[use].mean():8.3f} {g[use].mean()/max(t,1e-9):7.3f} "
-                f"{marg[use].mean():8.3f} {marg[use].mean()/max(t,1e-9):7.3f} "
-                f"{stats.pearsonr(g[use], truth[use])[0]:7.3f}")
-      use = covered & np.isfinite(g) & (g > 0)
-      t = truth[use].mean()
-      print(f"  {'all covered':>18} {int(use.sum()):>7} {t:8.3f} "
-            f"{g[use].mean():8.3f} {g[use].mean()/max(t,1e-9):7.3f} "
-            f"{marg[use].mean():8.3f} {marg[use].mean()/max(t,1e-9):7.3f} "
-            f"{stats.pearsonr(g[use], truth[use])[0]:7.3f}   "
-            f"(pi*g correlates {stats.pearsonr(marg[use], truth[use])[0]:+.3f})\n", flush=True)
+       print(f"--- {SCHEME}/{FOCUS}: {n_per_study} subjects x {n_studies} studies "
+             f"({len(studies)} reported, {reported / max(len(studies),1):.0f} peaks each, "
+             f"{len(held)} held out, height z = {used_cut:.2f}) ---")
+       print(f"  {'truth stratum':>18} {'vox':>7} {'truth g':>8} {'CBES g':>8} {'ratio':>7} "
+             f"{'pi*g':>8} {'ratio':>7} {'r':>7}")
+       for lo, hi in ((0, 50), (50, 75), (75, 90), (90, 99), (99, 100)):
+           band = (truth >= np.percentile(truth, lo)) & (
+               truth < np.percentile(truth, hi) if hi < 100 else np.ones_like(truth, bool))
+           use = covered & band & np.isfinite(g) & (g > 0)
+           if use.sum() < 50:
+               print(f"  {f'{lo}-{hi}%':>18} {int(use.sum()):>7}   too few")
+               continue
+           t = truth[use].mean()
+           print(f"  {f'{lo}-{hi}%':>18} {int(use.sum()):>7} {t:8.3f} "
+                 f"{g[use].mean():8.3f} {g[use].mean()/max(t,1e-9):7.3f} "
+                 f"{marg[use].mean():8.3f} {marg[use].mean()/max(t,1e-9):7.3f} "
+                 f"{stats.pearsonr(g[use], truth[use])[0]:7.3f}")
+       use = covered & np.isfinite(g) & (g > 0)
+       t = truth[use].mean()
+       print(f"  {'all covered':>18} {int(use.sum()):>7} {t:8.3f} "
+             f"{g[use].mean():8.3f} {g[use].mean()/max(t,1e-9):7.3f} "
+             f"{marg[use].mean():8.3f} {marg[use].mean()/max(t,1e-9):7.3f} "
+             f"{stats.pearsonr(g[use], truth[use])[0]:7.3f}   "
+             f"(pi*g correlates {stats.pearsonr(marg[use], truth[use])[0]:+.3f})\n", flush=True)

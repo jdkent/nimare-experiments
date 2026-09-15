@@ -432,3 +432,33 @@ the extraction and the conversion agree, since the reported value *is* that map'
 `nimare/meta/cbma/effectsize.py` now states the compression, the dependence on reporting
 convention, the per-coordinate ceiling, and the list of remedies measured and rejected, so the
 warning is no longer only about an unidentified constant.
+
+### Held-out HCP under realistic reporting, and why pi*mu works
+
+Re-running the held-out HCP design through `reporting.py` rather than a fixed cut with a cap.
+Cluster-extent thresholding, one focus per surviving cluster at its centre of mass:
+
+| design | 0-50% | 50-75% | 75-90% | 90-99% | 99-100% | overall | r |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 20 subjects x 16, `g` | 10.67 | 3.24 | 1.90 | 1.25 | 1.27 | 1.66 | +0.519 |
+| 20 subjects x 16, `pi*g` | 4.58 | 1.56 | 1.07 | 0.95 | 1.27 | 1.13 | +0.663 |
+| 30 subjects x 12, `pi*g` | 4.23 | 1.36 | 0.87 | 0.81 | 1.16 | 1.00 | +0.649 |
+
+Above the truth's 75th percentile `pi*g` is within 10% to 20% of a truth measured on subjects
+the estimator never saw, and the pain top-stratum figure of 1.23 replicates here at 1.16 to 1.27.
+
+It does not work for the reason the map's name gives. Every synthetic HCP study is drawn from
+one population, so the true prevalence is exactly 1 and `pi*g` should equal `g`. Instead
+`prevalence` comes back near 0.68. Multiplying by it is shrinking an inflated magnitude by a
+data-driven factor, not averaging over studies that have no effect -- two documented biases
+cancelling, `g` inflated upward by peak selection and `prevalence` compressed downward toward
+the middle of its range. Worth using, not worth extrapolating.
+
+Below the median it is still four to five times the truth, so the compression is intact.
+
+### Landed
+
+`g_marginal` reinstated in `nimare/meta/cbma/effectsize.py` with all three caveats stated, and
+the PR description rewritten: the within-analysis null, the refusal of degenerate collections,
+the corrected familywise error rates, the no-cap validation protocol, and the magnitude limits
+above replacing the numbers that came from the capped extraction.
