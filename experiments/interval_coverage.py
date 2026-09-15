@@ -45,6 +45,7 @@ import numpy as np
 import nibabel as nib
 from pathlib import Path
 from scipy import ndimage
+from scipy.stats import t as student_t
 from joblib import Parallel, delayed
 from nimare.meta.cbma import CBES
 from nimare.meta.cbma.effectsize import peak_stat_to_hedges_g
@@ -153,8 +154,14 @@ def one(seed, n_studies, n_image, tau, peak_bias=None, fwhm=10.0,
     pos = int(np.ravel_multi_index(READ_AT, SHAPE))
     pi = (float(res.get_map("prevalence", return_type="array").ravel()[pos])
           if "prevalence" in res.maps else np.nan)
+    # `dof` is returned because the docstring tells callers to refer `se` to a t on it, and an
+    # earlier version of this bed scored only `g +/- 1.96 se`. That made every coverage number a
+    # lower bound on what a caller following the documentation gets, by an amount that depends on
+    # exactly the quantity the bed was not recording.
+    dof = (float(res.get_map("dof", return_type="array").ravel()[pos])
+           if "dof" in res.maps else np.nan)
     return (float(res.get_map("g", return_type="array").ravel()[pos]),
-            float(res.get_map("se", return_type="array").ravel()[pos]), pi, reported)
+            float(res.get_map("se", return_type="array").ravel()[pos]), pi, reported, dof)
 
 
 #: Kernel widths to sweep in the coordinates-only arm. Widening the kernel was measured on real
@@ -205,7 +212,8 @@ if __name__ == "__main__":
     print(f"truth at the read-out voxel: g = {TRUE_G:.3f}; prevalence 1 at every site")
     print(f"{N_SIMS} replications per arm; interval is g +/- 1.96*se\n")
     print(f"{'arm':34s} {'mean g':>7s} {'bias':>7s} {'mean se':>8s} {'sd of g':>8s} "
-          f"{'se/sd':>6s} {'cover':>6s} {'half/truth':>10s} {'mean pi':>8s} {'report':>7s}")
+          f"{'se/sd':>6s} {'cov(z)':>6s} {'cov(t)':>6s} {'dof':>5s} {'half/truth':>10s} "
+          f"{'mean pi':>8s} {'report':>7s}")
     for label, ns, ni, tau, pb, pbs, width in ARMS:
         rows = Parallel(n_jobs=8)(delayed(one)(s, ns, ni, tau, pb, width, pbs)
                                   for s in range(N_SIMS))
@@ -216,11 +224,21 @@ if __name__ == "__main__":
             continue
         g = np.array([r[0] for r in rows]); se = np.array([r[1] for r in rows])
         pi = np.array([r[2] for r in rows]); rep = np.array([r[3] for r in rows])
+        dof = np.array([r[4] for r in rows], dtype=float)
         ok = np.isfinite(g) & np.isfinite(se) & (se > 0)
         cover = np.mean((g[ok] - 1.96 * se[ok] <= TRUE_G) & (TRUE_G <= g[ok] + 1.96 * se[ok]))
+        # The interval the docstring actually recommends: a t on the fit's own dof, per
+        # replication rather than at the mean dof, since the critical value is nonlinear in it.
+        crit = np.where(
+            np.isfinite(dof[ok]) & (dof[ok] > 0),
+            student_t.ppf(0.975, np.maximum(dof[ok], 1.0)),
+            1.96,
+        )
+        cover_t = np.mean((g[ok] - crit * se[ok] <= TRUE_G) & (TRUE_G <= g[ok] + crit * se[ok]))
         sd = g[ok].std(ddof=1)
         print(f"{label:34s} {g[ok].mean():7.3f} {g[ok].mean()-TRUE_G:+7.3f} {se[ok].mean():8.3f} "
-              f"{sd:8.3f} {se[ok].mean()/max(sd,1e-9):6.2f} {cover:6.2f} "
+              f"{sd:8.3f} {se[ok].mean()/max(sd,1e-9):6.2f} {cover:6.2f} {cover_t:6.2f} "
+              f"{np.nanmedian(dof):5.1f} "
               f"{1.96*se[ok].mean()/TRUE_G:10.2f} {np.nanmean(pi):8.3f} "
               f"{rep.mean()/ns:7.2f}   (n={ok.sum()}, {refused} refused)", flush=True)
     print("\nse/sd near 1 means the width matches the estimator's real variability.")

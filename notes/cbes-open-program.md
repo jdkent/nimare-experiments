@@ -2219,3 +2219,50 @@ bed differ only in magnitude, 0.800 and 0.600, so the truth is 1.333 and no voxe
 `g(v1)/g(v2)` covers coordinates-only, the unidentified scale really is the whole problem and a
 ratio-valued output is worth having; if it does not, "coordinates identify the pattern but not the
 scale" is too generous a summary.
+
+### The whole coverage table scored the wrong interval
+
+The class docstring tells callers to build the interval from `se` against a **t on `dof`**, not
+against a normal, and gives a reason: a normal interval was measured at 73-94% of nominal against
+91-97% for the t. Every arm of the coverage table -- all three versions of it -- scored
+`g +/- 1.96 se`.
+
+That is not a rounding difference. `dof` is `n_eff - 1` with `n_eff` a Kish effective sample size
+over the studies reaching a voxel, so it is far below the study count: measured directly on a
+twelve-study fit with two image donors it is **4.46**, where the t critical value is 2.666 against
+1.960. The interval the documentation recommends is **36% wider** than the one I measured.
+
+Propagating each arm's own bias and spread through a t, without refitting anything:
+
+```
+arm                   measured  model@1.96  |   t,dof=5  t,dof=11  t,dof=23
+12 st,  0 img             0.75        0.84  |      0.99      0.94      0.89
+12 st,  2 img cal         0.99        0.98  |      1.00      0.99      0.99
+24 st,  0 img             0.35        0.40  |      0.83      0.59      0.49
+24 st,  2 img cal         0.91        0.94  |      0.99      0.97      0.95
+24 st, 24 img cal         0.97        0.94  |      0.99      0.97      0.96
+```
+
+At a dof near 5, which is what the one direct measurement suggests, the coordinates-only arms go
+from 0.75 and 0.35 to something near 0.99 and 0.83. **That would overturn the table's central
+conclusion** -- that the interval is usable with donors and not without them -- and it is the
+conclusion I had just finished writing into the docstring.
+
+So the emphasis was misplaced in a specific way. The bias measurements stand: +0.255 coordinates
+only against -0.038 calibrated is a fact about the point estimate and no interval changes it. What
+does not stand unqualified is "coordinates alone leave a bias no interval width can absorb",
+because the interval the documentation actually recommends is a third wider than the one that
+sentence was measured against.
+
+The bed now returns `dof` and reports coverage under both intervals side by side, `cov(z)` and
+`cov(t)`, with the critical value taken per replication rather than at the mean dof since it is
+nonlinear in it. Re-running. The docstring carries the caveat in the meantime rather than waiting
+for the table.
+
+The general lesson is sharper than "check your critical value". The bed was built to measure
+whether the documented interval covers, and it measured a *different* interval than the one
+documented three paragraphs above the table it produced -- the same class of error as running
+every arm at `peak_bias=None` when the docstring recommends `peak_bias_scale="images"`. Both times
+the fix is the habit already written down: **make the documented configuration the first thing you
+measure**, and that includes the documented way of reading the output, not only the documented
+settings.
