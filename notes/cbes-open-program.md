@@ -4472,3 +4472,50 @@ correction.
 
 To get a real NeuroVault arm would need a different collection: studies whose maps actually clear
 a corrected threshold. That is a fetch over the network and a new selection step, not a rerun.
+
+## CBES against SDM-PSI at one image: the magnitude holds up, the pattern trades places
+
+jdkent's question was whether the one-image path beats SDM-PSI across datasets. Three beds were
+attempted; two could answer.
+
+**NIDM pain, published tables, 1 image, 4 splits:**
+
+| estimate | r | rank r | AUC | magnitude |
+|---|---|---|---|---|
+| images only | +0.379 | +0.311 | 0.777 | 1.234 |
+| CBES `g` | +0.382 | +0.333 | 0.801 | **0.859** |
+| SDM-PSI | **+0.541** | **+0.374** | **0.817** | 0.181 |
+
+**HCP MOTOR_LH, held-out subjects, 1 image, 3 splits:**
+
+| estimate | r | rank r | AUC | magnitude |
+|---|---|---|---|---|
+| SDM-PSI | +0.658 | **+0.509** | 0.885 | 0.32 |
+| images only | +0.754 | +0.475 | 0.934 | **0.90** |
+| CBES `g` | **+0.772** | +0.485 | **0.939** | 0.62 |
+| CBES `g_marginal` | +0.688 | +0.445 | 0.864 | 0.42 |
+
+**NeuroVault animal: impossible.** Zero peaks under every scheme; see the section above.
+
+Three readings, and the first is the only one that holds across both beds.
+
+**On magnitude CBES beats SDM-PSI in both, by a wide margin.** 0.859 against 0.181 on pain, 0.62
+against 0.32 on HCP. SDM-PSI recovers between a fifth and a third of the true effect in both
+beds; CBES recovers between three fifths and six sevenths. That is the axis CBES exists for, and
+it is the one place the answer is consistent.
+
+**On pattern they trade places by dataset.** SDM leads on pain (r +0.541 against +0.382, AUC
+0.817 against 0.801); CBES leads on HCP (r +0.772 against +0.658, AUC 0.939 against 0.885). SDM
+wins rank correlation on HCP while losing Pearson and AUC there, so even within one bed the
+pattern verdict depends on the statistic. **No general claim about pattern is supportable from
+two datasets that disagree.**
+
+**On HCP, images-only still beats CBES on magnitude** (0.90 against 0.62), as it did at two
+images. That is the regime the warnings describe -- every synthetic study drawn from one
+population, so the true prevalence is 1 and any fitted shortfall is error. Beating SDM there is
+not the same as being worth using there.
+
+Caveats that bound all of this: 4 and 3 splits with no error bars, so differences under about
+0.05 in `r` are not interpretable; the two beds differ in reference construction (held-out
+studies against held-out subjects) as well as in dataset; and pain is the only bed whose tables
+are the ones papers printed.
