@@ -1572,3 +1572,57 @@ is a limitation of the validation rather than of the method, it is not fixable b
 what is on disk, and it should be stated plainly wherever those claims appear. Curating a second
 collection -- grouping the 43 unlabelled studies by contrast name, or harvesting a new paradigm
 with 15+ studies -- is the work that would lift it, and it is data work rather than modelling.
+
+## The default kernel width is what cost CBES the convergence comparison
+
+Sweeping the right parameter. NIDM pain, 8 splits, held-out image reference, `g_marginal` scored.
+
+```
+                brain covered  top decile covered  AUC on covered  AUC whole mask
+fwhm  6 mm             0.013               0.060           0.677           0.527
+fwhm 10 mm             0.090               0.336           0.757           0.642   <- default
+fwhm 16 mm             0.263               0.636           0.798           0.745
+fwhm 24 mm             0.608               0.879           0.780           0.782
+MKDA density           1.000               1.000              --           0.667
+ALE (earlier run)      1.000               1.000              --           0.753
+```
+
+**The whole-mask deficit was a kernel-width artefact, not a property of the method.** At the
+default 10 mm, CBES covers 9% of the brain, captures a third of the truth's top decile, and loses
+to MKDA over the whole mask (0.642 against 0.667). At 16 mm it covers 26% and 64%, and *beats*
+MKDA on the whole mask (0.745). At 24 mm it covers 61% and 88%, and beats ALE too (0.782 against
+0.753). So the earlier finding -- "over the whole brain ALE is the best arm and every CBES map is
+the worst" -- holds only at the default kernel.
+
+**And it is not a trade of precision for extent.** The `AUC on covered` column improves as well,
+0.757 at 10 mm to 0.798 at 16 mm. A wider kernel makes the estimate better *where it already
+existed* and also extends it. Only at 24 mm does the covered-AUC turn down slightly (0.780),
+which is where the trade finally appears. On this collection the sweet spot for both columns is
+around 16 mm and the default is well below it.
+
+**The qualification that matters, and it is a real one.** The optimum depends on how smooth the
+reference is. The truth here is an inverse-variance pooling of z maps -- a smooth, spatially
+extensive field -- and a wide kernel is rewarded for matching its extent. Against a punctate
+truth a narrow kernel would win. So the honest claim is not "16 mm is right" but:
+
+> On a reference of the kind an image-based meta-analysis produces, CBES's default 10 mm kernel is
+> narrow enough to cost it both accuracy and the comparison against convergence estimators, and
+> widening it to 16 mm improves both the estimate and its extent. Whether 16 mm is right in
+> general depends on the extent of the effects being pooled, which no single collection settles.
+
+For reference, the convergence estimators' own kernels are in this range: ALE uses an
+N-dependent Gaussian of roughly 10-12 mm FWHM and MKDA a 10-15 mm sphere. A 16 mm kernel is on
+the wide side of the literature's practice but not outside it.
+
+**The silence radius, swept separately since it changes the estimates and not their extent:**
+
+```
+radius  8 mm    AUC on covered 0.688
+radius 20 mm    AUC on covered 0.757   <- default
+radius 30 mm    AUC on covered 0.767
+```
+
+Monotone and still rising at 30 mm, consistent with the docstring's own note that `prevalence`
+increases with this radius at every true value. The default is close to the best of these but not
+at it; the gain from 20 to 30 mm is 0.010, against 0.041 from widening the kernel from 10 to
+16 mm. So the kernel is the parameter that matters and the silence radius is second order.
