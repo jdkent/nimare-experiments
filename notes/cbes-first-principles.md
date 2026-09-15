@@ -937,3 +937,38 @@ a consistent direction (under-estimating at larger N, because the saturated fits
 `pi`). That is the behaviour the proposal needed: right where the collection supports it, visibly
 and disclosably wrong outside. Note that the *product* is well estimated at `mu = 0.8` (0.41/0.43,
 0.50/0.49, 0.54/0.50) at exactly the site where the factors are worst -- which is the whole point.
+
+## 21. The z-to-g conversion rests on a degrees-of-freedom assumption nobody reports
+
+This came out of my own convention bug, but it is a property of the estimator and it is worth
+having on its own. When a study reports a z-map peak, CBES maps z back to a t on `n - 1` degrees
+of freedom -- treating the reported z as a p-value-preserving image of a t, which is what most
+neuroimaging software produces -- and then converts the t to an effect size. Right in principle;
+the difficulty is that reported peaks sit far into the tail, where that map is steep.
+
+Effect size recovered from a reported z at `n = 30`, varying only the assumed residual df:
+
+```
+reported z   df=29   df=60   df=120   df=1000   spread
+      3.30   0.653   0.626    0.614     0.604    1.08x
+      4.00   0.830   0.776    0.752     0.733    1.13x
+      5.00   1.133   1.009    0.959     0.918    1.23x
+      6.00   1.522   1.273    1.178     1.105    1.38x
+```
+
+**The assumption is load-bearing and the sensitivity grows with the reported height** -- so it is
+worst exactly where the winner's curse is worst, and in the same direction. A z of 6 read with
+df = 29 when the map's effective df was really in the hundreds over-states the effect size by
+38%.
+
+The effective df of a published z-map is often not `n - 1`. Variance smoothing raises it, and
+FSL's FLAME does that deliberately; a mixed-effects analysis has its own; software differs in
+what it writes into a z-map; and papers seldom state it. So a collection is not merely uncertain
+about this -- it is systematically likely to have a higher effective df than the sample size
+implies, which biases the magnitude upward.
+
+Two modest responses, neither requiring new modelling: say so in the docstring next to the
+existing magnitude caveats, and allow an explicit per-study df in the metadata so a caller who
+knows it is not forced to let the sample size stand in. A study reporting a *t* is unaffected --
+the conversion from t is direct -- which is a small argument for preferring `stat_column="t_stat"`
+where a collection offers both.
