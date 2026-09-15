@@ -644,3 +644,40 @@ That fully specifies the fix. It has to be a refusal, not a different p-value ca
 the statistic to refuse on is already computed during correction: the number of distinct attained
 maxima and their spread. The current guard counts 2^20 arrangements and waves through a null that
 attains six values.
+
+### Coordinates lose on localisation too, and the design is the realistic one
+
+The mixing experiment only ever scored magnitude, which left open whether coordinates lose the
+number but win the map. Rescored with a rank correlation and the area under the curve for
+recovering the truth's top decile:
+
+| images | estimate | r | rank r | AUC |
+| --- | --- | --- | --- | --- |
+| 1 | images only | +0.520 | **+0.514** | **0.820** |
+| 1 | plus 9 coordinate studies | +0.320 | +0.287 | 0.750 |
+| 2 | images only | +0.723 | **+0.706** | **0.905** |
+| 2 | plus 8 coordinate studies | +0.545 | +0.630 | 0.868 |
+| 3 | images only | +0.774 | **+0.761** | **0.920** |
+| 3 | plus 7 coordinate studies | +0.614 | +0.687 | 0.889 |
+| 5 | images only | +0.829 | **+0.817** | **0.936** |
+| 5 | plus 5 coordinate studies | +0.697 | +0.742 | 0.914 |
+
+Images alone win on every measure at every count. The hypothesis that coordinates trade magnitude
+accuracy for localisation is refuted; they lose both, less badly for the map.
+
+**The design is the realistic one, which I nearly mis-stated.** The image arm takes `work[:k]` and
+the coordinate arm takes `work[k:]` -- *different* studies, with the truth from a third set never
+used by either. So this is not "degrade an available image to coordinates". It is three images
+against three images plus seven additional coordinate-only studies, scored on eleven held-out
+studies. More than tripling the study count, in coordinate form, makes every metric worse.
+
+Two caveats survive and they are where the remaining case for coordinates lives.
+
+*Same territory.* Every pain study is whole-brain and shares a construct, so the coordinate
+studies cover ground the images already cover. Coordinates reaching regions, tasks or populations
+the images do not would add coverage this design cannot see. That is the strongest untested
+argument for including them.
+
+*Seven, not seventy.* A real coordinate meta-analysis has thirty to a hundred studies. The
+bias-versus-noise decomposition says more will not help, since a shared bias does not average
+down, but that is an extrapolation from seven.
