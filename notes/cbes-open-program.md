@@ -3059,3 +3059,41 @@ Three corrections this session came from a measurement, not a model: absolute er
 was wanted, a bin that mixed two behaviours, and an n too small for the effect being claimed. All
 three produced confident wrong statements that survived until re-measured. Report n and SE beside
 any number that goes into a docstring.
+
+## The 0.4 deficit located, and #66 was closed on a probe that could not represent its hypothesis
+
+Instrumented the four-foci bed to report, per focus, the observed reporting rate against the rate
+the model computes at the true mu, and the mu that the observed count alone would imply. 16
+collections.
+
+| truth | reported | silent | observed rate | model's rate | ratio | fitted mu | mu from count alone |
+|---|---|---|---|---|---|---|---|
+| 0.2 | 0.12 | 17.31 | 0.007 | 0.007 | 1.00 | 0.211 (+6%) | -0.144 |
+| 0.4 | 0.88 | 16.50 | **0.050** | **0.089** | **1.78** | 0.337 (-16%) | 0.161 |
+| 0.6 | 6.50 | 10.94 | 0.373 | 0.402 | 1.08 | 0.618 (+3%) | 0.586 |
+| 0.8 | 12.56 | 5.19 | 0.708 | 0.797 | 1.13 | 0.850 (+6%) | 0.754 |
+
+**The defect is the report limb's functional form.** The model uses `P(|g| >= c | mu)`, but a
+paper reports a voxel only if it cleared `c` **and** was a local maximum. So the model overstates
+the reporting probability, by a factor that peaks at **1.78 in the middle of the window** and
+falls to 1.08-1.13 above it and 1.00 below it (where nothing is reported at all). An overstated
+P(report) against an under-observed count drags mu down, and it drags hardest exactly where the
+factor is largest: the 0.4 focus.
+
+**Two things I had wrong.**
+
+*"The indicator channel dominates: 17 observations against 2 image values."* No. At 0.4 the count
+alone implies mu = 0.161 and the images imply about 0.4; the fit lands at 0.337. The channels are
+genuinely combined, and the images carry most of the weight. Below the window the count implies a
+*nonsensical* mu = -0.144 and the fit is +6% accurate, which is the same fact in a starker form.
+
+*"#66 falsified: the report limb is correctly specified."* The hypothesis -- that a reported peak
+is a local maximum and not any exceedance, so P(report | mu) is overstated -- is now **confirmed
+and quantified**. What I falsified was my *probe* for it: raising the limb's probability to a power
+`alpha` rescales the log-probability by a constant factor in mu, whereas the real correction is
+mu-dependent (1.00, 1.78, 1.08, 1.13 across the four truths, non-monotone). A one-parameter
+uniform flattening cannot represent a non-monotone mu-dependence, so the sweep was never a test of
+the hypothesis. Reopened with a quantified target: make `P(report | mu)` reproduce 0.007 / 0.050 /
+0.373 / 0.708 rather than 0.007 / 0.089 / 0.402 / 0.797.
+
+The radius sweeps stay falsified on their own terms -- those did test what they claimed.
