@@ -495,6 +495,40 @@ studies. A bias every coordinate study shares does not -- pooling more of them c
 on the wrong number, and mixing them with unbiased images drags the pool toward it in proportion
 to their weight.
 
+### Corrected: the calibration explains the anomaly, not the verdict
+
+The table above ran the mixed fit with `peak_bias=None`, so coordinates entered on their
+inflated scale against images on the true one with nothing reconciling them -- the configuration
+the class docstring warns against for mixed collections, which ship `peak_bias='per-study'` with
+`peak_bias_scale='images'` for exactly this case. Rerun with both settings:
+
+| images | estimate | r | ratio | rmse |
+| --- | --- | --- | --- | --- |
+| 1 | images only | +0.520 | 1.62 | 0.446 |
+| 1 | mixed, uncalibrated | +0.083 | 1.92 | 0.666 |
+| 1 | mixed, scaled to images | +0.320 | 1.66 | 0.506 |
+| 2 | images only | +0.723 | 1.50 | 0.346 |
+| 2 | mixed, uncalibrated | +0.545 | 1.35 | 0.345 |
+| 2 | mixed, scaled to images | +0.589 | 1.40 | 0.373 |
+| 3 | images only | +0.774 | 1.34 | 0.276 |
+| 3 | mixed, scaled to images | +0.602 | 1.29 | 0.331 |
+| 5 | images only | +0.829 | 1.22 | 0.210 |
+| 5 | mixed, scaled to images | +0.662 | 1.24 | 0.274 |
+
+The calibration accounts for the one genuinely strange number -- at a single image the mix scored
+below both of its parts, and rescaling lifts it from +0.083 to +0.320. It accounts for nothing
+else: at two images and above the two mixed rows are within 0.02 of each other, and images alone
+still win at every count on both correlation and error. Mixing costs about 0.13 to 0.17 of
+correlation and that is not an artefact of the scale.
+
+What this changes is the remedy, not the finding. An earlier note here proposed that coordinates
+stop feeding `g` while continuing to feed the null -- which is incoherent, because the
+permutation null *is* a null for the `g` map: if shuffling coordinate magnitudes does not move
+`g`, those studies contribute nothing to inference either. The coherent version leaves pooling,
+coverage and the null alone and redefines the one map that is already conditional on images:
+`g_absolute`, currently the mixed fit with its constant pinned, measured worse than an
+inverse-variance pool of the image studies by themselves.
+
 Three limits on the result: eight splits of one collection; every pain study is whole-brain, so
 the tables added no spatial coverage that the images did not already have, which would not hold
 against ROI images; and pain's median N of 16 makes a single image noisy, though still unbiased.
