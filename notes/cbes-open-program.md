@@ -3404,3 +3404,42 @@ Contamination checked rather than assumed: CBES's donor g/g_var maps were being 
 same directory `sdm_parse pp` scans for `<study>.nii.gz`. Moved to a `cbes/` subdirectory, and the
 SDM input directory verified to hold exactly `s00.nii.gz`, `s01.nii.gz` and `pp`'s own
 `sdm_mask.nii.gz` before the number was believed.
+
+## Retraction: prevalence is NOT what decides whether the correction helps
+
+I shipped "the two beds bracket the regime" -- pain at prevalence < 1 where the correction helps,
+HCP at prevalence 1 where it hurts. Built the regime as a dial to check it, and it is wrong.
+
+`does_prevalence_decide_it.py`: `n_studies` studies of 30 subjects, of which `round(pi * n)` are
+**MOTOR_LH** studies that carry the effect and the rest are **EMOTION_FACES** studies that do not
+-- real subjects, real noise, real reported peaks, just in the wrong places, so they are silent at
+the motor voxels for the right reason. Held-out MOTOR subjects give both estimands exactly:
+`mu` = their g, `pi*mu` = prevalence x that. 6 splits.
+
+| true pi | reported pi | g / mu | g_marg / pi*mu | images / pi*mu |
+|---|---|---|---|---|
+| 1.00 | 0.918 | **0.68** | 0.57 | 0.91 |
+| 0.75 | 0.714 | **0.63** | 0.60 | 1.08 |
+| 0.50 | 0.590 | **0.56** | 0.67 | 1.35 |
+| 0.25 | 0.540 | **0.53** | 1.15 | 2.50 |
+
+**`g` under-estimates `mu` at every prevalence and degrades monotonically as prevalence falls.**
+It does not improve where the correction supposedly has something to correct. So prevalence is
+not the variable.
+
+**Nor is the statistic.** The pain bed reported whole-map rmse and bias; this bed reported a ratio
+at the truth's top quartile, and I suspected the absolute-value floor. Measured both on the dial:
+rmse `g` 0.130 against images 0.129 at pi = 1, and 0.281 against 0.241 at pi = 0.5. The two arms
+tie or the images win on the *pain statistic* too, where on pain CBES won 0.210 against 0.269.
+
+So two candidate explanations tested and rejected, and the difference between the beds is
+genuinely unexplained. They differ in at least three ways at once: real studies against synthetic,
+real between-study heterogeneity against essentially none, and a 19-study-level reference against
+a 300-subject pooled one. The next dial to build is tau2, since that is the one I can add to the
+synthetic bed directly.
+
+**One thing this bed did improve on:** the prevalence estimate itself. Against a *designed* pi on
+real data it reads 0.918, 0.714, 0.590, 0.540 for true 1.00, 0.75, 0.50, 0.25 -- so it tracks well
+down to about 0.5 and then floors near 0.54. That is better than the simulator's compression
+(a true 0.25 read 0.49 to 0.60 there) and is now the number in the docstring, since a designed
+prevalence on real subjects beats a simulator for this purpose.
