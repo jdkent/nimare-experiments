@@ -1106,3 +1106,54 @@ what fixes that; heterogeneous study power is (E3).
 from voxelwise-height thresholding -- the one regime where the smallest reported value really is
 near the cut. On cluster-extent tables it is reliably too high by about 0.9 z, and it damages the
 two outputs that are identified while flattering the one that is not.
+
+## The complete corrected coverage table (final)
+
+100 replications per arm, truth 0.800 at the read-out voxel, prevalence 1 at every site,
+calibrated reporting regime, studies reporting a genuine t on `n - 1` degrees of freedom.
+
+```
+arm                              mean g    bias  mean se  sd of g  se/sd  cover  half/truth  report
+12 studies,  0 images, tau 0.0    1.059  +0.259    0.164    0.075   2.19   0.72       0.40    1.00
+12 studies,  0 images, per-study  1.055  +0.255    0.171    0.080   2.14   0.75       0.42    1.00
+12 studies,  2 images, tau 0.0    0.927  +0.127    0.134    0.098   1.36   0.87       0.33    1.00
+12 studies,  6 images, tau 0.0    0.827  +0.027    0.090    0.071   1.27   0.99       0.22    1.00
+12 studies, 12 images, tau 0.0    0.782  -0.018    0.065    0.059   1.10   0.94       0.16    1.00
+12 studies,  0 images, tau 0.3    1.102  +0.302    0.249    0.157   1.58   0.80       0.61    0.90
+12 studies,  6 images, tau 0.3    0.812  +0.012    0.147    0.127   1.16   0.96       0.36    0.90
+12 studies, 12 images, tau 0.3    0.785  -0.015    0.110    0.099   1.12   0.93       0.27    0.90
+24 studies,  0 images, tau 0.0    1.048  +0.248    0.113    0.051   2.24   0.28       0.28    1.00
+24 studies,  0 images, per-study  1.046  +0.246    0.118    0.059   2.01   0.35       0.29    1.00
+24 studies,  6 images, tau 0.0    0.873  +0.073    0.080    0.058   1.38   0.89       0.20    1.00
+24 studies, 24 images, tau 0.0    0.778  -0.022    0.045    0.041   1.11   0.97       0.11    1.00
+```
+
+Weight-share fit over all six `tau = 0` arms: `b0 = 0.260`, `r = 6.40`, max residual 0.022. `r`
+sits around 6 rather than being tightly pinned -- it read 5.74 on four points and 6.40 on six --
+so "an image is worth five or six coordinate studies for magnitude" is the honest statement. The
+discriminating contrast holds a third time: the same six donors give +0.027 at `f = 0.50` and
++0.073 at `f = 0.25`.
+
+**`se/RMSE` predicts coverage and `se/sd` does not**, cleanly across the table:
+
+```
+                       se/sd   se/RMSE   coverage
+12 studies,  0 img      2.19      0.61       0.72
+24 studies,  0 img      2.22      0.45       0.28
+12 studies,  6 img      1.27      1.18       0.99
+24 studies, 24 img      1.10      0.97       0.97
+```
+
+`se/sd` ranks the four arms 2.19 / 2.22 / 1.27 / 1.10 -- monotone in the wrong direction relative
+to coverage. `se/RMSE` ranks them 0.61 / 0.45 / 1.18 / 0.97, in exactly coverage order. This is
+the metrics-that-lie entry, now confirmed on the corrected data.
+
+**Coverage still degrades with more studies** in the coordinates-only arms: 0.72 at 12 studies to
+0.28 at 24, and 0.75 to 0.35 with `peak_bias='per-study'`. Milder than the uncorrected 0.10 to
+0.00, and the same signature: a fixed bias with a shrinking interval. It is the one failure mode
+that improves on every accuracy metric while the inference gets worse.
+
+**The all-donor arms are now a clean reference.** 12 of 12: bias -0.018, `se/sd` 1.10, coverage
+0.94. 24 of 24: -0.022, 1.11, 0.97. Both against nominal 0.95. The pooling, the observed-
+information standard error and the read-out path are correct; every failure in this table is in
+the coordinate channel.
