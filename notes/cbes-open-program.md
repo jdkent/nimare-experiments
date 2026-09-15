@@ -2177,3 +2177,45 @@ similar answer because the bias also grew.
 So the claim survives its own test and the mechanism I first gave for it was incomplete. That is
 the second time today that stating a claim, naming the measurement that would break it, and
 running that measurement changed the claim rather than confirming it.
+
+### The relative map has no external truth, and my test of it was the voxel-set mistake again
+
+`g_relative = g / P95(|g|)` is built so that a common multiplicative inflation cancels exactly. If
+the peak-height bias were one constant `c`, then `g = c*mu` and the ratio is free of it. That made
+it the obvious candidate for an interval that covers coordinates-only, where the interval on `g`
+covers 0.75 and 0.35. Measured against `mu / P95(|mu|)`, with `se_relative = se / P95(|g|)`:
+
+```
+arm                        truth     mean     bias    se/sd  cover
+12 studies, 0 images       4.572    0.872   -3.700     2.11   0.00
+24 studies, 0 images       4.572    0.893   -3.679     1.43   0.00
+12 studies, 2 images       4.572    2.868   -1.704     1.29   0.03
+```
+
+**This is my test being wrong, not the estimator.** The fitted `P95(|g|)` came out 1.212
+coordinates-only against the truth's `P95(|mu|)` of 0.175 -- a factor of seven. The truth field is
+a handful of Gaussian blobs in a 30^3 volume and therefore mostly zero, so its 95th percentile
+sits in the blobs' skirts; the fitted map is kernel-smoothed, censored and inflated over its whole
+covered support, so its 95th percentile sits somewhere else entirely. Two quantiles of
+differently *shaped* distributions do not cancel a common factor, whatever the factor is.
+
+That is exactly the failure recorded as task #38 -- "it depends entirely on the voxel set" -- and I
+made it in a script whose own docstring warns against it and then picks the wrong voxel set. The
+honest conclusion is narrower and more useful than either a pass or a fail here:
+
+> **`g_relative` has no external truth to be scored against.** Its normalizer is a property of the
+> estimator's own map, so "does `g_relative` cover" is not a well-posed question without also
+> fixing what the truth's normalizer is computed over -- and any choice of that is a choice about
+> the answer.
+
+One thing the arms do say cleanly: `se/sd` for the relative map (2.11, 1.43, 1.29) matches `se/sd`
+for `g` in the same fits (2.14, 2.01, 1.32). Dividing by the normalizer scales the estimate and its
+error together, so relative precision is unchanged -- which is what `se_relative = se / P95(|g|)`
+assumes and is the one part of the proposal that survives.
+
+The question itself is still worth answering, and it does not need a normalizer.
+`experiments/does_the_scale_cancel.py` asks it as a **ratio between two voxels**: two sites of the
+bed differ only in magnitude, 0.800 and 0.600, so the truth is 1.333 and no voxel set enters. If
+`g(v1)/g(v2)` covers coordinates-only, the unidentified scale really is the whole problem and a
+ratio-valued output is worth having; if it does not, "coordinates identify the pattern but not the
+scale" is too generous a summary.
