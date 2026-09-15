@@ -380,25 +380,58 @@ CI green on every push. 104 tests pass.
 
 ## What needs your decision
 
-- **#53** Should `threshold="study-min"` stop being the default? It costs 0.20 of prevalence
-  accuracy on cluster-extent tables where a fixed constant costs 0.008.
-- **#56** Should the default `fwhm` move off 10 mm? It costs both accuracy and the comparison
-  against convergence estimators on the one collection that can be measured.
-- **#51** The naive count vs fitted prevalence: stand behind the level, or emit both?
+Ordered by how much turns on the answer. Task numbers refer to the tracked list.
+
+**1. #62 — the degrees of freedom for a censored-likelihood standard error.** `n_eff` counts only
+studies whose foci reach a voxel; the likelihood also uses the studies that stayed silent, whose
+silence is what bounds the effect. So the same studies are credited with information in the
+numerator and denied it in the denominator: at a well-covered voxel the roster is 10 studies,
+`n_eff` is 4.76, `dof` is 3.76, and the critical value is 2.87 where the roster would give 2.26.
+Worth ~15-20% of interval width. **It is not a fix for the calibration** -- projected across
+sixteen arms, coverage under a roster `dof` still spans 0.00 to 0.99. Options: the roster
+(simple, overstates the other way), a Kish count weighting silences by their censoring
+information (matches the likelihood, but the weight is parameter-dependent), a profile-likelihood
+interval (needs no `dof`, fixes the `dof = 0` case where the recipe currently yields `nan`, most
+work), or leave and document, which is the current state.
+
+**2. #53 — should `threshold="study-min"` stop being the default?** It costs 0.20 of prevalence
+accuracy on cluster-extent tables where a fixed constant costs 0.008. Newly measured: it costs
+only about **0.044 of bias**, so the decision turns almost entirely on `prevalence`, not on `g`.
+
+**3. #56 — should the default `fwhm` move off 10 mm?** Now a sharp trade rather than a preference.
+Widening improves the map on real data and **destroys the interval**: coverage 0.98 / 0.52 / 0.13
+across 10 / 16 / 24 mm at twelve studies, on a bias that does not move, because `se` falls *and*
+`n_eff` rises toward the study count so the critical value shrinks too. A single default cannot
+serve both goals.
+
+**4. #61 — the max-statistic guard's threshold.** The guard fires on 78% of fits in the bad cell
+and takes the overall familywise rate from 0.150-0.180 to 0.050 -- but that is
+`(1 - 0.783) x 0.231` and not error control. Among fits it *passes*, rejection is 0.231 (exact
+binomial p = 0.0245). The six-foci control is clean, so tightening is cheap. Which of its two
+conditions to move is being measured.
+
+**5. #57 — recast the mixed-collection guidance as weight share.** `r` is between 3.0 and 4.6
+(measured out of sample), so one image donor carries three to five coordinate studies' worth of
+pooling weight. Adding coordinate-only studies to a mixed collection therefore moves the
+magnitude *away* from the truth while narrowing the interval. Shipped to the docstring; flagged
+here in case you want it said differently.
+
+**Smaller, and unchanged:**
+
+- **#51** The naive count vs fitted `prevalence`: stand behind the level, or emit both?
 - **#47** The images-only refusal is inconsistent with the all-donor path, and its stated reason
-  ("no foci to permute") is now false since `_permute_image_values` exists. Allow both, or refuse
-  both? Evidence favours allowing.
+  ("no foci to permute") is false since `_permute_image_values` exists. Evidence favours allowing.
 - **#49** Emit a per-voxel window-of-detectability diagnostic?
 - **#48** Should a simulation-derived bias number go in a warning, or only the mechanism?
-- **#57** The image-*fraction* framing looks wrong now. With `r` between 3 and 4.6 (one image
-  study carries three to five coordinate studies' worth of pooling weight, measured out of
-  sample) what matters is the weight share `r*n_img / (r*n_img + n_coord)`. That falls when
-  coordinate-only studies are added, so **adding coordinate studies to a mixed collection makes
-  the magnitude worse while narrowing the interval** -- both pushing coverage down. Should the
-  guidance be recast in those terms?
 - **#43** How to present scale uncertainty for `g_absolute` — second interval, combined, or
   documented multiplication?
 - **#36** Where `g` comes from when a collection has images.
+
+**And one thing I cannot do for you:** `nimare-experiments` has **no git remote**. Every note and
+script in it exists only in this container, which is reclaimed after inactivity. I am scoped to
+`neurostuff/nimare` and cannot push elsewhere, and per your instruction this material does not
+belong in the PR. I have sent you this file and a tarball of `notes/`, `PROTOCOL.md`, `results/`
+and all the experiment scripts, but the repository needs a remote.
 
 ## What the two root errors did and did not touch
 
