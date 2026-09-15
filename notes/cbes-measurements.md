@@ -590,3 +590,35 @@ One difference between the two designs is not yet accounted for and should not b
 settled: the old extraction took every local maximum above a fixed threshold, the current one
 takes one focus per surviving cluster, about six per study. The current coordinate arm carries
 less information, and some of the gap may be that rather than the reference. Testable, untested.
+
+## Error rates under the within-analysis null, with the familywise metric actually correct
+
+The numbers previously recorded here came from a log written *before* the familywise fix, whose
+"voxel FWE" column read 0.0000 and 0.0001 -- the second of which is arithmetically impossible as
+a mean of zeros and ones over 100 draws, which is what gave it away. The script was corrected and
+never rerun. 100 simulations per cell, 200 permutations, nominal 0.05, binomial standard error
+0.022.
+
+| cell | studies | uncorrected (per-voxel) | voxel FWE (familywise) |
+| --- | --- | --- | --- |
+| global null, N 20-40 | 20 | 0.0113 | 0.070 |
+| global null, N 10-1000 | 20 | 0.0125 | 0.060 |
+| global null, N 10-1000 | 12 | 0.0120 | 0.060 |
+| global null, 2 foci/study | 20 | 0.0007 | **0.180** |
+| power at focal g = 0.8, N 20-40 | 30 | 0.710 | 0.030 |
+| power at focal g = 0.8, 2 foci/study | 30 | 0.640 | 0.020 |
+
+The first three cells hold their level. The heterogeneous-N cells matter most: that is the
+condition under which the old across-study shuffle rejected at 96.7%.
+
+**The fourth cell is a defect.** Twenty studies reporting two foci each give a familywise rate of
+0.18, about six standard errors above nominal, and the guard does not fire -- 2^20 arrangements
+clears its 10^4 threshold easily. Swapping two values inside a study is a tiny perturbation, so
+the max-statistic distribution those arrangements generate is far narrower than the count
+implies. The pairing is diagnostic: 0.0007 uncorrected, ultra-conservative, against 0.18
+familywise. A too-narrow permutation distribution of the maximum puts the familywise cutoff too
+low. The guard counts arrangements when it should measure the spread of the attained maxima.
+
+Few foci per study is the realistic regime under cluster-extent reporting, so this is not a
+corner case, and the separately measured clustered global null -- voxel 0.100 +- 0.039 against
+0.000 for cluster size and 0.050 +- 0.028 for cluster mass -- is probably the same cause.
