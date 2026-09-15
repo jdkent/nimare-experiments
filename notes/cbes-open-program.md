@@ -1346,3 +1346,38 @@ So `g_marginal` is trustworthy where the effect is not reported by nearly everyo
 the full peak-height inflation where it is. Since "reported by nearly everyone" is what makes a
 voxel interesting to a reader, that is a caveat to state in the docstring rather than a
 reassurance.
+
+## The caveat on the convergence comparison, written before the numbers arrive
+
+The smoke run (2 splits) has `g_marginal` at rank correlation 0.553 and top-decile AUC 0.850
+against ALE's 0.233 / 0.665 and MKDA's 0.375 / 0.698. That is the first strongly favourable
+comparative result in this program, which is exactly when I should write the objections down
+rather than after.
+
+**The reference structurally favours the magnitude estimators.** The truth is an
+inverse-variance pooling of held-out *images* -- a magnitude map, and specifically an estimate of
+`pi * mu`, which earlier work established is the quantity an IBMA estimates and the one
+`g_marginal` shares. ALE and MKDA estimate convergence, a different quantity. Scoring both
+against a magnitude reference asks how well each approximates a magnitude, which is the question
+one of them was built for. A convergence map that perfectly captured where studies agree would
+still lose here wherever agreement and magnitude diverge.
+
+So the fair reading, whatever the numbers say, is narrow: **if what a reader wants is a map of
+where the effect is large, this comparison speaks to that; if what they want is a map of where
+studies agree, ALE answers that and this comparison does not test it.** I should not report the
+result as "CBES beats ALE" without that clause.
+
+**Two things that are legitimate advantages rather than artefacts.** CBES uses the reported
+heights and ALE/MKDA do not, and the heights carry real information (23a) -- that is a genuine
+difference in inputs. And CBES models silence, which is information the convergence statistic
+discards. Both are reasons to expect it to do better, and neither is a rigged comparison.
+
+**One thing to check rather than assume.** The voxel set is CBES's own `n_studies > 0`, so all
+estimators are scored on the same voxels but the set is chosen by one of them. If CBES's coverage
+radius happens to exclude voxels where the convergence maps do well, that would flatter it.
+Worth a sensitivity check on the union of coverage instead.
+
+**And the size of the evidence.** One collection, 21 studies, ten splits of the same data. That
+is a single source, which is what the retracted height-flattening claim also rested on before
+the real-data check reversed it. A second collection -- the NeuroVault paradigm sets -- should
+carry this before it goes near the PR.
