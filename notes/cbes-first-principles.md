@@ -437,3 +437,24 @@ the scope buys.
 A residual inflation of 1.76 remains with the constant fixed. Candidates not yet separated: the
 basis represents the truth only to r = 0.679, the ridge penalty is arbitrary, and the rate
 function is still an approximation at the cluster-reporting studies.
+
+### T6 complete: the joint never beats the images
+
+| images | coordinates | estimator | r | rmse | ratio |
+| --- | --- | --- | --- | --- | --- |
+| 2 | 30 | images only | +0.686 | 0.157 | 1.25 |
+| 2 | 30 | coordinates only | +0.442 | 0.983 | 5.74 |
+| 2 | 30 | joint | +0.689 | 0.156 | 1.29 |
+| 5 | 30 | images only | +0.694 | 0.155 | 1.22 |
+| 5 | 30 | coordinates only | +0.501 | 0.570 | 4.16 |
+| 5 | 30 | joint | +0.695 | 0.155 | 1.23 |
+
+Adding thirty coordinate studies to two images moves the shape correlation from +0.686 to +0.689.
+The point-process formulation does not repeat the *harm* the earlier schemes did -- pooling,
+rescaled pooling and gating all made things measurably worse, and this does not -- but it does not
+help either. On this corpus, with these study counts, coordinates modelled correctly are neutral
+rather than beneficial once images are present.
+
+That is a meaningfully better place to be than "actively harmful", because a neutral channel can
+become useful where images are absent, which is the case none of these designs can test. But it
+is not the result section 11 was heading toward.
