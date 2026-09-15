@@ -3786,3 +3786,34 @@ Which makes a sharp prediction. The `pi`/`mu` ridge runs along curves of roughly
 `pi*mu`, so the *product* should be far better determined than either factor. `g_marginal` and
 `se_marginal` are already emitted, so if the ridge is the mechanism, `se_marginal/sd(g_marginal)`
 should sit near 1 exactly where `se/sd` for `g` is worst. Running.
+
+### Prediction falsified: `g_marginal` is the steadier estimate and the worse interval
+
+The ridge argument said the product should be the determined combination, so `se_marginal` should
+be the sound width. Measured, 32 replications, true `pi` = 1:
+
+| 2 images, 18 tables | sd(g) | se | se/sd | sd(g_m) | se_m | se/sd_m | fitted pi |
+|---|---|---|---|---|---|---|---|
+| null | 0.1116 | 0.2041 | 1.83 | 0.0762 | 0.3491 | **4.58** | 0.551 |
+| g=0.2 | 0.1280 | 0.1877 | 1.47 | 0.1084 | 0.2215 | 2.04 | 0.627 |
+| g=0.4 | 0.0803 | 0.1323 | 1.65 | 0.0930 | 0.2305 | 2.48 | 0.858 |
+| g=0.6 | 0.0785 | 0.1543 | 1.97 | 0.0877 | 0.2134 | 2.43 | 0.903 |
+| g=0.8 | 0.0755 | 0.1300 | 1.72 | 0.0830 | 0.1311 | 1.58 | 0.960 |
+
+**Half the prediction held and it was the useless half.** The product *is* the steadier estimate
+-- 0.0762 against 0.1116 at quiet voxels -- so the ridge really does run roughly along constant
+`pi*mu`. But its reported error is worse, 0.349 against 0.204, and `se_marginal/sd` beats `se/sd`
+in only the strongest stratum.
+
+The reason is mechanical and I should have seen it before running: `Var(mu*pi)` needs the *whole*
+2x2 inverse, not a Schur complement, so a near-singular information matrix amplifies there rather
+than cancelling. The ridge makes the determinant small; the delta method divides by it.
+
+So the conclusion flips the remedy. The width does not need a different estimand -- it needs a
+variance that does not invert a near-singular matrix. A **profile likelihood** does exactly that:
+no inverse, and it sidesteps the `dof` question (#62) in the same stroke, since a profile interval
+needs no degrees of freedom at all. That is now the one concrete route left for the interval, and
+the first thing to try rather than the last.
+
+(The 20-image arm also re-confirms the fix from a second angle: with `pi` held at 1, `se_marginal`
+equals `se` exactly in every stratum, as it must when `mu*pi = mu`.)
