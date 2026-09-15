@@ -643,10 +643,18 @@ magnitude. Power calculations for a new study, which need the marginal on a real
 
 Stated as a single claim, because it now organises almost every result in this program:
 
-> In a coordinate table, the information about an effect is in *whether and where* foci appear,
-> not in *how large* the reported statistics are. Every method that used counts and locations has
-> worked; every method that used reported magnitudes has failed, and failed in the direction the
-> selection predicts.
+> In a coordinate table, most of the information about an effect is in *whether and where* foci
+> appear rather than in *how large* the reported statistics are. The magnitudes carry a real but
+> small remainder.
+
+**[Corrected later in the session -- see 23a.]** The original version of this claim said the
+information "is" in the counts and that every method using magnitudes had failed. Section 23 then
+appeared to measure the heights carrying *less* than nothing, and both were too strong: with a
+correctly supplied reporting threshold, deleting the heights costs 0.268 in correlation with the
+truth on simulated fields and drops the AUC for the truth's top decile from 0.742 to chance on
+the NIDM pain collection. The heights are weak, not harmful. The table below is unaffected --
+each row bounds how *much* they carry, which is the part that survives -- but read it as "the
+count channel is the larger one", not "the height channel is empty".
 
 The evidence, gathered for other reasons and pointing the same way each time:
 
