@@ -56,7 +56,10 @@ SMOOTH_VOX = 0.8           # calibrated: 7.6 mm FWHM, a realistic reported smoot
 PEAK_G = 0.8               # calibrated: 100% of studies report, 3.7 foci each
 RADIUS_VOX = 2.5
 N_SIMS = int(os.environ.get("NSIMS", 100))
-OUT = Path(os.environ.get("COVOUT", "/tmp/claude-0/cov_imgs"))
+#: Per-process by default, because two concurrent runs of this script generated identical image
+#: filenames from (seed, studies, images, tau, k) and overwrote each other's files. That did not
+#: fail loudly -- it silently dropped arms from the output table, which is how it was noticed.
+OUT = Path(os.environ.get("COVOUT", f"/tmp/claude-0/cov_imgs_{os.getpid()}"))
 OUT.mkdir(parents=True, exist_ok=True)
 
 AFF = np.eye(4)

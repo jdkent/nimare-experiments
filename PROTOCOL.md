@@ -166,9 +166,15 @@ processes in the pipeline, each with a different PID from `$$`.
 
 Two conclusions, both duller and more useful than "be careful":
 
-- The rule needs to be **never write `pgrep -f <script>` in a waiter at all**, not "exclude
-  yourself when you do". Exclusion is one more thing to get wrong and it silently degrades to
-  waiting forever, which is the failure mode that looks like success.
+- The rule needs to be **never write a `-f` pattern that could match your own command line**, not
+  "exclude yourself when you do". Exclusion is one more thing to get wrong and it silently
+  degrades to waiting forever, which is the failure mode that looks like success.
+- **And it is not only `pgrep`.** I later ran `pkill -f interval_coverage.py` inside a compound
+  command whose own text contained that string, and killed the shell running it -- exit 144, the
+  whole command lost including a patch and a file write I had queued behind it. Third occurrence
+  in one session, in a third tool. Kill by **PID**:
+  `PID=$(ps -eo pid,args | grep "[i]nterval_coverage.py" | awk '{print $1}')`, where the bracket
+  trick keeps `grep`'s own line out, then `kill "$PID"`.
 - A rule written in a document does not fire at the moment of writing code. The thing that would
   have fired is a *habit*: launch with `run_in_background`, capture the PID, wait on `kill -0`.
   Where a habit is available, prefer it to a rule.
@@ -195,3 +201,20 @@ check is one line:
 This is the same family as the statistic-convention bug and the `study-min` degeneracy: in all
 three the harness was doing something reasonable that I had mislabelled, and the label was what I
 reasoned from. Cheap to catch, expensive to miss.
+
+
+## Two concurrent runs of one script must not share a scratch directory
+
+`interval_coverage.py` wrote its simulated images to a fixed `/tmp/claude-0/cov_imgs` with names
+built from `(seed, studies, images, tau, k)`. Two concurrent runs of it therefore generated
+*identical filenames* and overwrote each other's files mid-fit.
+
+It did not fail. It silently **dropped arms from the output table** -- eight of nineteen, from the
+middle of the sequence, with no error and exit code 0 -- which is how it was eventually noticed,
+after a stretch of trying to work out why a list comprehension I could read and verify was
+producing the wrong number of rows. The comprehension was fine.
+
+So: **derive any scratch path from the process, not from the script.** `f"…/cov_imgs_{os.getpid()}"`
+costs nothing and removes the whole class. And note the shape of this failure for next time -- a
+harness that is corrupting itself shows up as *your logic looking wrong*, which is exactly where
+you will not look.
