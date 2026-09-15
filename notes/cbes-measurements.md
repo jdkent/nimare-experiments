@@ -720,3 +720,36 @@ inflating, but the output does not tell a reader either way.
 undocumented. The design needed is otherwise settled: split the 21 studies, give ten to both
 methods as cluster-extent coordinates with no cap, hold eleven back for the truth, and reduce the
 imputations from 50 and raise the threads from 1 so the run finishes.
+
+### Coordinates as a spatial prior: the third combination scheme to fail
+
+If coordinates cannot supply magnitude but do carry location, the natural division of labour is to
+let the image estimate carry the scale and let coordinate density say where to trust it. Tested
+against studies neither arm saw, ten splits:
+
+| images | estimator | r | rank r | AUC | rmse |
+| --- | --- | --- | --- | --- | --- |
+| 1 | images only | +0.482 | +0.375 | **0.826** | 0.359 |
+| 1 | shrunk by coordinate density | +0.418 | +0.247 | 0.662 | 0.272 |
+| 1 | hard coordinate gate | +0.413 | +0.246 | 0.662 | 0.290 |
+| 1 | ORACLE gate on the truth | +0.750 | +0.856 | 0.902 | 0.265 |
+| 5 | images only | +0.734 | +0.588 | **0.943** | 0.168 |
+| 5 | shrunk by coordinate density | +0.338 | +0.166 | 0.585 | 0.288 |
+| 5 | hard coordinate gate | +0.340 | +0.166 | 0.585 | 0.282 |
+| 5 | ORACLE gate on the truth | +0.860 | +0.886 | 0.955 | 0.148 |
+
+The gate costs 0.16 to 0.36 of area under the curve, and costs more the better the image estimate
+is -- the more there is to damage. The one column that improves, root mean square error at a
+single image, is shrinkage toward zero flattering itself against a mostly-zero truth.
+
+**The oracle row matters as much as the failure.** A gate that knew where the truth was would lift
+the area under the curve to 0.955 and the rank correlation to 0.886, so spatial gating is a good
+idea and coordinate density is simply a bad gate. With five to nine coordinate studies the count
+is mostly zero, one or two, so `c / (c + 2)` multiplies by 0, 0.33 or 0.5: it zeroes large regions
+where the truth is moderate and nobody happened to place a focus, and keeps regions where somebody
+reported a noise peak.
+
+That is three schemes tested and failed -- naive pooling, pooling with the coordinates rescaled
+onto the image scale, and gating. Coordinates degrade an image-based estimate however they are
+attached to it. What survives is partition: coordinates answer where images are absent, and are
+reported as their own quantity rather than modulating the image estimate.
