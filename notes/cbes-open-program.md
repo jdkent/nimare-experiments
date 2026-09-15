@@ -936,3 +936,86 @@ the window of detectability. So the honest output is a graded one: `P` at design
 supports, reported confidently; the ceiling reported only where the collection's spread of power
 identifies `pi`, and refused elsewhere. That is exactly the diagnostic in task #49, arriving from
 a second direction, which is some reason to think it is the right diagnostic.
+
+## A prediction about threshold inference, recorded before the test
+
+My own protocol says to hand the real height threshold to the estimator through metadata rather
+than letting it be inferred from the smallest reported value. Every bed this session let it be
+inferred -- `threshold="study-min"` is the default -- and that now matters more than it did
+before, because section 22 showed `prevalence` is governed entirely by where the fitted magnitude
+sits relative to the assumed cutoff.
+
+The mechanism predicts a direction. Under cluster-extent reporting a reported focus is a
+cluster's *maximum*, which sits well above the cluster-forming cut. So the smallest reported
+value in a study is the smallest cluster maximum, not the threshold, and `study-min` -- even
+with the order statistic undone -- should infer a cutoff **above** the true forming cut.
+
+A cutoff inferred too high makes the fitted magnitude look closer to it, which makes more of the
+silence explicable as censoring, which inflates the prevalence. So:
+
+- `threshold="study-min"` should give a **higher** fitted prevalence than supplying the true
+  cluster-forming cut as a float.
+- In the coverage bed the true prevalence is 1, so an inflated prevalence is *closer* to the
+  truth there -- the inference error and the truth happen to point the same way, which means the
+  coverage bed cannot distinguish "right for the right reason" from "right by accident". The
+  prevalence sweep bed, where the truth ranges over 0.25 to 1.00, can.
+- `g` should move less, since it is identified mainly by the reported values rather than by the
+  silence.
+
+If instead `study-min` and the supplied cut agree closely, the order-statistic correction is
+doing its job under extent-based reporting too, and one documented worry can be retired.
+
+## Threshold inference is the whole story for `prevalence` (answered — and it retracts a caveat)
+
+Prediction confirmed, and the consequence is much larger than the prediction.
+
+20 coordinate-only studies, 30 replications, true magnitude 0.70, four sites with true
+prevalences 0.25 / 0.50 / 0.75 / 1.00, cluster-extent reporting at a forming cut of z = 3.0902:
+
+```
+threshold setting           median cut   pi@0.25 pi@0.50 pi@0.75 pi@1.00   mean g
+(the truth)                                 0.25    0.50    0.75    1.00     0.70
+study-min (the default)          4.015     0.482   0.860   0.961   0.998    0.873
+pooled-min                       3.532     0.320   0.588   0.809   0.992    0.911
+the true forming cut             3.090     0.212   0.466   0.722   0.953    0.951
+the library default 3.2905       3.291     0.248   0.501   0.752   0.972    0.935
+```
+
+**`study-min` infers a cut of 4.015 against a true 3.090** -- 0.93 z too high, exactly as
+predicted, because under cluster-extent reporting the smallest reported value is the smallest
+cluster *maximum*, not the threshold, and the order-statistic correction cannot know that.
+
+**And with the right threshold, `prevalence` is nearly unbiased.** 0.212 / 0.466 / 0.722 / 0.953
+against 0.25 / 0.50 / 0.75 / 1.00 -- errors of -0.04, -0.03, -0.03, -0.05, with no compression
+worth naming. The default gives 0.482 / 0.860 / 0.961 / 0.998: inflated at every site and
+squashed against 1 at the top.
+
+So the documented pathology of `prevalence` -- "compressed toward the middle of the range", a
+true 0.25 coming back as 0.49 to 0.60, "read it ordinally, not as a fraction" -- **is largely an
+artefact of the default threshold inference, not of the censored likelihood.** That is a
+retraction of a caveat I shipped to the docstring earlier today, whose measured numbers were all
+taken at the default.
+
+A fixed plausible constant beats inference. The library's own
+`DEFAULT_REPORTING_THRESHOLD_Z = 3.2905` lands at 0.248 / 0.501 / 0.752 / 0.972, which is about
+as good as supplying the truth -- because p < 0.001 is close to what studies actually use, and
+being roughly right beats being precisely wrong.
+
+**`g` moves the other way**, 0.873 at `study-min` against 0.951 at the true cut, on a truth of
+0.70. Same mechanism, opposite sign: a higher assumed cutoff means more of the reported mass is
+attributed to censoring, which pulls the magnitude down and pushes the prevalence up. So the two
+outputs cannot both be optimised by one threshold choice, and the *product* should be the most
+stable thing across the column -- 0.421, 0.536 (pooled-min, pi@0.50 x g), and so on. Worth
+checking directly.
+
+What this implies for earlier results, all of which were measured at the default:
+
+- The within-map ordering numbers (50% exact at a strong effect, 12% at a weak one) are
+  threshold-limited, not intrinsic. They must be re-measured with a supplied threshold before the
+  docstring's ordinal caveat is believed.
+- The naive-count comparison too. CBES's prevalence lost on ordering while winning on bias; with
+  a correct threshold its bias nearly vanishes, so the ordering may well improve with it. That
+  re-run is the next thing to do.
+- The window-of-detectability mechanism (section 20) is unaffected -- it is about where the truth
+  sits relative to the *real* threshold, and it is what explains why a mis-set threshold does so
+  much damage.
