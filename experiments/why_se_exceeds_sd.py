@@ -35,7 +35,7 @@ import reporting
 N = int(os.environ.get("NSIMS", 60))
 
 
-def one(seed, n_studies, n_image, tau, tau2_method):
+def one(seed, n_studies, n_image, tau, tau2_method, selection_model="zero-inflated"):
     rng = np.random.default_rng(seed)
     studies = []
     for k in range(n_studies):
@@ -61,7 +61,7 @@ def one(seed, n_studies, n_image, tau, tau2_method):
     ss = Studyset({"id": "tw", "name": "tw", "studies": studies}, target=None, mask=bed.MASK)
     est = CBES(fwhm=10.0, mask=bed.MASK, null_method="none", use_images=n_image > 0,
                peak_bias="per-study", peak_bias_scale="images" if n_image else 1.0,
-               tau2_method=tau2_method)
+               tau2_method=tau2_method, selection_model=selection_model)
     res = est.fit(ss)
     pos = int(np.ravel_multi_index(bed.READ_AT, bed.SHAPE))
     tau2 = (float(res.get_map("tau2", return_type="array").ravel()[pos])
@@ -75,13 +75,26 @@ if __name__ == "__main__":
     # The coordinates-only arm is included because that is where the excess width is largest --
     # se/sd 2.14 against 1.26 with six donors -- so it is where a wrong variance model shows
     # most clearly. An earlier version of this script measured only the six-donor arm.
-    print(f"{'donors':>7s} {'true tau':>9s} {'tau2 est':>9s} {'fitted tau2':>12s} "
+    print(f"{'donors':>7s} {'true tau':>9s} {'configuration':>14s} {'fitted tau2':>12s} "
           f"{'mean se':>8s} {'sd':>7s} {'se/sd':>6s} {'bias':>8s} {'cover':>6s}")
+    #: (label, tau2_method, selection_model). Three configurations, because there are two
+    #: candidate causes of the excess width and turning one off at a time is what separates them.
+    #: `tau2 none` tests the DerSimonian-Laird truncation story: a truncated estimator of a
+    #: quantity whose true value is zero has a positive mean, so the fit charges the interval for
+    #: heterogeneity that is not there. `selection none` tests the censoring term, whose observed
+    #: information carries uncertainty about which mixture component each observation came from --
+    #: genuine uncertainty if the model is right, inflation if it is not. It also changes the
+    #: estimand and drops the bias correction, so only the se/sd column is comparable there.
+    CONFIGS = [
+        ("baseline", "dl", "zero-inflated"),
+        ("tau2 none", "none", "zero-inflated"),
+        ("selection none", "dl", "none"),
+    ]
     for n_image in (0, 6):
         for tau in (0.0, 0.3):
-            for method in ("dl", "none"):
+            for label, method, selection in CONFIGS:
                 rows = [r for r in Parallel(n_jobs=4)(
-                    delayed(one)(s, 12, n_image, tau, method) for s in range(N))
+                    delayed(one)(s, 12, n_image, tau, method, selection) for s in range(N))
                     if r is not None]
                 g = np.array([r[0] for r in rows]); se = np.array([r[1] for r in rows])
                 t2 = np.array([r[2] for r in rows], dtype=float)
@@ -89,7 +102,7 @@ if __name__ == "__main__":
                 sd = g[ok].std(ddof=1)
                 cover = np.mean((g[ok] - 1.96*se[ok] <= bed.TRUE_G)
                                 & (bed.TRUE_G <= g[ok] + 1.96*se[ok]))
-                print(f"{n_image:7d} {tau:9.2f} {method:>9s} {np.nanmean(t2):12.4f} "
+                print(f"{n_image:7d} {tau:9.2f} {label:>14s} {np.nanmean(t2):12.4f} "
                       f"{se[ok].mean():8.3f} {sd:7.3f} {se[ok].mean()/sd:6.2f} "
                       f"{g[ok].mean()-bed.TRUE_G:+8.3f} "
                       f"{cover:6.2f}  (n={ok.sum()}, true tau2 {tau**2:.4f})", flush=True)

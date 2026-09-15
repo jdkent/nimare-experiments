@@ -2298,3 +2298,51 @@ sparse-but-not-narrow -- kept on the docstring's reasoning that "a coarse but wi
 still separates the observed value from the bulk". `experiments/which_limb_lets_them_through.py`
 cross-tabulates both statistics against rejection so the answer comes from the joint distribution
 rather than from tuning a constant to a thirteen-fit measurement.
+
+### The excess interval width is the censoring term. The tau2 story was wrong.
+
+`se/sd` runs 1.1 to 2.1 across the coverage table, and under the documented `t` interval that is
+what makes every default-kernel arm cover regardless of configuration. I had recorded
+DerSimonian-Laird truncation as the leading cause -- a truncated estimator of a quantity whose
+true value is zero has a positive mean, so the fit would be charging the interval for
+heterogeneity that is not there -- and written down the number it had to hit: fitted `tau2` near
+0.12 when the truth is 0.
+
+A two-fit smoke test settled it, on a coordinates-only twelve-study fit:
+
+```
+configuration        g       se   fitted tau2
+baseline          1.093    0.189      0.0000
+tau2 none         1.093    0.189      0.0000
+selection none    1.093    0.100      0.0000
+```
+
+Fitted `tau2` is **exactly zero**, so there is no truncation bias to speak of, and switching DL
+off changes the `se` by nothing at all. Target 0.12, value 0.0000. The hypothesis is dead, and it
+died for three seconds of compute rather than the eighty-replication run it was written for --
+which is the habit working, not a wasted prediction.
+
+What moves the `se` is the censoring term. `selection_model="none"` nearly halves it, 0.189 to
+0.100, which against the coordinates-only spread of 0.080 takes `se/sd` from about 2.4 to about
+1.25. Most of the excess, though not all.
+
+So the excess width is the observed information of the censored mixture, which carries uncertainty
+about which component each observation came from. That is genuine uncertainty about a latent
+quantity rather than an arithmetic error, and two readings remain open with different
+consequences:
+
+* **The `se` is right and `sd` is the wrong comparison.** The observed information is the error for
+  the parameter mu *in the selection model*; the replication-to-replication spread of the point
+  estimate is a different quantity. On this reading nothing needs fixing and the lesson is only
+  that coverage must never be read as validating the uncertainty.
+* **The information is overstated.** Under a correctly specified model the two should agree
+  asymptotically, so a factor of 2.4 at twelve studies is evidence of misspecification or of the
+  profiling step double-counting.
+
+One piece of evidence already bears on this and points somewhere useful. The oracle bed -- the
+brute-force MLE against the same censored mixture with *known* variances -- covered 94.5% to
+98.4%, close to nominal. So the information is about right where the model is true, which makes
+the excess in this bed more likely to be misspecification of the **reporting process** than of the
+likelihood. That is a different and more interesting defect than a variance bug, and it is
+testable: the bed's reporting is a cluster-forming cut with a fixed assumed extent, while the
+estimator's censoring term assumes height thresholding.
