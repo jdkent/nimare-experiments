@@ -206,15 +206,21 @@ reasoned from. Cheap to catch, expensive to miss.
 ## Two concurrent runs of one script must not share a scratch directory
 
 `interval_coverage.py` wrote its simulated images to a fixed `/tmp/claude-0/cov_imgs` with names
-built from `(seed, studies, images, tau, k)`. Two concurrent runs of it therefore generated
-*identical filenames* and overwrote each other's files mid-fit.
+built from `(seed, studies, images, tau, k)`, so two concurrent runs generated *identical
+filenames* and could overwrite each other's files mid-fit. Fixed by deriving the path from the
+pid: `f"…/cov_imgs_{os.getpid()}"`, which costs nothing and removes the class.
 
-It did not fail. It silently **dropped arms from the output table** -- eight of nineteen, from the
-middle of the sequence, with no error and exit code 0 -- which is how it was eventually noticed,
-after a stretch of trying to work out why a list comprehension I could read and verify was
-producing the wrong number of rows. The comprehension was fine.
+**That fix is hygiene, not a diagnosis.** It was prompted by a run that silently dropped eight of
+nineteen arms from its output table -- no error, exit code 0, and the dropped ones scattered
+through the middle of the sequence rather than truncated from the end. I wrote the collision up as
+the cause and then checked: the dropped set included `12 studies, 0 images, per-study`, which
+writes no images at all, and all three representative dropped configurations run correctly when
+called standalone. So the collision cannot explain it and **I did not find out what did.**
 
-So: **derive any scratch path from the process, not from the script.** `f"…/cov_imgs_{os.getpid()}"`
-costs nothing and removes the whole class. And note the shape of this failure for next time -- a
-harness that is corrupting itself shows up as *your logic looking wrong*, which is exactly where
-you will not look.
+Recording it unresolved rather than leaving a tidy wrong answer, because the wrong answer is the
+more expensive artefact: the next person to see arms vanish would fix the scratch directory and
+believe the matter closed. What is actually known is that the arms are individually fine, the
+comprehension that builds the list is fine, and the loop printed 11 of 19 with no diagnostic.
+The scientific question that run was asking was re-answered by a separate single-purpose script
+instead, which is the right move once a harness is under suspicion -- do not debug the harness on
+the critical path of a result.
