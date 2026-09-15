@@ -535,3 +535,210 @@ Two further readings of the table.
 coordinate-only studies, tau 0.3 raises coverage from 0.10 to 0.58 while raising `half/truth` from
 0.44 to 1.01. The interval becomes as wide as the effect. Anyone reading coverage alone would
 record heterogeneity as an improvement.
+
+## E3 — the power-spread prediction, confirmed (answered)
+
+Section 18's prediction, recorded before the run: the prevalence slope on the truth should rise
+as the spread of study power grows, while the product's slope changes least. True `mu = 0.6`,
+24 studies, prevalence swept 0.25 to 1.00, 24 replications per cell.
+
+```
+roster        fitted prevalence at true 0.25/0.50/0.75/1.00   slope    fitted g across the sweep
+fixed         0.275  0.476  0.597  0.680                      +0.534   0.481 0.667 0.702 0.734
+n varies      0.261  0.480  0.708  0.963                      +0.934   0.625 0.665 0.643 0.670
+both vary     0.219  0.472  0.739  0.979                      +1.019   0.632 0.620 0.646 0.644
+```
+
+Confirmed, and the clearest evidence of it is the column I had not thought to predict.
+
+**With a homogeneous roster, `g` is contaminated by the prevalence.** It should be 0.6 at every
+cell, because the true magnitude does not change across the sweep. Under the fixed roster it runs
+0.481 to 0.734 -- a 53% swing driven entirely by a parameter it is supposed to be separate from.
+Once sample sizes vary it is flat at 0.62-0.67 across the whole sweep, and varying thresholds too
+changes nothing further. That is the separation working, and it is a sharper diagnostic than the
+prevalence slope because the target is a constant.
+
+**The prevalence slope nearly doubles**, +0.534 to +1.019, and lands essentially on 1.
+
+**The part of the prediction that was wrong**: I said the marginal's slope would stay roughly
+constant, the product being identified all along. It went +0.733 to +1.118, a 53% improvement --
+smaller than the prevalence's 91% but not "roughly constant". The product is better identified
+than the factors under a homogeneous roster, not fully identified.
+
+Practical consequence, and it is a cheerful one for once: real collections *do* have
+heterogeneous sample sizes, so the regime that breaks the separation is not the common one. It is
+now a checkable precondition rather than an unknown -- and one CBES could compute and report.
+
+## E7 — the `g_marginal` cancellation is driven by reporting density (answered)
+
+Crossing true magnitude with true prevalence in one fit, 24 coordinate-only studies, 40
+replications. The target is the true marginal effect `pi * mu`.
+
+```
+site                 rep dens  true mu       g  g bias  true pi     pi  true marg  g_marg  marg bias
+strong, universal        0.95     0.80   1.292  +0.492     1.00  0.997      0.800   1.289     +0.489
+strong, uncommon         0.36     0.80   1.170  +0.370     0.40  0.557      0.320   0.640     +0.320
+weak, universal          0.20     0.45   0.755  +0.305     1.00  0.847      0.450   0.645     +0.195
+weak, uncommon           0.09     0.45   0.593  +0.143     0.40  0.619      0.180   0.422     +0.242
+```
+
+Confirmed as predicted: the absolute marginal bias tracks reporting density, worst at the
+strong universal site (0.489 at density 0.95) and smallest at the sparse ones. At that site
+`prevalence` reads 0.997, so there is nothing to offset `g`'s +0.492 and `g_marginal` inherits
+all of it. The cancellation is not structural; it needs silence to work on.
+
+One qualification I should state rather than let the headline stand alone: in *relative* terms
+the ranking inverts -- 61% of the truth at the dense site against 134% at the sparse weak one --
+so "worst where reporting is dense" is true of the absolute error and false of the relative one.
+Which matters depends on whether a reader is comparing regions or quoting a number.
+
+## The naive count beats the fitted prevalence at the only reading the docs endorse (answered)
+
+Both estimators scored on the *same* simulated collections -- 24 coordinate studies, four sites
+at true prevalences 0.25/0.50/0.75/1.00, 40 replications. The naive estimator is simply
+`(studies with a focus within r mm) / (studies in the collection)`, which needs no likelihood,
+no EM, no selection model and no threshold inference, and is biased low by construction.
+
+```
+effect 0.8   estimate at 0.25/0.50/0.75/1.00      mean|bias|  RMSE   rho    exact
+  CBES prevalence     0.315 0.534 0.819 0.925          0.061  0.170  +0.820   42%
+  naive, 10 mm        0.187 0.354 0.560 0.717          0.170  0.200  +0.954   80%
+  naive, 15 mm        0.222 0.420 0.646 0.804          0.102  0.148  +0.951   80%
+
+effect 0.5
+  CBES prevalence     0.276 0.428 0.615 0.716          0.129  0.303  +0.570   22%
+  naive, 15 mm        0.104 0.136 0.273 0.331          0.414  0.421  +0.877   60%
+
+effect 0.4
+  CBES prevalence     0.171 0.368 0.426 0.534          0.250  0.370  +0.542   20%
+  naive, 15 mm        0.066 0.105 0.132 0.177          0.505  0.509  +0.619   25%
+```
+
+The result splits cleanly, and both halves matter.
+
+**The censored likelihood does what it was built to do.** It corrects the naive count's downward
+bias, and by a lot: mean absolute bias 0.061 against 0.102-0.170 at a strong effect, 0.129
+against 0.414 at a moderate one, 0.250 against 0.505 at a weak one. Silence really is being read
+as evidence, and reading it works. That is a genuine result for the model.
+
+**And it loses, decisively, at the ordinal reading -- the only reading the documentation
+endorses.** Rank correlation +0.820 against +0.954 at a strong effect; the four-site ordering is
+exactly right in 42% of maps against 80%. At a moderate effect, 22% against 60%. Not one regime
+where the fitted prevalence orders better. The likelihood buys bias correction with variance, and
+the variance is what destroys the ranking.
+
+So the docstring is in an awkward position of its own making. It tells the reader to ignore the
+level and read the order, which is precisely the aspect where a count anyone could compute in
+three lines does better. The defensible positions are (a) stand behind the level, which means
+retracting "read it ordinally" and owning a calibration claim, or (b) emit the naive count too
+and say plainly which to use for which purpose. Both are honest; the present combination is not.
+
+On RMSE the two split by regime -- naive 15 mm wins at a strong effect (0.148 to 0.170) and CBES
+wins at weak ones (0.303 to 0.421, 0.370 to 0.509) -- so RMSE alone would have made this look
+like a draw and hidden the ordering gap entirely. Another entry for the metrics-that-lie list.
+
+## Reported heights are not decoration; within a study they are actively harmful (answered)
+
+16 coordinate-only studies, 30 replications, five sites. Locations, counts, study membership,
+sample sizes and thresholds untouched; only the reported statistics altered.
+
+```
+height input        r(g, truth)  mean g at sites  mean pi  r(pi, truth)
+as reported               0.436            0.916    0.844         0.481
+study-flattened           0.515            0.923    0.888         0.469
+all-flattened             0.421            0.906    0.897         0.494
+
+paired against 'as reported':
+  study-flattened   r changes +0.0796  (sd 0.1485, paired p 0.006)
+  all-flattened     r changes -0.0148  (sd 0.1901, paired p 0.672)
+```
+
+Stronger than section 17 predicted. Replacing every focus in a study with that study's own mean
+reported height -- destroying all within-study variation and nothing else -- **improves** the
+correlation with the truth by +0.080, at paired p 0.006. And destroying height information
+entirely costs nothing measurable (-0.015, p 0.67).
+
+So the within-study spread of reported heights carries *negative* information. That is what one
+should expect once the winner's curse is taken seriously: the differences between one study's
+reported peaks are differences in how far each local maximum overshot its own threshold, which is
+noise dressed as signal, and the estimator weights it as signal. The between-study level, which
+survives flattening, carries what little there is.
+
+This is the most direct evidence yet that the estimating equation is in the wrong channel, and it
+comes with a cheap intervention: a `peak_bias`-like option that replaces each study's reported
+magnitudes with their own mean would have improved the map in this bed. Worth trying on real
+collections before proposing it.
+
+`prevalence` is indifferent to all of this (0.481 / 0.469 / 0.494), which is consistent with it
+being a count-driven quantity.
+
+## Where the coordinates-only bias comes from, stage by stage (answered)
+
+12 coordinate-only studies, 40 replications, truth 0.800 at the read-out voxel.
+
+```
+stage                                      value  cumulative    step
+1. truth at the read-out voxel             0.800      +0.000
+   truth where the foci actually landed    0.673      -0.127  -0.127   <- localisation
+2. mean g implied by the reported peaks    0.993      +0.193  +0.320   <- winner's curse
+3. pooled, selection_model='none'          1.318      +0.518  +0.324   <- weighting + kernel
+4. pooled, shipped selection model         1.306      +0.506  -0.012   <- selection model
+```
+
+Two things here that I had wrong.
+
+**The pooling step contributes as much as the winner's curse**, +0.324 against +0.320. Everything
+written about this bias so far -- in the PR, in the docstring, in these notes -- attributes it to
+peak-height selection. Half of it happens *after* the reported values are in hand, in the
+inverse-variance weighting and the spatial kernel. That half is in code rather than in the
+literature's reporting practice, so unlike the winner's curse it might be fixable. It is the most
+promising lead in this whole program and I have no mechanism for it yet; candidates are that the
+kernel up-weights foci that landed closer to the read-out voxel (which are the larger excursions,
+since a bigger local noise peak pulls the maximum toward the true peak) and that the variance
+used for weighting, `1/n + g^2/2n`, is computed from the *reported* magnitude. The second would
+deflate rather than inflate, so it is probably the first. Logged as a task; it needs measuring,
+not reasoning.
+
+**The selection model does essentially nothing**: -0.012 on a +0.518 bias. Correctly signed --
+a censoring correction should pull down -- and negligible in size. That matches the earlier
+finding that `peak_bias='per-study'` moves nothing, and it means the zero-inflated censored
+likelihood is earning its keep on `prevalence` (where it beats the naive count's bias by a factor
+of three) and not on `g`.
+
+**Localisation helps rather than hurts**, by -0.127: the reported foci land where the truth is
+*lower* than at the read-out voxel, because the read-out voxel is the true peak and jitter can
+only move away from it. So localisation error partially offsets the winner's curse. That is worth
+knowing because the two are usually described together as though they compounded.
+
+## Is the coordinates-only `g` one scale error or a distortion? (answered, and a prediction falsified)
+
+Five sites at true g 0.800 / 0.700 / 0.600 / 0.500 / 0.400, 12 studies, 40 replications.
+
+```
+                   g / true g at the five sites            spread  within-map rho   exact
+coordinates only   1.630 1.577 1.539 1.640 0.996            1.65x   +0.922 (0.137)   57%
+2 of 12 imaged     1.301 1.260 1.185 1.072 1.013            1.28x   +0.957 (0.067)   65%
+12 of 12 imaged    1.011 1.013 1.020 0.964 1.002            1.06x   +0.972 (0.045)   72%
+```
+
+**Mostly one constant, failing at the bottom of the range.** Across the four stronger sites the
+ratio runs 1.539 to 1.640 -- a spread of 1.07x, near enough to a single multiplicative constant
+that the "read it relatively" defence holds there. The 1.65x headline spread is produced entirely
+by the weakest site, where the ratio collapses to 0.996. So the relative map is trustworthy over
+the part of the range that is reported consistently and breaks where reporting gets sparse, which
+is the same boundary `g_marginal` was already known to have ("calibrates the upper part of the
+range").
+
+**My prediction was wrong.** I predicted a U shape -- that a couple of images would make the
+*relative* map worse, because images remove the coordinate bias unevenly (most where reporting is
+sparse, least where it is dense), distorting a pattern that was at least uniformly wrong before.
+The spread instead falls monotonically, 1.65x to 1.28x to 1.06x, and the within-map ordering
+improves at every step. Uneven local dilution does not distort the pattern, so it also does not
+explain the old NIDM puzzle where images+coordinates correlated worse with a held-out truth than
+images alone. That puzzle is still open (task #37).
+
+**`g` orders voxels better than `prevalence` does.** 57% exact ordering over five sites against
+`prevalence`'s 50% over four (a strictly easier task), and rank correlation +0.922 against +0.862.
+If one of the two maps is to be recommended for a relative reading, the evidence favours `g` --
+which is the opposite of what the current documentation does, since it tells the reader to
+distrust `g`'s magnitude and read `prevalence` ordinally.
