@@ -321,3 +321,34 @@ single scalar. Any gain from joining has to appear in the field, where images ar
 
 *One dimension understates selection*, per the calibration check in section 10, so the numbers
 will not transfer even if the direction does.
+
+### Smoothness is not a blocker: the shared intensity constant cancels it
+
+The intensity needs a peak-height law, the law depends on smoothness, and no method exists for
+estimating smoothness from coordinates alone -- a real gap in the literature. T7 asks whether the
+gap matters, by generating at one smoothness and fitting with a law measured at another.
+
+| assumed sigma | versus truth | maxima per point | recovered scale | error |
+| --- | --- | --- | --- | --- |
+| 2.0 | x0.5 | 0.0954 | 0.867 | +0.067 |
+| 3.0 | x0.75 | 0.0643 | 0.867 | +0.067 |
+| 4.0 | x1 | 0.0485 | 0.874 | +0.074 |
+| 6.0 | x1.5 | 0.0324 | 0.870 | +0.070 |
+| 8.0 | x2 | 0.0243 | 0.873 | +0.073 |
+
+A fourfold error in smoothness moves the scale by 0.007. This is structural rather than lucky.
+`rho_max` enters the intensity multiplicatively and the shared constant is profiled as
+`C = n_total / integral`, so `C * rho_max` is invariant and the maxima density cancels
+identically. What is left is the *shape* of the peak-height survival, which for a standardised
+Gaussian field depends on the dimensionless ratio of spectral moments rather than on the full
+width at half maximum.
+
+So the model does not need a smoothness estimate. That is the second payoff from sharing the
+intensity constant across studies, the first being that a free per-study constant profiles the
+counts away entirely.
+
+The caveat is narrow and worth keeping. Sigma was varied within one kernel family, where the
+autocorrelation *shape* is identical by construction, so what is shown is invariance to the scale
+of smoothness and not to the shape of the spectrum. A genuinely different spectral shape --
+non-Gaussian smoothing, unsmoothed data -- would still matter. That is a far weaker requirement
+than knowing each study's FWHM, and far more stable across a literature.

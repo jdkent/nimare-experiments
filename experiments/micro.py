@@ -558,7 +558,78 @@ def joint_field():
           "\n  to do. A ratio near 1.00 means the scale came out right as well.\n")
 
 
+def smoothness_sensitivity():
+    """How wrong can the assumed smoothness be before the recovered scale suffers?
+
+    The intensity model needs a peak-height law, and that law depends on the field's smoothness.
+    In the testbed the law is measured from the generator, which is exactly right and therefore
+    says nothing about robustness. On real data it would come from random field theory given an
+    estimated smoothness, or from the images -- and no method exists for estimating it from
+    coordinates alone, which is a real gap.
+
+    So the question that decides whether the gap matters: mis-specify the smoothness deliberately
+    and see what it costs. Data are generated at one smoothness and fitted with a peak-height law
+    measured at another, from half to double. If the recovered scale barely moves, smoothness is
+    a detail to estimate roughly; if it tracks the error, it is a blocker and needs its own method.
+    """
+    print("T7: what mis-specified smoothness costs the recovered scale")
+    x = np.arange(LENGTH)
+    a_true, n_studies = 0.8, 24
+    shape_field = truth_field()
+    shape_field = shape_field / shape_field.max()
+
+    def noise_at(sigma, n=1):
+        raw = gaussian_filter1d(rng.standard_normal((n, LENGTH)), sigma, axis=-1, mode="wrap")
+        impulse = np.zeros(LENGTH)
+        impulse[LENGTH // 2] = 1.0
+        sd = np.sqrt((gaussian_filter1d(impulse, sigma, mode="wrap") ** 2).sum())
+        return raw / sd
+
+    def law_at(sigma, n_fields=1500):
+        heights = []
+        for _ in range(n_fields):
+            z = noise_at(sigma)[0]
+            interior = (z[1:-1] >= z[:-2]) & (z[1:-1] >= z[2:])
+            heights.append(z[1:-1][interior])
+        heights = np.sort(np.concatenate(heights))
+        return heights, heights.size / float(n_fields * LENGTH)
+
+    true_sigma = SMOOTH
+    tables = []
+    for j in range(n_studies):
+        n_subj = int(rng.integers(15, 40))
+        z = a_true * shape_field * np.sqrt(n_subj) + noise_at(true_sigma)[0]
+        cut, per_cluster = ((2.5, False), (4.5, False), (3.0, True))[j % 3]
+        idx = report(z, cut, per_cluster)
+        if idx.size:
+            tables.append((idx, float(np.abs(z[idx]).min()), n_subj))
+
+    print(f"  {'assumed sigma':>14} {'vs truth':>9} {'maxima/point':>13} {'scale':>7} {'error':>7}")
+    for factor in (0.5, 0.75, 1.0, 1.5, 2.0):
+        heights, rho_max = law_at(true_sigma * factor)
+
+        def neg(a):
+            field = a * shape_field
+            rates = []
+            for idx, u, n_subj in tables:
+                m = field * np.sqrt(n_subj)
+                rates.append(rho_max * (survival(heights, u - m) + survival(heights, u + m)))
+            integral = sum(float(r.sum()) for r in rates)
+            n_total = sum(idx.size for idx, _, _ in tables)
+            c_hat = n_total / max(integral, 1e-12)
+            total = 0.0
+            for (idx, _, _), r in zip(tables, rates):
+                total -= np.log(c_hat * r[idx] + 1e-300).sum()
+            return total + c_hat * integral
+
+        a = optimize.minimize_scalar(neg, bounds=(0.1, 2.0), method="bounded").x
+        print(f"  {true_sigma * factor:14.2f} {f'x{factor:g}':>9} {rho_max:13.4f} "
+              f"{a:7.3f} {a - a_true:+7.3f}")
+    print(f"\n  true scale {a_true}, true sigma {true_sigma}. Flat errors mean smoothness is a"
+          f"\n  detail; errors tracking the factor mean it needs its own estimator.\n")
+
+
 if __name__ == "__main__":
-    which = sys.argv[1:] or ["calibration", "channel_sweep", "identifiability", "detection_curve", "joint_model", "joint_field"]
+    which = sys.argv[1:] or ["calibration", "channel_sweep", "identifiability", "detection_curve", "joint_model", "joint_field", "smoothness_sensitivity"]
     for name in which:
         globals()[name]()
