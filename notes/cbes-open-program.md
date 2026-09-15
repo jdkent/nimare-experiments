@@ -4389,3 +4389,32 @@ delicate function, with drift, is a bad trade.
 So the honest summary: one large real win in the loader, nothing available in the censoring
 algebra, and the lever for the permutation null is `n_cores` -- it is a thousand independent
 fits and that is inherent to the design, not an inefficiency.
+
+## Every error rate on record was measured under a null that no longer exists
+
+Found while rewriting the PR description, which still advertised the old design in full.
+
+The familywise figures in that description -- the 0.070 and 0.060 cells, the **0.180** at two foci
+per study, and the whole max-statistic guard calibration above -- were measured under the
+*arrangement* null, which shuffled reported effect sizes among the foci of an analysis. The
+redesign reads no magnitude from a table, so that null was deleted. The shipped one scrambles each
+image study's values among that study's own voxels and holds the silence pattern fixed.
+
+**Different mechanism, so the numbers do not transfer, and the defect they exposed was a property
+of the deleted null.** The two-foci pathology came from swapping two values inside a study being a
+tiny perturbation of the max statistic; there is nothing to swap now, because the tables carry no
+values. Whether the image permutation has its own pathology is simply unknown.
+
+`experiments/fpr_after_redesign.py` measures it fresh: global null, nothing with an effect
+anywhere, thresholds varying study to study as in a literature search, three arms (20 studies with
+2 images, 20 with 1, 12 with 2), reporting the two quantities separately because they are easy to
+confuse -- the mean *share of voxels* under an uncorrected p < 0.05, and the share of
+*simulations* with any voxel surviving FWE.
+
+A two-simulation pilot put the uncorrected rate at 0.0501, 0.0379 and 0.0464, which is the right
+neighbourhood; the familywise rate needs the full run and is not quotable from two draws. The 40
+simulation run is in flight.
+
+**The PR description now says this is in progress rather than carrying the stale figures**, which
+is the part that mattered: a reviewer reading them would have been assessing an estimator that no
+longer exists.
