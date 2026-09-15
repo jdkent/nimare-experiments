@@ -327,3 +327,42 @@ cut floats with the signal -- the capping problem again, produced by nature this
 everything in it beyond the coverage radius is entered as the study having been *silent* there.
 A bigger true effect makes a bigger cluster and so a larger misread fraction, which pushes the
 estimate down hardest exactly where the effect is largest. `silence_misread.py` measures it.
+
+### The silence misreading is real, large, and not the cause
+
+`silence_misread.py` confirms the mechanism exists. Under cluster-extent reporting with one
+focus per surviving cluster, 46.3% of the voxels a pain study found significant lie outside the
+coverage radius of that cluster's single focus, and the estimator enters every one as the study
+having been silent there. It scales with cluster size as predicted -- 54% and 61% for the two
+studies with the largest clusters, 0.7% for the study whose largest cluster is 63 voxels -- and
+under voxelwise family-wise thresholding, where surviving blobs are tiny, it is only 2.2%.
+
+`cluster_extent_coverage.py` then removes the error and nothing else, by giving each study an
+analysis mask covering everything except its own significant-but-uncovered territory. This is
+the *oracle* version of importing cluster extent: the true significant set from the full image,
+which no reported number could beat.
+
+| truth stratum | truth g | g as now | ratio | g, silence fixed | ratio |
+| --- | --- | --- | --- | --- | --- |
+| 0-50% | 0.084 | 1.749 | 20.74 | 1.744 | 20.68 |
+| 50-75% | 0.238 | 1.869 | 7.86 | 1.864 | 7.84 |
+| 75-90% | 0.393 | 1.894 | 4.82 | 1.887 | 4.80 |
+| 90-99% | 0.650 | 2.030 | 3.13 | 2.011 | 3.10 |
+| 99-100% | 0.960 | 2.205 | 2.30 | 2.177 | 2.27 |
+
+Correlation with the truth goes +0.209 to +0.194. Reclassifying 46% of significant territory
+moves the estimate by about 1%, in the wrong direction for the correlation.
+
+Why so little: a voxel deep inside a large cluster has no focus within kernel reach either, so
+its estimate is set entirely by *other* studies' values. Cancelling one study's silence vote
+barely moves a voxel several other studies are already speaking about.
+
+`extent_sphere_fidelity.py` closes the line. Across 119 surviving clusters the median is 131
+voxels, whose volume-matched sphere has a 13 mm radius -- smaller than the 20 mm coverage
+already in use. Placed at the reported maximum it recovers 40% of the cluster against the
+fixed sphere's 66%, because clusters are elongated and the maximum is not their centroid. An
+extent-driven radius would cover *less* of the typical cluster than the current fixed one while
+buying at most the 1% above.
+
+The mask device works and is verified: masks load, are keyed per analysis, and the fitted values
+move. The negative result is the model's, not the harness's.
