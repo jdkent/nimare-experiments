@@ -112,12 +112,9 @@ endorses. That combination isn't tenable: either stand behind the level and retr
 ordinally", or emit the count too and say which to use for what. (Being re-run on the t
 convention; the comparison is like-for-like either way since both read the same data.)
 
-**3. Reported heights are worse than useless within a study.** Replacing every focus in a study
-with that study's own mean reported height — destroying within-study variation and nothing else —
-**improves** correlation with the truth by +0.080 (paired p 0.006). Removing height information
-entirely costs nothing measurable (−0.015, p 0.67). The within-study spread of reported heights
-carries *negative* information, which is what the winner's curse implies: the differences between
-one study's peaks are differences in how far each overshot its own threshold.
+**3. ~~Reported heights are worse than useless.~~ RETRACTED — see the third correction below.**
+The reported magnitudes carry little but they are not harmful, and they are doing most of the
+localising on real data.
 
 ## A second retraction: the ordering numbers I shipped were too generous
 
@@ -128,6 +125,32 @@ a strong effect (not 50%) and **6%** at a weak one (not 12%), with rank correlat
 independent — identical to three decimals under both settings — because a change of cutoff
 applies a roughly common inflation across voxels, so this stands on its own and is not fixed by
 task #53.
+
+## A third retraction: I recommended deleting the reported heights, and that was wrong
+
+I found that flattening every reported height improved the map's correlation with the truth by
++0.284 (paired p < 0.001), called it the program's strongest result, and filed a feature request.
+It was an artefact of a threshold interaction. Once every focus carries the same number,
+`threshold="study-min"` infers a cutoff *equal to that number*, so every observation sits exactly
+at its own censoring bound and the map's variation comes from censoring geometry rather than data.
+
+```
+                    threshold: study-min (inferred)   threshold: supplied 3.2905
+as reported                    0.429                             0.297
+study-flattened                0.638  (+0.209, p 0.000)          0.133  (-0.164, p 0.000)
+all-flattened                  0.713  (+0.284, p 0.000)          0.029  (-0.268, p 0.000)
+```
+
+The sign flips. And the real-data check — NIDM pain, 10 splits, held-out reference, real threshold
+handed in — agrees with the supplied-threshold column: flattening takes r from 0.230 to 0.04 and
+the AUC for the truth's top decile from 0.653 to 0.48, i.e. chance, both at paired p < 0.001.
+
+So the magnitudes carry essentially all of this fit's localising ability on real data. What
+survives from the other measurements is only that they carry *little in absolute terms* — 0.055 z
+per unit of true g at a 3.29 cut, 5–9% of the variance at a focus's own location. "Little" is not
+"negative", and I conflated those. The feature request is withdrawn (task #54).
+
+The protocol caught this: it mandates confirming on real data, and that is what reversed it.
 
 ## Theory that held up
 
