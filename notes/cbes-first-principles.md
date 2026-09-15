@@ -458,3 +458,29 @@ rather than beneficial once images are present.
 That is a meaningfully better place to be than "actively harmful", because a neutral channel can
 become useful where images are absent, which is the case none of these designs can test. But it
 is not the result section 11 was heading toward.
+
+### The basis was the binding constraint, and T6's verdict is suspended
+
+A sweep of the penalty and the basis, with the intensity constant fixed:
+
+| basis | penalty | strength | ceiling r | r | ratio |
+| --- | --- | --- | --- | --- | --- |
+| 24 | ridge | 0.01 | 0.679 | +0.751 | 1.77 |
+| 24 | roughness | 1 | 0.679 | +0.675 | 1.65 |
+| 24 | roughness | 30 | 0.679 | +0.532 | 1.82 |
+| 24 | roughness | 300 | 0.679 | +0.472 | 1.96 |
+| 48 | ridge | 0.01 | **0.954** | **+0.936** | **1.47** |
+
+The roughness hypothesis is refuted: it degrades the correlation and does not fix the inflation,
+so CBMR's penalty is not the answer to this particular problem. The basis is: doubling it lifts
+the achievable correlation from 0.679 to 0.954 and the achieved one from 0.751 to 0.936, while the
+inflation falls to 1.47.
+
+**This probe contains no images at all, so +0.936 is coordinates alone** -- against the +0.442 and
++0.501 T6 reported for the same arm. T6 gave every arm 24 basis functions and profiled the
+constant, and both choices bit hardest on the arm carrying the most spatial information to
+express. Its conclusion that the joint never beats the images was measured under a handicap that
+was not neutral between arms, and is suspended pending the rerun.
+
+The lesson is the same one the harness bugs kept teaching: a shared handicap is not a fair
+comparison when the arms differ in how much they need the thing being limited.
