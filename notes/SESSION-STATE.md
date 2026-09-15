@@ -31,12 +31,23 @@ Truth 0.800, prevalence 1 at every site, calibrated reporting regime (every stud
 clusters each), 100 replications, studies reporting a genuine t. `half/truth` is the interval's
 half-width over the effect.
 
-**Caveat found late: every arm used `peak_bias=None`, not the configuration the docstring
-recommends** (`peak_bias="per-study"` with `peak_bias_scale="images"`). With `None`, images merely
-outvote the coordinates — which is exactly why the weight-share model fits so well. The
-recommended setting additionally uses them to *correct* the coordinate values' scale. So the
-"diluted, never corrected" headline may belong to my chosen configuration rather than to the
-method. Calibrated arms are running; the prediction is recorded in `cbes-open-program.md`.
+**RETRACTED, and this is the important one: every arm used `peak_bias=None`, not the configuration
+the docstring recommends** (`peak_bias="per-study"` with `peak_bias_scale="images"`). Measured
+directly, at the image fraction that matters:
+
+```
+2 of 12 images, truth 0.800    mean g    bias  mean se  cover
+  peak_bias=None (the table)    0.904  +0.104    0.141   0.93
+  per-study, scale from images   0.753  -0.047    0.109   1.00
+```
+
+So the coordinate values **are** corrected, not merely outvoted, and "the coordinate channel is
+diluted, never corrected" — which I reported twice — is false of the estimator. It is true only of
+`peak_bias=None`. The weight-share model (`b0 = 0.260`, `r = 6.40`, max residual 0.022) is a
+correct model of the configuration the documentation tells users not to rely on, and every
+projection hung off it ("2 images of 20 studies leaves the magnitude 20% high") needs re-deriving
+from calibrated arms before being quoted. The table below therefore describes a variant, not the
+recommended use.
 
 | studies | images | bias | se/sd | coverage | half/truth |
 | --- | --- | --- | --- | --- | --- |
