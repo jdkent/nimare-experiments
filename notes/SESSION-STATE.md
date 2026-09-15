@@ -31,6 +31,13 @@ Truth 0.800, prevalence 1 at every site, calibrated reporting regime (every stud
 clusters each), 100 replications, studies reporting a genuine t. `half/truth` is the interval's
 half-width over the effect.
 
+**Caveat found late: every arm used `peak_bias=None`, not the configuration the docstring
+recommends** (`peak_bias="per-study"` with `peak_bias_scale="images"`). With `None`, images merely
+outvote the coordinates — which is exactly why the weight-share model fits so well. The
+recommended setting additionally uses them to *correct* the coordinate values' scale. So the
+"diluted, never corrected" headline may belong to my chosen configuration rather than to the
+method. Calibrated arms are running; the prediction is recorded in `cbes-open-program.md`.
+
 | studies | images | bias | se/sd | coverage | half/truth |
 | --- | --- | --- | --- | --- | --- |
 | 12 | 0 | +0.259 | 2.19 | 0.72 | 0.40 |
