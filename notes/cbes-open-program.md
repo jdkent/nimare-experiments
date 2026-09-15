@@ -1843,3 +1843,31 @@ real collection sits in. The calibrated arm is **four times closer to the truth*
 0.127) on a smaller interval (0.107 against 0.134) with better coverage (0.99 against 0.87). There
 is no axis on which the uncalibrated setting is preferable there, which is what makes it the right
 primary and makes a whole session's worth of numbers taken in the other setting the variant.
+
+### A crash found by running the documented configuration
+
+Re-running the coverage table with `peak_bias_scale="images"` primary hit an unhandled error on
+the first all-donor arm:
+
+```
+12 studies, 12 images, calibrated  ->  ValueError: No study contributed any in-mask voxels.
+```
+
+Reproduced minimally: 2 of 6 and 5 of 6 studies imaged calibrate fine (scale 0.677 and 0.476),
+6 of 6 raises. The cause is structural rather than incidental. The scale is read off the donors by
+comparing, at shared voxels, what the coordinate-only fit says against what each donor's image
+says; when every study is a donor the roster less the donors is empty, so `_statistic` gets an
+empty focus table and no image studies, and `_accumulate` raises from three frames down with a
+message that names neither the cause nor the configuration.
+
+Fixed (commit c8590c0) by returning 1.0 with `scale_source_ = "unset"`, which is the right answer
+rather than a fallback: a donor's own peaks are dropped in favour of its image, so with every
+study imaged there are no coordinate values for a scale to act on.
+
+Worth noting how it was found. Two deliberate tests already exercise the all-donor collection
+shape, and the coverage work had already identified it as the best-behaved configuration
+measured -- but nothing had ever combined that shape with the documented `peak_bias_scale`
+setting, because every arm of the table used `peak_bias=None`. The bug had been sitting behind
+exactly the configuration gap that made the magnitude numbers describe a variant. Running the
+documented default first would have found it hours earlier, which is the second time today that
+habit would have paid.
