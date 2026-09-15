@@ -2266,3 +2266,35 @@ every arm at `peak_bias=None` when the docstring recommends `peak_bias_scale="im
 the fix is the habit already written down: **make the documented configuration the first thing you
 measure**, and that includes the documented way of reading the output, not only the documented
 settings.
+
+### The max-statistic guard is well-targeted and slightly too permissive
+
+Measured on the cell that exposed the familywise defect and on a control, 20 studies, global null,
+N 10-1000, 200 permutations, 60 simulations each:
+
+```
+foci/study  guard fired  voxel FWE  rejected|kept  n kept
+         2        0.783      0.050          0.231      13
+         6        0.017      0.050          0.051      59
+```
+
+Two readings, and they point the same way.
+
+**The two-foci cell is mitigated but not controlled.** The overall 0.050 -- against 0.150 to 0.180
+before the guard -- is not error control: a withheld fit cannot reject, so the aggregate is just
+`(1 - 0.783) * 0.231`. Among the fits the guard *passes*, which is the population a user is in when
+they get a p-value at all, rejection is 0.231 against nominal 0.05, exact binomial p = 0.0245 with
+a 95% lower bound of 0.066. The mechanism is right and the threshold is in the wrong place.
+
+**The six-foci control is clean, and that is what makes tightening cheap.** The guard fires on 1
+fit in 60, and the rate is nominal both overall (0.050) and among the kept (0.051, n = 59). So the
+guard is not refusing legitimate collections, and there is a lot of headroom: a threshold strict
+enough to catch the marginal two-foci fits would cost almost nothing here.
+
+What remains is *which* threshold. The guard refuses only when a null is both sparse (under 20
+distinct attained maxima of 200) and narrow (coefficient of variation under 0.05). Distinct counts
+run about six throughout the two-foci regime, so the thirteen kept fits are almost certainly
+sparse-but-not-narrow -- kept on the docstring's reasoning that "a coarse but wide distribution
+still separates the observed value from the bulk". `experiments/which_limb_lets_them_through.py`
+cross-tabulates both statistics against rejection so the answer comes from the joint distribution
+rather than from tuning a constant to a thirteen-fit measurement.
