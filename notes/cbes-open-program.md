@@ -1515,3 +1515,60 @@ two-thirds, badly but better than a tie.
 `coverage_radius` is the lever this identifies. It is currently `2 * fwhm`; a wider radius would
 cover more of the truth at the cost of claiming estimates further from any evidence. The
 trade-off is now measurable, which it was not before, and it deserves a sweep.
+
+## The second collection owed to #38 is blocked by data, not by effort
+
+Two things checked, and both are worth recording rather than quietly dropping.
+
+**The NeuroVault "animal" collection cannot support a coordinate-based test at all.** Its 11
+movie-watching z maps peak at:
+
+```
+  study   max |z|   cluster-forming cut is 3.09
+   8836      3.89
+   8838      0.70
+   8854      1.50
+   8891      0.56
+   8892      1.58
+   8893      3.24
+   8894      1.23
+   8895      1.22
+   8956      1.36
+   8962      3.45
+   9000      2.62
+```
+
+Seven of eleven peak below 2. Under realistic reporting -- a p < 0.001 forming cut with a
+family-wise extent test -- **every one of the eleven reports nothing**, which the extraction duly
+returns. So this collection is not a weak test of a coordinate method; it is not a test of one,
+because there would be no published table to meta-analyse. Worth knowing because
+`second_collection.py` used a bare uncorrected `U = 3.2905` on the same data, which would have
+yielded foci from only the three studies peaking above 3.29 -- so that earlier experiment was
+running on three studies, not eleven.
+
+**The harvested 258-study corpus is strong enough but is not grouped into usable collections.**
+98% of its studies have a peak clearing the forming cut and 80% clear a plausible corrected
+height, so strength is not the problem. Paradigm membership is:
+
+```
+  None / Other                43
+  rest eyes open              10
+  rest eyes closed             8
+  go/no-go task                7
+  episodic recall              6
+  2nd-order rule acquisition    6
+  lexical decision task         6
+  monetary incentive delay      6
+```
+
+The two rest-state sets have no task contrast to meta-analyse. The largest genuine task paradigm
+is seven studies, which split in half gives three supplying coordinates -- too thin to carry the
+#38 comparison, whose effect sizes are on the order of 0.1 in AUC.
+
+**So the honest position:** every comparative and magnitude claim about CBES rests on the 21-study
+NIDM pain collection, because it is the only assembled collection with enough studies sharing a
+paradigm whose maps are strong enough to yield coordinate tables under realistic reporting. That
+is a limitation of the validation rather than of the method, it is not fixable by more analysis of
+what is on disk, and it should be stated plainly wherever those claims appear. Curating a second
+collection -- grouping the 43 unlabelled studies by contrast name, or harvesting a new paradigm
+with 15+ studies -- is the work that would lift it, and it is data work rather than modelling.
