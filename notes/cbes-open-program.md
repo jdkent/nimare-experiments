@@ -3225,3 +3225,57 @@ on a 42 ms benchmark is within that.
 `benchmark` then passed on the head with no change from me, which is the confirmation. No comment
 posted on the PR: the check is green there, so there is nothing to stand down from -- but the
 local numbers are recorded here in case it recurs.
+
+## HCP, reference from held-out subjects: the correction does harm where prevalence is truly 1
+
+The cleanest reference available. MOTOR_LH, 786 subjects: 480 cut into 16 synthetic studies of
+30, coordinates extracted the way papers do (cluster-forming, whole clusters, one focus per
+cluster, 8 mm apart, no cap -- 14.4 peaks per table); the remaining **306 subjects, used to make
+no coordinate at all**, give the truth. The selection producing the peaks is therefore statistically
+independent of the quantity compared against, which nothing before this was.
+
+| estimate | r | rank r | AUC | mag ratio | \|est\| top | \|ref\| top |
+|---|---|---|---|---|---|---|
+| images only (2 images) | **+0.845** | +0.576 | **0.973** | **0.85** | 0.394 | 0.446 |
+| CBES g | +0.830 | +0.575 | 0.967 | 0.63 | 0.290 | 0.446 |
+| CBES g_marginal | +0.785 | +0.564 | 0.943 | 0.54 | 0.259 | 0.446 |
+
+**Pooling the two images alone beats CBES on every metric, magnitude included.** That is the
+opposite of the pain split-half, where CBES cut rmse 23% and bias 47%.
+
+### Why, and it is not a bug
+
+**HCP has prevalence exactly 1 by construction** -- every synthetic study draws from the same
+population, so there is no between-study absence for the zero-inflated mixture to find. And the
+images here are unthresholded maps of 30 subjects from that same population, so pooling two of
+them is already nearly unbiased (0.85, the shortfall being Hedges' variance weighting and noise).
+There is nothing for a selection correction to correct.
+
+Measured directly: **fitted prevalence is 0.664 against a true 1.0**, rising to 0.929 at the
+strongest decile. Where the effect is strong enough that most studies report it, pi is right;
+where it is weaker, the model reads "failed to clear its threshold" as "has no effect". That is
+the mixture's identifiability problem -- both explanations fit a silence -- and here every unit of
+mass it puts on the null component is pure error.
+
+Worse, it is not a clean pi/mu trade. If pi = 0.664 and the marginal is 0.85, then mu should read
+1.28; it reads 0.63. The silences push mu down through the censoring term *and* pi down through
+the mixture, so `g_marginal = pi * mu` is shrunk twice and comes back worst of all (0.54).
+
+### What this means for the recommendation
+
+The two beds bracket the regime:
+
+  * **pain, 21 real studies** -- genuinely different paradigms and populations, so prevalence < 1.
+    The correction helps: rmse -23%, bias -47%, the top-voxel overestimate eliminated.
+  * **HCP synthetic studies** -- one population, prevalence 1. The correction only hurts:
+    magnitude 0.63 against 0.85 for the images alone.
+
+A user cannot easily tell which regime a real collection is in, and the estimator currently offers
+no diagnostic for it beyond `prevalence` itself -- which is exactly the quantity that is wrong
+when it matters. That is the most important open problem on the design, above the report-limb
+functional form.
+
+Note this is a stronger statement than the docstring's existing prevalence caveats. Those say
+`prevalence` is compressed and should be read ordinally. This says the compression **propagates
+into the magnitude** and can make `g` worse than doing nothing, in a regime that is not exotic:
+any collection of similar studies of the same effect.
