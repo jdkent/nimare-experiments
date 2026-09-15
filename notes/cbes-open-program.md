@@ -1891,3 +1891,40 @@ merely been close it would have meant the fallback was doing something.
 It also confirms the arm is still a usable reference: bias -0.018, `se/sd` 1.10, coverage 0.94
 against a nominal 0.95, which is the row that shows the pooling and the observed-information
 standard error are correct. The fix did not cost that.
+
+### And this retracts "the interval has no validated operating point"
+
+I wrote earlier, in the success-criteria reflection, that "the interval never reaches nominal
+coverage in any genuinely coordinate-based configuration" and therefore "the interval on `g` has
+no validated operating point". The 12-study calibrated arms say otherwise:
+
+```
+arm                                   bias  mean se  se/sd  coverage
+12 studies,  2 images, calibrated   -0.038    0.107   1.32      0.99
+12 studies,  6 images, calibrated   -0.026    0.083   1.26      0.98
+12 studies, 12 images (no coords)   -0.018    0.065   1.10      0.94
+12 studies,  0 images               +0.255    0.171   2.14      0.75
+```
+
+The 2-image row is genuinely coordinate-based: ten of twelve studies speak only through
+coordinate tables, and the two donors are supplying a scale rather than carrying the estimate.
+It covers 0.99 against a nominal 0.95 with a bias of -0.038 on a truth of 0.800 -- under 5%.
+
+So the corrected claim, which is narrower than "it works" and much narrower than what I said:
+
+> With the documented configuration and at least two image donors, the interval on `g` covers --
+> 0.94 to 0.99 against a nominal 0.95 across image fractions from 0.17 to 1.00 -- erring
+> conservative, with `se/sd` from 1.10 to 1.32. Coordinates-only it does not: 0.75 at twelve
+> studies and 0.35 at twenty-four, and worse as studies accumulate.
+
+Two honest qualifications on the positive half. The coverage is *conservative* rather than
+calibrated: `se/sd` of 1.32 means the interval is a third wider than the estimator's own
+variability, so it covers partly by being generous. And it is one bed, one truth value, one
+reporting regime.
+
+But the shape of the claim changes. "No validated operating point" said the quantity was beyond
+rescue; what is actually true is that the operating point requires the documented configuration
+and a couple of donors, and I had been measuring the configuration without them. That is the third
+conclusion this session that was a property of my setup rather than of the estimator, and the
+count is itself the finding: when a result is negative, the first question should be whether the
+harness is configured the way a user would configure it.
