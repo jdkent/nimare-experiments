@@ -3097,3 +3097,54 @@ the hypothesis. Reopened with a quantified target: make `P(report | mu)` reprodu
 0.373 / 0.708 rather than 0.007 / 0.089 / 0.402 / 0.797.
 
 The radius sweeps stay falsified on their own terms -- those did test what they claimed.
+
+## SDM-PSI vs the redesigned CBES: SDM wins the pattern by a wide margin. This is a design problem.
+
+21-study NIDM pain. SDM's coefficient is the one already on disk -- 50 imputations over
+coordinates built at U = 3.2905. CBES gets the *same* extraction: 2 of the studies as g/g_var
+images and the other 19 as coordinate tables, because the redesign requires at least one image.
+Reference: the inverse-variance mean of the 19 images CBES never saw, so CBES is not scored
+against its own input; SDM is mildly flattered (2 of its 21 tables came from reference studies),
+which is the conservative direction. 228,483 voxels.
+
+| estimate | r | rank r | AUC | mag ratio | \|est\| top | \|ref\| top |
+|---|---|---|---|---|---|---|
+| **SDM-PSI coeff (21 tables)** | **+0.689** | **+0.627** | **0.877** | 0.41 | 0.210 | 0.462 |
+| images only (2 images) | +0.407 | +0.283 | 0.751 | 0.63 | 0.311 | 0.462 |
+| CBES g (2 img + 19 tab) | +0.358 | +0.287 | 0.755 | **0.62** | 0.314 | 0.462 |
+| CBES g_marginal | +0.390 | +0.289 | 0.755 | 0.57 | 0.291 | 0.462 |
+
+**SDM wins the pattern decisively** -- r +0.689 against +0.358, rank r +0.627 against +0.287,
+AUC 0.877 against 0.755. Not close, and the 2-of-21 flattery cannot account for it.
+
+**CBES wins the magnitude**: 0.62 of the reference at the top quartile against SDM's 0.41. SDM is
+2.4x too low there, CBES 1.6x.
+
+### What this says about the design
+
+The redesign discarded the coordinate channel's *spatial* information along with its heights.
+SDM's imputation uses each peak's location and height to build a whole per-study map, and that is
+where its pattern advantage comes from. CBES's silence channel corrects the level and does
+essentially nothing for the pattern -- on the split-half bed that showed up as rank r +0.002
+(p = 0.90) and AUC -0.004 (p = 0.32), and here it shows up as what that costs.
+
+Worse: **CBES's r (+0.358) is *below* images-only (+0.407).** The silence channel slightly hurts
+the pattern, which matches the split-half result (r -0.042, paired p = 0.017). So with 2 images
+the pattern is set by 2 studies' noise and the indicators do not rescue it.
+
+The central open question for the design is now sharp: **can the coordinate *locations*
+contribute to the pattern without their heights?** In principle the indicator carries location
+information -- -1 where studies reported, +1 where all were silent -- but it enters only through a
+censoring term that nudges a magnitude the images already set. SDM, with no images at all, builds
+its pattern entirely from locations and gets nearly twice the correlation.
+
+Two honest readings, and they are not exclusive:
+
+1. CBES answers a different question (mu, the effect among studies that have one, on a real
+   effect-size scale) and is better at it -- the magnitude column says so, and SDM's imputed
+   coefficient is 2.4x low.
+2. For anyone who wants a map of *where*, 21 coordinate tables through SDM beat 2 images plus 19
+   silences through CBES, and it is not marginal.
+
+Next: does the gap close as the image count rises? If CBES needs 5+ images to match SDM's
+pattern, the honest recommendation is narrower than the docstring currently implies.
