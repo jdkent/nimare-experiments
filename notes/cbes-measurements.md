@@ -839,3 +839,49 @@ reported nothing -- and almost none of it is in the reported magnitudes. An esti
 coordinate tables only as presence/absence evidence, discarding the peak heights entirely, would
 capture the benefit measured here and avoid the cost. That is a testable design and it has not
 been tried.
+
+### Silence-only coordinates dominate the shipping mixed configuration
+
+If the corpus helps through silence and hurts through values, the design follows: keep the tables
+in the censoring term, drop their magnitudes from the pooled mean. NIDM pain, 2 images held fixed,
+8 splits, truth is the held-out half.
+
+```
+          estimate       r  rank r    AUC  mean err  err at top    rmse
+       images only  +0.723  +0.706  0.905    +0.198      +0.221   0.346
+     mixed (ships)  +0.589  +0.600  0.874    +0.160      +0.185   0.373
+      silence only  +0.643  +0.676  0.884    +0.072      -0.020   0.277
+  coordinates only  +0.218  +0.205  0.650    +1.451      +1.230   1.587
+```
+
+**Silence-only beats the shipping configuration on all six metrics** -- higher `r`, `rank r` and
+`AUC`, smaller bias overall and at the top decile, lower `rmse`. If coordinates are used alongside
+images at all, using only their silence looks strictly better than using their magnitudes.
+
+**Against images-only it is a real trade.** Magnitude decisively better -- `rmse` 0.277 against
+0.346, and top-decile bias **-0.020 against +0.221**, essentially unbiased -- and pattern worse,
+`r` 0.643 against 0.723. So the answer depends on whether `g` is read as a number or as a map,
+which is the same fork the metric audit exposed.
+
+**This is not the flattening idea that was withdrawn.** That replaced every peak height with a
+constant in a *coordinates-only* fit and took `r` from 0.230 to 0.04 with the top-decile AUC to
+chance. Checked by reading the script rather than trusting the note: it builds studies with
+`"points"` only and no `"images"` key, so the magnitudes were the sole source of localisation
+there. Here the images supply the pattern. I proposed this variant before verifying that
+distinction, which was the wrong order.
+
+**The implementation cost is small, and not by accident.** The channels are already separate:
+`_accumulate` builds the pooled mean from the focus table, while `_apply_selection_model` takes
+the roster from `sample_sizes` and the silence geometry from the table. Filtering inside
+`_accumulate` alone removes the magnitudes and leaves every study's silence intact, so the probe
+is a subclass in `experiments/silence_only_coordinates.py` and nothing in the estimator changed.
+
+Two consequences worth weighing rather than asserting. `peak_bias` and `peak_bias_scale` become
+meaningless in this mode -- there are no coordinate magnitudes for a scale to act on -- which also
+retires the calibration path, the all-donor crash that lived in it, and the two-donor requirement
+for `g_absolute`. And `prevalence` is untouched, having never been a magnitude question.
+
+The first implementation attempt crashed inside `_resolve_peak_bias_scale`, which fits the
+coordinates alone to calibrate. That was informative rather than incidental: with the magnitudes
+discarded there is nothing to calibrate, so the arm belongs at `peak_bias=None` and should never
+reach that path.

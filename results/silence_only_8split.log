@@ -1,0 +1,21 @@
+NIDM pain: 21 studies, 2 images held fixed, 8 splits
+
+  split 1/8
+  split 2/8
+  split 3/8
+  split 4/8
+  split 5/8
+  split 6/8
+  split 7/8
+  split 8/8
+
+          estimate       r  rank r    AUC  mean err  err at top    rmse
+       images only  +0.723  +0.706  0.905    +0.198      +0.221   0.346
+     mixed (ships)  +0.589  +0.600  0.874    +0.160      +0.185   0.373
+      silence only  +0.643  +0.676  0.884    +0.072      -0.020   0.277
+  coordinates only  +0.218  +0.205  0.650    +1.451      +1.230   1.587
+
+The variant earns its place only if it holds pattern near images-only AND beats it
+on the error at the top decile. Pattern collapsing toward the coordinates-only floor
+would mean the silence geometry distorts the map, which the flattening retraction
+would have predicted and this design was built to escape.
