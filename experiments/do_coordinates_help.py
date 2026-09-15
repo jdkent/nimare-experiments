@@ -124,9 +124,25 @@ def cbes_fit(image_members, coord_members, maps, sizes, workdir, calibrate=False
 
 
 def score(estimate, use, truth):
-    return (stats.pearsonr(estimate[use], truth[use])[0],
-            estimate[use].mean() / max(truth[use].mean(), 1e-9),
-            float(np.sqrt(np.mean((estimate[use] - truth[use]) ** 2))))
+    """Magnitude accuracy and localisation, which are different questions.
+
+    The magnitude columns ask whether the number is right. The localisation columns ask only
+    whether the map ranks voxels correctly and finds the strong ones -- which is what a reader
+    uses a meta-analytic map for, and which a biased but monotone estimate can do well. Scoring
+    only the first is what made the earlier version of this experiment answer half the question.
+    """
+    est, tru = estimate[use], truth[use]
+    top = tru >= np.percentile(tru, 90)
+    # AUC for "is this voxel in the truth's top decile", from the rank-sum identity.
+    order = stats.rankdata(est)
+    n_pos, n_neg = int(top.sum()), int((~top).sum())
+    auc = ((order[top].sum() - n_pos * (n_pos + 1) / 2) / (n_pos * n_neg)
+           if n_pos and n_neg else np.nan)
+    return (stats.pearsonr(est, tru)[0],
+            est.mean() / max(tru.mean(), 1e-9),
+            float(np.sqrt(np.mean((est - tru) ** 2))),
+            float(stats.spearmanr(est, tru)[0]),
+            float(auc))
 
 
 ss = ImageTransformer(target="z").transform(load_pain())
@@ -175,13 +191,16 @@ for _ in range(N_SPLITS):
         rows[k]["mixed, scaled to images"].append(score(got_cal[0], use, truth))
         rows[k]["coordinates only"].append(score(got_coord[0], use, truth))
 
-print(f"  {'images':>7} {'estimate':>22} {'r':>7} {'ratio':>7} {'rmse':>7}")
+print(f"  {'images':>7} {'estimate':>24} {'r':>7} {'ratio':>7} {'rmse':>7} "
+      f"{'rank r':>7} {'AUC top':>8}")
 for k in N_IMAGES:
     if k not in rows:
         continue
     for name, values in rows[k].items():
-        r, ratio, rmse = np.mean(np.array(values), axis=0)
-        print(f"  {k:>7} {name:>22} {r:+7.3f} {ratio:7.2f} {rmse:7.3f}")
+        r, ratio, rmse, rho, auc = np.mean(np.array(values), axis=0)
+        print(f"  {k:>7} {name:>24} {r:+7.3f} {ratio:7.2f} {rmse:7.3f} "
+              f"{rho:+7.3f} {auc:8.3f}")
     print()
-print("If a mixed row beats 'images only' the tables are worth including. Compare the two"
-      "\nmixed rows first: if they differ, the earlier verdict was about the calibration.")
+print("Magnitude accuracy is r, ratio and rmse; localisation is the rank correlation and the"
+      "\narea under the curve for recovering the truth's top decile. Coordinates can lose the"
+      "\nfirst and win the second, and only the first has been measured until now.")

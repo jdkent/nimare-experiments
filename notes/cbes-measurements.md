@@ -622,3 +622,25 @@ low. The guard counts arrangements when it should measure the spread of the atta
 Few foci per study is the realistic regime under cluster-extent reporting, so this is not a
 corner case, and the separately measured clustered global null -- voxel 0.100 +- 0.039 against
 0.000 for cluster size and 0.050 +- 0.028 for cluster mass -- is probably the same cause.
+
+### The familywise defect is a degenerate null, not the tail fit
+
+`why_fwe_fails.py` separates the two mechanisms that could produce a familywise rate of 0.18 at
+two foci per study, by rerunning the same simulations with the generalized Pareto tail
+approximation switched off.
+
+| foci/study | tail fit | voxel FWE | null max CV | distinct maxima |
+| --- | --- | --- | --- | --- |
+| 2 | on | 0.150 | 0.032 | 6 |
+| 2 | off | 0.150 | 0.032 | 6 |
+
+Identical. The tail fit is not implicated, and Winkler et al. (2016) validate that method and
+recommend it for familywise-corrected p-values in any case. The cause is the null itself: across
+200 permutations the maximum statistic takes **six distinct values**, with a coefficient of
+variation of 0.032. Swapping two values inside a study does not move the maximum. No method of
+reading a p-value off a distribution that flat can control the error rate.
+
+That fully specifies the fix. It has to be a refusal, not a different p-value calculation, and
+the statistic to refuse on is already computed during correction: the number of distinct attained
+maxima and their spread. The current guard counts 2^20 arrangements and waves through a null that
+attains six values.
