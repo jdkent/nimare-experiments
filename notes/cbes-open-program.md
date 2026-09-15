@@ -3571,3 +3571,24 @@ cluster-forming extent requirement was the mechanism. It cannot be, on this bed 
 simulator's rule is `(magnitude == maximum_filter(magnitude, size=3)) & (magnitude >= threshold)`,
 every suprathreshold local maximum and no extent test at all. Read the generator, not the
 assumption.
+
+## Shipped: `coordinate_share`, the diagnostic all the caveats needed
+
+Every warning accumulated this session is about *when* to trust the coordinate channel, and none
+of them is checkable against a collection in hand. What is checkable is whether the channel is
+even acting at a voxel -- and the quantity was already being computed and discarded.
+`_observed_information` accumulates the images' contribution to `I_mu_mu` and the indicators'
+contribution separately before summing, so the ratio is free.
+
+  0  the images carry the estimate alone; the tables changed nothing here, so none of the
+     coordinate caveats apply at this voxel
+  1  the indicators carry it, and all of them do
+
+On a 20-study collection with two donors: range 0.02 to 1.00, **median 0.10, and 0.79 at the
+focus**. So on a typical map the images carry the estimate almost everywhere and the coordinates
+take over exactly where studies reported. That is the stratification the whole design rests on --
+the 54%-vs-6% bias reduction measured at the start -- now readable per voxel rather than only in
+aggregate across a corpus.
+
+Emitted only under `selection_model="zero-inflated"`; with the selection off the tables are inert
+and the share is identically zero, so a map would be noise.
