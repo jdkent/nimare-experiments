@@ -2979,3 +2979,33 @@ optimum), but the motivating number was weaker than stated.
 Slope and intercept are the honest summary for this estimator. Recorded in the docstring, which
 previously claimed the coordinate channel "corrects the bias rather than the compression" -- now
 measurably wrong and replaced.
+
+### Correction: the weak end is where the correction *works*, not where it over-corrects
+
+I shipped "the weak end is where to expect over-correction" off the absolute values. The relative
+errors say the opposite:
+
+| truth | images | err% | CBES g | err% | g_marginal | err% |
+|---|---|---|---|---|---|---|
+| 0.2 | 0.242 | **+21.0** | 0.188 | **-6.0** | 0.151 | -24.5 |
+| 0.4 | 0.446 | +11.5 | 0.345 | -13.8 | 0.293 | -26.8 |
+| 0.6 | 0.586 | -2.3 | 0.605 | +0.8 | 0.589 | -1.8 |
+| 0.8 | 0.764 | -4.5 | 0.798 | -0.3 | 0.765 | -4.4 |
+| **mean \|err%\|** | | **9.8** | | **5.2** | | **14.4** |
+
+At the *weakest* focus CBES is more accurate than the images by a factor of three (-6% against
++21%), which is precisely what the selection correction exists for: a focus at a true 0.2 against
+a cutoff near 0.6 g is reported mostly by luck, so pooling only what got reported reads it as far
+too strong. The only focus where `g` is worse is 0.4 (-13.8% against +11.5%), comparable in size
+and opposite in sign.
+
+**So the slope of 0.729 is not the foci being compressed.** It comes from the blob skirts, where
+the truth runs 0.05 to 0.2 and both arms are dominated by the floor that reading a map as `|g|`
+imposes. The per-focus column, not the slope, is what says what a peak's magnitude is worth.
+
+`g_marginal` is the one map that *is* worse at the weak end (-25%, -27%), because `prevalence`
+falls toward its floor exactly where few studies reported. Narrowed in the docstring to "prefer
+it only when comparing against an image-based reference", where it is the matching estimand.
+
+Third correction this session from reading absolute rather than relative error. Worth a habit:
+for a quantity spanning a range, report relative error per stratum, never a pooled absolute one.
