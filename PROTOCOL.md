@@ -224,3 +224,21 @@ comprehension that builds the list is fine, and the loop printed 11 of 19 with n
 The scientific question that run was asking was re-answered by a separate single-purpose script
 instead, which is the right move once a harness is under suspicion -- do not debug the harness on
 the critical path of a result.
+
+## Re-run the head's CI run, never a superseded one
+
+Three CI jobs failed on an intermediate commit with
+`Could not find a version that satisfies the requirement cognitiveatlas>=0.1.11` -- a pip index
+failure at install time, before any test body ran, on a dependency the branch does not touch. On
+the *same run and same commit*, nineteen of twenty-two jobs installed fine, and those same checks
+had passed twelve minutes earlier on the previous commit. Transient, and a legitimate case for the
+one allowed re-run.
+
+But I re-ran that *older* run rather than the head's. Under a concurrency group GitHub treats the
+restarted run as the newest activity for the branch and cancels the head's run, so the re-run
+bought a confirmation of a transient failure on a commit nobody cares about and left the commit
+that matters with no CI at all. Undoing it took a cancel plus a re-run of the head.
+
+So: before re-running anything, check whether the failing run is still the head's. If it is not,
+re-run the head's run instead -- it exercises the same code with the later commits included, which
+is what needs to be green.
