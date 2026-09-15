@@ -1083,3 +1083,57 @@ collection's mean before fitting. In this bed it would have been the single larg
 improvement available. It needs checking on real collections, where the heights at least carry
 the between-study differences in sample size and threshold that this bed also varies -- but the
 bed varies them and the result still favours deletion.
+
+## 23a. RETRACTION of section 23: flattening the heights only helps when the threshold is wrong
+
+Section 23 claimed that deleting the reported magnitudes improves the fitted map by +0.284 in
+correlation with the truth, called it the largest accuracy gain measured anywhere in this
+program, and recommended a feature on the strength of it. That was an artefact, and the check
+that caught it is the one the protocol mandates: try it on real data.
+
+```
+                    threshold: study-min (inferred)   threshold: supplied 3.2905
+height input             r(g, truth)                       r(g, truth)
+as reported                    0.429                             0.297
+study-flattened                0.638   (+0.209, p 0.000)         0.133   (-0.164, p 0.000)
+all-flattened                  0.713   (+0.284, p 0.000)         0.029   (-0.268, p 0.000)
+```
+
+**The sign flips.** And the real collection agrees with the supplied-threshold column: on NIDM
+pain split in half, with the real height threshold handed in through metadata, flattening drops
+the AUC for the truth's top decile from 0.742 to 0.507 -- from useful to chance.
+
+**The mechanism, which I should have seen when writing the test.** Once every focus in a study
+carries the same number, `threshold="study-min"` infers a cutoff *equal to that number*. Every
+observation then sits exactly at its own censoring bound, which is a degenerate configuration:
+the fitted map's variation comes from the censoring geometry rather than from the data. It
+happened to correlate better with the truth than the as-reported map did under the same
+(also mis-set) inferred threshold. I measured the difference between two artefacts and read it
+as a finding about information channels.
+
+Note the supplied threshold also lowers the as-reported map from 0.429 to 0.297, so the inferred
+threshold was flattering both arms; and `r(prevalence, truth)` rises from 0.526 to 0.661 with a
+supplied threshold, consistent with the separate threshold finding.
+
+**What this retracts and what survives.**
+
+Retracted: that the heights carry *negative* information, that deleting them improves anything,
+and the feature recommendation built on it (task #54, withdrawn).
+
+Surviving, because it rests on other measurements: the heights carry **little** -- a reported
+peak moves 0.055 z per unit of true g at a 3.29 cut, one coordinate explains 5-9% of the variance
+in the truth at its own location, and the estimator's own `peak_information` puts the excess over
+noise peaks at +0.17 to +0.23 z in a favourable bed. "Little" is not "negative", and section 17's
+claim that counts carry more than heights is not the same claim as section 23's that heights
+carry less than nothing. I conflated them.
+
+The corrected version of section 17's headline: **counts and locations carry most of the signal,
+and the heights carry a real but small remainder that is worth keeping.** That is a weaker and
+duller statement than the one I wrote, and it is the one the evidence supports.
+
+**And the meta-lesson, which is the same one as this morning.** I found a large effect in a
+simulation, proposed a mechanism for it, and wrote it up as the program's strongest result --
+without asking what in the harness could produce it. The one-minute check here was "what does
+`study-min` infer when every value is identical", and it is the same class of check that the
+statistic-convention bug needed. Twice in one session, the input path was the problem and I
+looked at the model.

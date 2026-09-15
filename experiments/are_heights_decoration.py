@@ -75,7 +75,7 @@ def build(records, mode):
     return Studyset({"id": "h", "name": "h", "studies": studies}, target=None, mask=MASK)
 
 
-def one(seed):
+def one(seed, threshold="study-min"):
     rng = np.random.default_rng(seed)
     records = []
     for _ in range(N_STUDIES):
@@ -89,7 +89,8 @@ def one(seed):
         return None
     out = []
     for mode in ("as reported", "study-flattened", "all-flattened"):
-        est = CBES(fwhm=10.0, mask=MASK, null_method="none", use_images=False, peak_bias=None)
+        est = CBES(fwhm=10.0, mask=MASK, null_method="none", use_images=False, peak_bias=None,
+                   threshold=threshold)
         res = est.fit(build(records, mode))
         g = res.get_map("g", return_type="array").ravel()
         pi = res.get_map("prevalence", return_type="array").ravel()
@@ -109,20 +110,26 @@ if __name__ == "__main__":
     print(f"{N_STUDIES} coordinate-only studies, {N_SIMS} replications")
     print(f"mean true g at the five sites: "
           f"{np.mean([TRUTH[s] for s in SITE_IJK]):.3f}\n")
-    rows = [r for r in Parallel(n_jobs=8)(delayed(one)(s) for s in range(N_SIMS))
-            if r is not None]
-    a = np.array(rows, dtype=float)            # (sims, modes, metrics)
     names = ("as reported", "study-flattened", "all-flattened")
-    print(f"{'height input':18s} {'r(g, truth)':>12s} {'mean g at sites':>16s} "
-          f"{'mean pi at sites':>17s} {'r(pi, truth)':>13s}")
-    for m, name in enumerate(names):
-        print(f"{name:18s} {a[:, m, 0].mean():12.3f} {a[:, m, 1].mean():16.3f} "
-              f"{a[:, m, 2].mean():17.3f} {a[:, m, 3].mean():13.3f}", flush=True)
-    print("\nDifferences from 'as reported', paired across replications:")
-    for m, name in enumerate(names[1:], start=1):
-        d = a[:, m, 0] - a[:, 0, 0]
-        t = stats.ttest_rel(a[:, m, 0], a[:, 0, 0])
-        print(f"  {name:18s} r changes {d.mean():+.4f} "
-              f"(sd {d.std(ddof=1):.4f}, paired p {t.pvalue:.3f})")
+    # Both threshold settings, because flattening interacts with inferring the cutoff from the
+    # smallest reported value: once every focus carries the same number, `study-min` infers a
+    # threshold equal to that number and every observation sits exactly at its own cut, which
+    # is degenerate. A supplied threshold is the only way to ask what flattening alone does.
+    for threshold, label in (("study-min", "study-min (inferred)"),
+                             (3.2905267314919255, "supplied 3.2905")):
+        rows = [r for r in Parallel(n_jobs=8)(delayed(one)(s, threshold)
+                                              for s in range(N_SIMS)) if r is not None]
+        a = np.array(rows, dtype=float)        # (sims, modes, metrics)
+        print(f"\n--- threshold: {label} ---")
+        print(f"{'height input':18s} {'r(g, truth)':>12s} {'mean g at sites':>16s} "
+              f"{'mean pi at sites':>17s} {'r(pi, truth)':>13s}")
+        for m, name in enumerate(names):
+            print(f"{name:18s} {a[:, m, 0].mean():12.3f} {a[:, m, 1].mean():16.3f} "
+                  f"{a[:, m, 2].mean():17.3f} {a[:, m, 3].mean():13.3f}", flush=True)
+        for m, name in enumerate(names[1:], start=1):
+            d = a[:, m, 0] - a[:, 0, 0]
+            t = stats.ttest_rel(a[:, m, 0], a[:, 0, 0])
+            print(f"  {name:18s} r changes {d.mean():+.4f} "
+                  f"(sd {d.std(ddof=1):.4f}, paired p {t.pvalue:.3f})")
     print("\nIf flattening the heights within a study costs almost nothing, the statistic")
     print("column is decoration and the estimator is a count-and-location method.")
