@@ -3592,3 +3592,31 @@ aggregate across a corpus.
 
 Emitted only under `selection_model="zero-inflated"`; with the selection off the tables are inert
 and the share is identically zero, so a map would be noise.
+
+### And `coordinate_share` does NOT predict where the interval fails -- tested, falsified
+
+The obvious next inference from the new map: since the `se` excess was located in the censoring
+term, `se/sd` should be worse where the share is high. Tested on the four-foci bed, 16
+replications, per-voxel spread across them:
+
+| coordinate_share | voxels | se/sd | mean se | sd of g |
+|---|---|---|---|---|
+| [0.00, 0.05) | 123 | 2.93 | 0.183 | 0.063 |
+| [0.05, 0.10) | 537 | 3.21 | 0.192 | 0.060 |
+| [0.10, 0.25) | 10530 | 3.23 | 0.187 | 0.058 |
+| [0.25, 0.50) | 4344 | 2.97 | 0.223 | 0.075 |
+| [0.50, 1.01) | 91 | **2.28** | 0.372 | 0.163 |
+
+Top decile of share 2.86, bottom decile 3.24. **Flat, and slightly better where the coordinates
+act most** -- the opposite of the prediction.
+
+So the over-statement is roughly uniform over the map (se/sd ~ 3 everywhere) and does not follow
+the channel that produces it. Which also means the earlier reading -- "the excess is located in
+the censoring term, since `selection_model="none"` halves the se" -- was conflating things:
+switching the selection model off changes the estimator entirely, including the `dof` fallback,
+so that comparison was never a within-fit localisation.
+
+The docstring now says explicitly that the share bounds *which caveats apply* and says nothing
+about the interval's width, so nobody infers the rule I just failed to establish. And a uniform
+3x over-statement points at something structural -- the conditional-vs-marginal mismatch, or an
+incomplete Louis missing-information correction -- rather than anything per-voxel.
