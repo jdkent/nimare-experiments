@@ -109,3 +109,50 @@ So:
   variates, the denominator goes nearly constant, and the t collapses into a z -- the very
   confusion being avoided. Use a probability integral transform of a smooth Gaussian field, which
   keeps the marginal exact.
+
+## Before explaining a measurement, run the one-minute check that it is wrong
+
+Three of today's errors are the same error. A number arrived, it was surprising, I went looking
+for a mechanism, and I found one in the estimator -- because the estimator was what I was
+studying. In each case a check costing about a minute would have shown the number was not what I
+thought it was.
+
+| the surprising number | the mechanism I proposed | what it actually was | the check I skipped |
+| --- | --- | --- | --- |
+| 30% of replications unfittable | a degenerate-null defect | 18% of studies reported anything: the bed was in the wrong regime | print the reporting fraction |
+| pooling adds +0.324 of bias | kernel up-weights the larger excursions | my stage-2 baseline used `z/sqrt(n)`; the pooling step adds +0.001 | compare the estimator's own conversion on one number |
+| a further +0.323 from "conversion convexity" | Jensen on a convex transform of a selected maximum | my bed reported a known-variance z where the estimator expects a t (Jensen is only +0.043) | check the null variance or tail of the generated statistic |
+
+The rule that would have caught all three, stated so it can be executed rather than merely
+agreed with:
+
+> **When a measurement surprises you, write down the cheapest check that would show the
+> measurement is wrong, and run it before proposing any mechanism.** If you cannot name such a
+> check, that is the finding -- the bed is not instrumented well enough to be believed.
+
+"Suspect the test before the theory" was already in my notes and did not stop me, because it is a
+disposition rather than a step. Naming the check is the step. All three checks above take about a
+minute and each would have saved an hour of confident wrong explanation.
+
+A corollary on where to look: the mechanism you find first will be in whatever you are currently
+studying, because that is where your attention is. That is a property of attention, not evidence
+about the system. The input path -- what the bed generates, what convention it declares, what
+regime it lands in -- is the part nobody is studying and therefore the part that goes unchecked.
+
+## What worked: write the prediction down first
+
+The counterweight to the above, and it earned its keep today. Four predictions were recorded
+before their tests reported:
+
+- the bias tracks image *share* rather than donor count, with a numeric range -- **confirmed**
+  (+0.176 measured against +0.12 to +0.20 predicted)
+- the prevalence/magnitude split needs a spread of study power -- **confirmed**, and by a
+  diagnostic the prediction had not named (fitted `g` swinging 53% across a prevalence sweep
+  under a fixed roster and going flat once sample sizes varied)
+- the `g_marginal` cancellation depends on reporting density -- **confirmed**
+- a couple of images would distort the relative map into a U-shaped ratio spread -- **falsified**,
+  monotone 1.65x to 1.28x to 1.06x
+
+The falsification was the most immediately useful of the four, because it retired a mechanism I
+would otherwise have carried into the write-up as an explanation for an old puzzle. A prediction
+written down cannot be quietly reshaped to fit what arrives; one held in mind can, and will.

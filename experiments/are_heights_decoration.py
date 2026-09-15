@@ -71,7 +71,7 @@ def build(records, mode):
             {"id": f"s{k}-1", "name": "1", "metadata": meta, "points": [
                 {"space": "MNI",
                  "coordinates": [float(v) for v in nib.affines.apply_affine(AFF, ijk)],
-                 "values": [{"kind": "Z", "value": float(z)}]} for ijk, z in used]}]})
+                 "values": [{"kind": "T", "value": float(z)}]} for ijk, z in used]}]})
     return Studyset({"id": "h", "name": "h", "studies": studies}, target=None, mask=MASK)
 
 
@@ -80,10 +80,9 @@ def one(seed):
     records = []
     for _ in range(N_STUDIES):
         n = int(rng.integers(20, 41))
-        noise = ndimage.gaussian_filter(rng.standard_normal(SHAPE), SMOOTH_VOX)
-        noise *= 1.0 / (noise.std() + 1e-12)
-        z = (TRUTH + noise / np.sqrt(n)) * np.sqrt(n)
-        foci, _ = reporting.report_peaks(z[MASK_BOOL], MASK_BOOL, SHAPE, ZOOMS, "cluster", "max")
+        t_map = reporting.study_t_field(TRUTH, n, SMOOTH_VOX, rng, shape=SHAPE)
+        foci, _ = reporting.report_peaks(t_map[MASK_BOOL], MASK_BOOL, SHAPE, ZOOMS,
+                                         "cluster", "max")
         if foci:
             records.append((n, foci))
     if len(records) < 4:
@@ -103,6 +102,10 @@ def one(seed):
 
 
 if __name__ == "__main__":
+    reporting.assert_statistic_convention(
+        reporting.study_t_field(np.zeros(SHAPE), 30, SMOOTH_VOX,
+                                np.random.default_rng(7), shape=SHAPE), 30, "T")
+    print("statistic convention check passed: studies report a t on n - 1 degrees of freedom")
     print(f"{N_STUDIES} coordinate-only studies, {N_SIMS} replications")
     print(f"mean true g at the five sites: "
           f"{np.mean([TRUTH[s] for s in SITE_IJK]):.3f}\n")

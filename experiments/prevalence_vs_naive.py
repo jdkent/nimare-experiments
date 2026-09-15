@@ -37,7 +37,11 @@ SITES = [(-32.0, 0.0, 0.0), (-10.0, 0.0, 0.0), (12.0, 0.0, 0.0), (34.0, 0.0, 0.0
 SITE_PREVALENCE = [0.25, 0.50, 0.75, 1.00]
 N_SIMS = int(os.environ.get("NSIMS", 40))
 N_STUDIES = 24
-U = 3.2905
+#: Reporting threshold as a two-sided p, so each study's cut sits on its own t scale. Fixing a
+#: single number on the z scale instead would hand the estimator a statistic whose convention
+#: does not match the one it assumes (a t on n - 1 degrees of freedom), which inflates every
+#: recovered magnitude by about a third -- see PROTOCOL.md.
+REPORTING_P = 2.0 * stats.norm.sf(3.2905)
 LOCALISATION_SD = 4.0
 N_NOISE = 1
 #: Radius for the naive count. 10 mm is the scale of the estimator's own kernel; 15 mm is the
@@ -60,26 +64,29 @@ def one(seed, effect):
     studies, per_study_points = [], []
     for k in range(N_STUDIES):
         n = int(rng.integers(20, 41))
+        cut = float(stats.t.isf(REPORTING_P / 2.0, n - 1))
         meta = {"sample_sizes": [n]}
         points = []
         for site, prevalence in zip(SITES, SITE_PREVALENCE):
             if rng.random() >= prevalence:
                 continue
-            var = 1.0 / n + effect**2 / (2.0 * n)
-            z = rng.normal(effect, np.sqrt(var)) * np.sqrt(n)
-            if abs(z) < U:
+            # A genuine noncentral t: the effect enters as the noncentrality and the
+            # denominator carries its own n - 1 degrees of freedom, which is the statistic a
+            # one-sample group analysis produces and the one the estimator's conversion assumes.
+            t = float(stats.nct.rvs(df=n - 1, nc=effect * np.sqrt(n), random_state=rng))
+            if abs(t) < cut:
                 continue
-            points.append((np.asarray(site) + rng.normal(0, LOCALISATION_SD, 3), z))
+            points.append((np.asarray(site) + rng.normal(0, LOCALISATION_SD, 3), t))
         for _ in range(N_NOISE):
             loc = rng.uniform(-44, 44, 3)
-            points.append((loc, (U + rng.exponential(1.0 / U)) * rng.choice([-1.0, 1.0])))
+            points.append((loc, (cut + rng.exponential(1.0 / cut)) * rng.choice([-1.0, 1.0])))
         if not points:
             continue
         per_study_points.append(np.array([p[0] for p in points]))
         studies.append({"id": f"s{k}", "name": f"s{k}", "metadata": meta, "analyses": [
             {"id": f"s{k}", "name": "1", "metadata": meta, "points": [
                 {"space": "MNI", "coordinates": [float(c) for c in loc],
-                 "values": [{"kind": "Z", "value": float(z)}]} for loc, z in points]}]})
+                 "values": [{"kind": "T", "value": float(z)}]} for loc, z in points]}]})
     if len(studies) < 8:
         return None
 
@@ -116,7 +123,8 @@ def score(name, block, truth):
 
 if __name__ == "__main__":
     truth = np.array(SITE_PREVALENCE)
-    print(f"{N_STUDIES} coordinate studies, {N_SIMS} replications, U = {U}")
+    print(f"{N_STUDIES} coordinate studies, {N_SIMS} replications, reporting at two-sided "
+          f"p = {REPORTING_P:.2e} on each study's own t scale")
     print("Same collections scored by both estimators; lower RMSE and higher rho are better.\n")
     for effect in (0.8, 0.5, 0.4):
         rows = [r for r in Parallel(n_jobs=8)(delayed(one)(s, effect) for s in range(N_SIMS))
