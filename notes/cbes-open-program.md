@@ -2594,3 +2594,49 @@ time the correction changed a conclusion I had already written down.
 The bias-to-width model predicts `cov(t)` across all twenty-one arms to a mean absolute error of
 **0.024**, against 0.036 for `cov(z)`, so the median `dof` is a sufficient summary and there is no
 behaviour left unaccounted for. Two numbers describe the entire coverage column.
+
+### The over-wide `se` is masking the bias, and under heterogeneity two errors cancel
+
+Sixty replications, twelve studies, three configurations so the two candidate causes separate:
+
+```
+donors  true tau  configuration  fitted tau2  mean se      sd  se/sd     bias  cover
+     0      0.00       baseline       0.0039    0.176   0.077   2.28   +0.260   0.83
+     0      0.00      tau2 none       0.0000    0.171   0.074   2.32   +0.258   0.80
+     0      0.00 selection none       0.0039    0.109   0.081   1.35   +0.272   0.17
+     0      0.30       baseline       0.0146    0.261   0.156   1.67   +0.250   0.90
+     0      0.30      tau2 none       0.0000    0.232   0.163   1.43   +0.260   0.80
+     0      0.30 selection none       0.0146    0.128   0.137   0.93   +0.333   0.20
+     6      0.00       baseline       0.0054    0.084   0.063   1.33   -0.031   1.00
+     6      0.00      tau2 none       0.0000    0.082   0.063   1.29   -0.034   1.00
+     6      0.00 selection none       0.0058    0.075   0.067   1.12   -0.042   0.93
+```
+
+**`tau2` is not the cause, and at real heterogeneity it is underestimated sixfold.** Fitted
+`tau2` is 0.0146 against a true 0.0900 at `tau = 0.3`. My truncation hypothesis had the sign
+backwards: DerSimonian-Laird here is not spuriously positive, it is badly low.
+
+**The censoring term is the cause, and removing it lands `se/sd` at or below 1.** The `se` drops
+38% coordinates-only, 51% under heterogeneity, 11% with six donors, and `se/sd` goes 2.28 → 1.35,
+1.67 → **0.93**, 1.33 → 1.12. The 0.93 is the telling one: below 1 is where the variance
+decomposition says a well-calibrated *conditional* `se` should sit, so the censoring term is the
+anomaly and the rest of the machinery is about right.
+
+**But the inflated `se` is what holds the coverage up.** Switch the censoring term off and
+coordinates-only coverage collapses from 0.83 to **0.17**, and from 0.90 to 0.20 under
+heterogeneity, because the bias is unchanged (+0.260 → +0.272, +0.250 → +0.333) while the interval
+narrows by half. That is not a reason to keep the inflation. It is the opposite: **an honest
+interval around a biased point estimate ought to miss**, and the over-wide `se` is masking a bias
+the user should be told about. Fixing it would make the estimator report plainly that
+coordinates-only `g` is not trustworthy, instead of covering by accident. Less flattering, more
+honest.
+
+**And under heterogeneity two errors cancel.** The censoring term inflates the `se`,
+DerSimonian-Laird underestimates `tau2` sixfold, and the net is coverage of 0.90 at 1.96 and 0.94
+at the documented `t`. So the near-nominal coverage in the heterogeneity arms is not evidence the
+model is right; it is two errors of opposite sign, and either one fixed alone makes coverage
+worse. That is worth knowing before anyone quotes the τ arms as reassurance -- I nearly did.
+
+One residual: with the censoring term off, coordinates-only `se/sd` is still 1.35. With donors it
+is 1.12 and under heterogeneity 0.93, so the residual is specific to the coordinates-only
+configuration and shrinks when either changes. Not yet located.
