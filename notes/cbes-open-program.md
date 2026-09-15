@@ -1810,3 +1810,36 @@ Correction to my own retraction, written an hour ago: I said the calibrated sett
 halves the bias", which is true at two donors and false at six, where it is worse. The accurate
 statement is that it removes the *dependence on the donor count* at the cost of a small constant
 over-correction.
+
+## The definitive coverage table: documented configuration primary
+
+The bed was restructured so the configuration the docstring recommends is the primary arm set and
+`peak_bias=None` is kept alongside on every imaged arm as a labelled variant. Before reading the
+new numbers, the shared arms reproduce the old ones exactly, which is the check that the
+restructure changed nothing but the selection:
+
+```
+arm                                  old table   new table
+12 studies,  0 images (per-study)       +0.255      +0.255
+12 studies,  2 images, peak_bias=None   +0.127      +0.127
+```
+
+So the two runs are directly comparable and the difference between the calibrated and uncalibrated
+arms is the configuration rather than any drift in the bed.
+
+```
+arm                                   mean g    bias  mean se  sd of g  se/sd  cover  half/truth
+12 studies,  0 images                  1.055  +0.255    0.171    0.080   2.14   0.75       0.42
+12 studies,  0 images @ fwhm 16        1.048  +0.248    0.109    0.064   1.70   0.28       0.27
+12 studies,  0 images @ fwhm 24        1.049  +0.249    0.086    0.057   1.50   0.05       0.21
+12 studies,  2 images, calibrated      0.762  -0.038    0.107    0.081   1.32   0.99       0.26
+12 studies,  2 images, peak_bias=None  0.927  +0.127    0.134    0.098   1.36   0.87       0.33
+```
+
+(remaining arms still running)
+
+The 2-image pair is the one that matters, because two donors among a dozen studies is the regime a
+real collection sits in. The calibrated arm is **four times closer to the truth** (0.038 against
+0.127) on a smaller interval (0.107 against 0.134) with better coverage (0.99 against 0.87). There
+is no axis on which the uncalibrated setting is preferable there, which is what makes it the right
+primary and makes a whole session's worth of numbers taken in the other setting the variant.
