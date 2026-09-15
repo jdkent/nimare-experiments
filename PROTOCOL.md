@@ -242,3 +242,28 @@ that matters with no CI at all. Undoing it took a cancel plus a re-run of the he
 So: before re-running anything, check whether the failing run is still the head's. If it is not,
 re-run the head's run instead -- it exercises the same code with the later commits included, which
 is what needs to be green.
+
+## A refusal makes the aggregate rate meaningless; report the rate among what was kept
+
+The max-statistic guard was measured on the cell that exposed the familywise defect -- twenty
+studies reporting two foci each, where the rate had been 0.150 to 0.180 against a nominal 0.05:
+
+```
+foci/study  guard fired  voxel FWE  rejected|kept  n kept
+         2        0.783      0.050          0.231      13
+```
+
+`voxel FWE` is exactly nominal and that is not error control. A withheld fit cannot reject, so the
+overall rate is just `(1 - 0.783) * 0.231 = 0.050`. It lands on 0.05 because the refusal rate and
+the conditional rate happen to multiply to it, and it would have looked equally reassuring at a
+conditional rate of 0.46 with 89% refused.
+
+The number that means something is the rate **among the fits the guard let through**, because that
+is the population a user is in when they get a p-value at all: 0.231, exact binomial p = 0.0245,
+95% lower bound 0.066. The mechanism is right and the threshold is in the wrong place.
+
+So whenever a method can refuse, decline, withhold or fall back, an error rate over all attempts
+is uninterpretable. Report three numbers: the refusal rate, the rate among those kept, and the
+overall -- and treat the middle one as the error rate. The same applies to any arm where
+replications can fail to fit: "0.95 coverage over 100 replications, 30 of which were unfittable"
+is a statement about 70 replications selected for being fittable.
