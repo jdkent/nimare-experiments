@@ -268,6 +268,30 @@ overall -- and treat the middle one as the error rate. The same applies to any a
 replications can fail to fit: "0.95 coverage over 100 replications, 30 of which were unfittable"
 is a statement about 70 replications selected for being fittable.
 
+## Change the estimator in this order: algebra, then simulation, then real data
+
+Any fix, addition or removal to the estimator's behaviour starts with a proof in `proofs/` --
+sympy claims that fail loudly, not prose that asserts. Only once the change holds mathematically,
+simulate it against a known truth. Only once that agrees, run it on real data, which is where the
+assumptions the algebra had to make get tested.
+
+Never the reverse. A change that starts from a simulation result is fitted to a bed; a change that
+starts from real data is fitted to a collection. Both look like progress and neither generalises.
+When a measurement suggests a change, that is the moment to go and prove it, not the moment to
+write the code.
+
+The proof is also where a wrong idea dies cheapest. `mixture_identification.py`: the reporting
+indicator's information matrix has determinant identically zero, so no quantity of coordinate
+tables can separate prevalence from magnitude -- which settles what a corpus of 1,443 tables can
+and cannot buy, without running it. `roughness_cannot_be_liberal.py`: roughening a field raises
+its maximum, so a permutation null that destroys spatial autocorrelation makes a max-statistic
+test conservative -- which killed a documented explanation whose sign was backwards.
+
+Suspect the proof as readily as the test. A claim that reduces to zero because the same terms were
+added and subtracted proves nothing, and a duplicated claim is not two claims. Every proof file
+carries a calibration check against a result already established at full scale, for the same
+reason every fast testbed does.
+
 ## Batch pushes, or CI never finishes a run
 
 Eight pushes in ninety minutes, each one cancelling the previous run under the repository's
