@@ -2546,3 +2546,43 @@ means the comparison everyone would reach for does not exist yet.
 It also names Costafreda as a source on the missing-data bias, alongside Wager. Second
 independent pointer to Costafreda 2012 (doi:10.1016/j.jneumeth.2012.07.016) in an hour, after
 SDM-PSI cited it for the censored-likelihood MLE. That is now the paper to get.
+
+## The mu bias at prevalence 1 is a boundary effect, not an O(1/k) term
+
+I claimed the bias looked like a correctable O(1/k) mixture bias, on two points: +0.068 at two
+images and +0.022 at six, a factor of three for a factor of three. The sd fell by the same factor
+and I did not check it. Swept properly, 300 reps per cell, images 2 to 16:
+
+  images   max_iter      bias        sd   bias/sd
+       2         25   +0.0721    0.1965     0.367
+       2        400   +0.0645    0.2875     0.224
+       4         25   +0.0411    0.1104     0.372
+       4        400   +0.0311    0.1331     0.234
+       8         25   +0.0231    0.0749     0.308
+       8        400   +0.0175    0.0778     0.225
+      16         25   +0.0151    0.0561     0.269
+      16        400   +0.0122    0.0572     0.213
+
+At convergence bias/sd is flat at about 0.22 across an eightfold change in image count. An O(1/k)
+bias would give bias/sd falling as 1/sqrt(k), a factor of 2.83 from 2 to 16 images: 0.224 would
+have to become 0.079. It reads 0.213.
+
+So the bias is a fixed fraction of the standard deviation, which is a boundary signature. At a
+true prevalence of 1 the mixture can always explain a small magnitude by lowering pi instead of
+lowering mu, and that asymmetry floors mu-hat at a constant fraction of its own scale.
+
+Two consequences:
+
+  * Not correctable by subtraction. The correction would need the sd, and removing a bias of this
+    kind re-inflates the variance.
+  * Not worth chasing. A bias of 0.22 sd contributes 0.22^2 / (1 + 0.22^2), about 5%, of mean
+    squared error. The lever on it is the same as the lever on the variance: more images.
+
+At max_iter 25 the ratio declines mildly, 0.37 to 0.27, so early stopping adds a component that
+does fall with the image count -- consistent with the shrinkage pulling towards the images-only
+pool, whose own bias behaves differently.
+
+Item B of the proof queue is therefore closed without a proof: there is no O(1/k) term to derive.
+Third time today an inference drawn from a correct observation has failed its measurement, and the
+pattern is the same each time -- a ratio looked constant, or a difference looked large, and I did
+not check what the denominator was doing.
