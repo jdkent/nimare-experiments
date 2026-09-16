@@ -2444,3 +2444,46 @@ scenarios (0-4%), **but 15-23% for cluster-based statistics at high z-thresholds
 meta-analyses of small studies**. So SDM-PSI has a liberal corner in exactly the regime I was
 chasing in CBES: few studies, small studies, cluster statistics. Worth noting their evidence
 standard -- 400 per cell -- against the 40 I drew conclusions from.
+
+## Homogenised sample sizes on real pain data: g is unaffected
+
+`HOMOGENISE=1` in validate_redesign.py declares the corpus mean sample size for every study while
+the data keep their true sizes -- the scenario where an analyst has no per-study sample sizes and
+defaults them. Published tables, 8 splits, same seeds.
+
+  estimate                  r     rank r   AUC    mean err  err at top   rmse
+  true sizes,      g   +0.575     +0.481  0.886     +0.073      +0.014  0.240
+  homogenised,     g   +0.582     +0.482  0.885     +0.066      -0.011  0.228
+  true sizes,      gm  +0.602     +0.485  0.887     -0.062      -0.282  0.184
+  homogenised,     gm  +0.583     +0.476  0.879     -0.062      -0.296  0.181
+
+The spread destroyed is real: the corpus runs 9 to 32 subjects, a 3.56x range with cv 0.38. So
+this is not a vacuous test, and flattening it left g slightly *better* (rmse 0.240 to 0.228), not
+worse. With 8 splits a 0.012 difference is not a result in itself; the result is the absence of
+harm.
+
+**This confirms the simulation rather than contradicting it, and corrects what I told the user.**
+The spread bed already showed that sample-size spread buys prevalence rmse (0.244 to 0.208, 15%)
+and leaves mu rmse alone (0.4586, 0.4781, 0.4405, 0.4371, 0.4301 across arms, no ordering). The
+pain bed scores mu against a held-out reference and has no ground truth for prevalence, so "no
+harm to g" is exactly the predicted outcome. I had said a defaulted constant "kills the mu/pi
+split outright and misreports the regime test" -- true of the mechanism, overstated as a
+consequence for g.
+
+Also worth pricing: pain's 3.56x spread is much narrower than the simulation's 12-to-120. The
+closest simulated arm, 12-to-40 at 3.3x, bought only 4.6% of prevalence rmse against 15% for the
+wide one. So on a corpus like this the identification benefit of real sample sizes is a few
+percent, not fifteen.
+
+### Where the requirement now rests
+
+  1. **The silent drop.** A study with no sample size never enters the roster, so its silence is
+     discarded with no warning, and studies missing the field are not a random subset. Unchanged
+     and still the strongest reason.
+  2. **The threshold conversion.** z to g depends on n, so a wrong n biases the censoring bound.
+  3. **Prevalence accuracy.** Real, measured at 15% for a tenfold spread and about 5% for a
+     threefold one.
+  4. **Not g.** Magnitude is carried by the images and survives a 3.56x spread being flattened.
+
+So: require it, drop-with-warning rather than silently, and do not justify the requirement by
+claiming g needs it.
