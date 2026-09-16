@@ -99,11 +99,30 @@ def write_image(values, path):
     return path
 
 
+#: With HOMOGENISE=1 every study *declares* the corpus mean sample size while the data keep their
+#: true ones. That is the scenario where an analyst has no per-study sample sizes and defaults
+#: them, and it is the one the algebra says should matter: the coordinate channel's ability to
+#: separate mu from pi is sum_{j<k} (u_j v_k - u_k v_j)^2, which is exactly zero when every study
+#: shares (cutoff, sigma), and sigma is set by the declared sample size. On published tables the
+#: threshold is a single assumed z for everyone, so the declared sample size is the only thing
+#: left that can vary.
+HOMOGENISE = os.environ.get("HOMOGENISE", "0") == "1"
+
+
+def declared(sizes):
+    """Per-study sample size as the estimator will see it."""
+    if not HOMOGENISE:
+        return {i: int(n) for i, n in enumerate(sizes)}
+    mean = int(round(float(np.mean(sizes))))
+    return {i: mean for i in range(len(sizes))}
+
+
 def build(image_members, coord_members, maps, sizes, published=None):
+    said = declared(sizes)
     studies = []
     for i in image_members:
         g, var = g_and_var(maps[i], sizes[i])
-        meta = {"sample_sizes": [int(sizes[i])]}
+        meta = {"sample_sizes": [said[i]]}
         studies.append({"id": f"i{i}", "name": f"i{i}", "metadata": meta, "analyses": [
             {"id": f"i{i}", "name": "1", "metadata": meta, "points": [], "images": [
                 {"url": write_image(g, f"{WORKDIR}/g_{i}.nii.gz"),
@@ -120,7 +139,7 @@ def build(image_members, coord_members, maps, sizes, published=None):
             points = published.get(i)
             if points is None or not len(points):
                 continue
-            meta = {"sample_sizes": [int(sizes[i])]}
+            meta = {"sample_sizes": [said[i]]}
             entries = []
             for xyz in points:
                 ijk = np.rint(nib.affines.apply_affine(
@@ -144,7 +163,7 @@ def build(image_members, coord_members, maps, sizes, published=None):
                                     scheme=SCHEME, focus=FOCUS)
         if not foci:
             continue
-        meta = {"sample_sizes": [int(sizes[i])], "reporting_threshold": float(height)}
+        meta = {"sample_sizes": [said[i]], "reporting_threshold": float(height)}
         studies.append({"id": f"c{i}", "name": f"c{i}", "metadata": meta, "analyses": [
             {"id": f"c{i}", "name": "1", "metadata": meta, "points": [
                 {"space": "MNI",

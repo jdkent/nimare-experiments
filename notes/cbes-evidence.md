@@ -2394,3 +2394,53 @@ leaves power on the table; calibrating the atom empirically would recover some.
 The practical statement for the worst failure mode: a collection with two images cannot be told
 whether its prevalence is below 1 -- power 0.13 at a true 0.6. A collection with twenty can, at
 0.62 to 0.75. That is a design answer, and it is the first one this failure mode has had.
+
+## CORRECTION from the SDM-PSI paper itself: it uses a censored likelihood
+
+I claimed, in this file and in the shipped docstring, that MetaNSUE and SDM-PSI resolve the bound
+by multiple imputation while CBES writes it into the likelihood. Having read
+doi:10.1016/j.neuroimage.2018.10.077, that is wrong. Section 3.2.2 states the likelihood
+explicitly:
+
+    L = prod_i [ Phi((y_upper,i - X_i b) / sqrt(v_upper,i + tau^2))
+               - Phi((y_lower,i - X_i b) / sqrt(v_lower,i + tau^2)) ]
+
+described as "not the likelihood of a specific effect size but the likelihood that the unreported
+effect size lays within the two effect size bounds", citing Tobin (1958), Costafreda (2012) and
+Schnedler, "Likelihood estimation for censored random vectors". That is the same Tobit
+construction. The multiple imputation runs *after* it -- "SDM-PSI only uses MLE as a starting
+point for the subsequent multiple imputation, avoiding the biases associated with single
+imputation" -- to propagate uncertainty and to enable the subject-image permutation.
+
+So the earlier head-to-head in censoring_versus_imputation.py measured CBES against a *pure*
+multiple-imputation estimator that nobody actually ships. The measurement stands as a comparison
+of two estimators; it does not describe SDM-PSI, and the docstring claim built on it was
+retracted in NiMARE fd6d1fb.
+
+The impute() design I proposed under #86 is also not novel: SDM-PSI already draws from a truncated
+normal with the MLE and the bounds as parameters, and already imposes positive correlation between
+adjacent voxels using the AES-SDM correlation templates -- the spatial-coherence problem I flagged
+as the hard part. #86 should be recast as "match what SDM-PSI does", not "invent it".
+
+### What actually differs, from the source
+
+  * **Peak heights.** "The lower and upper effect-size bounds are obvious in a peak: both are the
+    effect size of the peak." A reported peak enters as an exact observation at its reported
+    height, i.e. with zero interval width, so the upward bias of a selected maximum enters
+    directly. CBES discards heights; that costs information and avoids this.
+  * **No prevalence.** Their beta is one effect size, "the same for all studies". So there is no
+    g against g_marginal distinction and no rank-1 identification problem -- there is nothing to
+    separate. CBES's ridge is the price of asking a question SDM-PSI does not ask.
+  * **Declared shrinkage.** SDM-PSI damps influential studies on purpose, iteratively discarding
+    the study that most increases the absolute MLE, "similar to a trimmed mean", and says this is
+    "required for a correct control of the FWER". CBES shrinks too, through max_iter, but by
+    accident. Theirs is a documented choice.
+  * **Inference.** Permutation of imputed subject images against permutation of image values.
+
+### Their FWER is more nuanced than "too conservative"
+
+Table 1, 400 simulated meta-analyses per cell with Clopper-Pearson intervals: conservative in most
+scenarios (0-4%), **but 15-23% for cluster-based statistics at high z-thresholds in small
+meta-analyses of small studies**. So SDM-PSI has a liberal corner in exactly the regime I was
+chasing in CBES: few studies, small studies, cluster statistics. Worth noting their evidence
+standard -- 400 per cell -- against the 40 I drew conclusions from.
