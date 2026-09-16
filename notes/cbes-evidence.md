@@ -2586,3 +2586,72 @@ Item B of the proof queue is therefore closed without a proof: there is no O(1/k
 Third time today an inference drawn from a correct observation has failed its measurement, and the
 pattern is the same each time -- a ratio looked constant, or a difference looked large, and I did
 not check what the denominator was doing.
+
+# ==================== A second estimator: the marginal effect ====================
+
+Design document supplied 16 September. Working through it in the order the rules now require:
+algebra, then simulation, then real data. New NiMARE branch
+`claude/marginal-effect-combined-estimator`, taken from main at bc361b1.
+
+## The document's own numbers check out
+
+Verified before building on it, since a design document deserves the same suspicion as a testbed.
+All four checkable claims reproduce exactly: the peak ratio 8.331 at u = 0.5 with M = 27;
+information eigenvalues [0, 10.593] for identical cutoffs against [0.259, 7.110] for 0.35 and 0.8;
+the non-identified pair (active mean 0.500, prevalence 0.3181, marginal 0.1591) and (0.800,
+0.1160, 0.0928); and the control-variate reductions of 23% and 59%.
+
+## proofs/marginal_control_variate.py -- 8 claims
+
+The image-corrected predictor m_hat = Ybar_I + lambda (fbar_C - fbar_I). Built from actual random
+variables at n = 2, N = 3 and handed to sympy.stats, which independently confirms the mean is m
+for any lambda and any predictor, and the variance is Var(Y - lambda f)/n + lambda^2 Var(f)/N
+including its cross term. My first draft "verified" unbiasedness by subtracting mu_f from itself,
+which proves nothing; that is now a real computation.
+
+  lambda* = Cov(Y,f) / ((1 + n/N) Var(f))          a regression slope, shrunk
+  V*/V_images = 1 - rho^2 / (1 + n/N)
+
+**The cap is the useful part.** As N grows the ratio tends to 1 - rho^2, so a perfect predictor
+with unlimited coordinate studies still cannot beat the images alone by more than the squared
+correlation. There is no configuration in which coordinates substitute for images. At 8 images
+and 100 tables: 23% reduction at rho = 0.5, 59% at rho = 0.8, against floors of 0.750 and 0.360.
+
+## proofs/reporting_partition_and_variance.py -- 10 claims
+
+Three defects, two of which correct claims of mine.
+
+**The three reporting events are not a two-outcome experiment.** Report inside one radius, silence
+beyond a larger one, annulus dropped. The likelihood uses P(|Y| >= c) and P(|Y| < c) as
+complementary. They are not: 1 - (p_A + p_C) = p_B, and a correct conditional likelihood carries
+1/(p_A + p_C). The error does not cancel between limbs -- it biases the score by
+d/dmu log(p_A + p_C), which moves with mu. This is a real defect in the shipped model, not a
+documentation problem.
+
+**An image-only tau2 is not the active component's tau2.** Var(theta) = pi tau_a^2 +
+pi(1-pi) mu_a^2, so substituting the total for the active part errs by
+-(1-pi) tau_a^2 + pi(1-pi) mu_a^2, vanishing only at pi = 1. At mu_a = 0.5 and tau_a = 0.15 the
+error is +0.036, +0.051, +0.047 at prevalence 0.8, 0.6, 0.4 -- two to three times tau_a^2 itself,
+and positive, so the active spread is over-stated. `_pool` does exactly this substitution.
+
+**No universal factor-of-two bound on the report limb.** The peak probability is
+(1 - Phi(u)^M)/M, verified by differentiating rather than by symbolic integration, and the ratio
+of exceedance to peak probability is 8.33 at u = 0.5, growing as M 2^(M-1)/(2^M - 1) as the
+threshold vanishes. My docstring's "bounded by a factor of two" is false in general. At the
+conventional z = 3.09 the ratio is 1.013, so it happens to hold where it is used -- over-general
+rather than wrong in practice, and it should say so.
+
+Also caught by the proof rather than by me: I first wrote that u -> 0 limit as M/2. It is
+M 2^(M-1)/(2^M - 1), because Phi(0) is 1/2 and not 0. The claim failed and I fixed it.
+
+## Corrections owed to the estimator's Notes
+
+  * "spreading thresholds 2.3 to 4.5 changes nothing" -- false as stated. Threshold spread does
+    restore rank; the document's counterexample gives a minimum eigenvalue of 0.259 where
+    identical cutoffs give 0. What I measured was a small *effect on prevalence rmse* over one
+    range, which is a different statement.
+  * "the error is largely bounded by a factor of two" -- not universal.
+  * my reading of Bossier. Their methods threshold at voxelwise FDR 0.05 and extract cluster
+    maxima, so their test condition is censored summary data. The sentence I quoted concerns
+    missing *peak effect sizes*, not absence of censoring. I over-read it and the note saying
+    "no existing benchmark for what CBES does" is too strong.
