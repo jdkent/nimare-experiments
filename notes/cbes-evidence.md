@@ -2487,3 +2487,38 @@ percent, not fifteen.
 
 So: require it, drop-with-warning rather than silently, and do not justify the requirement by
 claiming g needs it.
+
+## External support for coverage_radius, from Radua et al. 2014
+
+Full text via PMC3919071, doi:10.3389/fpsyt.2014.00013. They recreate effect-size maps from peak
+information at a grid of anisotropy degrees and FWHMs, and score against the effect-size map
+computed from the raw statistical parametric map.
+
+Their optimal isotropic kernel is **40-45 mm FWHM**, which they note is "substantially larger than
+in previous validations" of 20-25 mm. A 40-45 mm FWHM puts the half-maximum at 20-22 mm from the
+peak, which is where DEFAULT_COVERAGE_RADIUS_MM = 20 sits. That parameter was chosen here as
+"roughly the extent a paper's peak stands in for", with nothing behind it. It now has an external
+number that agrees.
+
+Two further things worth having:
+
+  * They reached the adaptivity conclusion from the other direction. "Optimal FWHM might vary
+    largely depending on the specific data meta-analyzed", and their remedy is full anisotropy
+    *because* it removes the FWHM dependence entirely (their Eq. 3 at alpha = 1). CBES's adaptive
+    report_radius is the same admission with a cruder remedy -- pick one of two radii from a
+    corpus statistic, rather than remove the dependence.
+  * The correlation templates are published and free, covering all 26 neighbours of every voxel
+    for grey matter, white matter, CSF and FA. That is exactly the covariance the Gaussian copula
+    in #86 needs, so it does not have to be estimated.
+
+**Caveat, and it matters for how much weight the agreement carries.** Their validation recreates
+maps from the peaks of the *same* statistical map it then compares against: 120 IXI subjects split
+six ways, each split thresholded at p < 0.001 with a 10-voxel minimum, peaks extracted, map
+recreated, compared to that split's own effect-size map. The truth is conditioned on the noise
+that produced the peaks, which is the thing PROTOCOL.md forbids and the reason this project splits
+studies or holds out subjects. So their 40-45 mm optimum is plausibly tuned to how well a kernel
+reproduces that map's own noise, and the agreement with 20 mm should be read as encouraging rather
+than as confirmation.
+
+Their cluster counts are worth recording for the reporting bed: mean 22 +- 28 clusters per map,
+median 16 +- 14, at p < 0.001 with a 10-voxel minimum extent -- the same scheme reporting.py uses.
