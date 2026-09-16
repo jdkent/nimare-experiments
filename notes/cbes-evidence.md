@@ -2705,3 +2705,36 @@ bias, variance, ratio and floor, and the two failure modes reproduce. It is the 
 fails on this corpus. That is worth having, because the implementation is now a measuring device
 for any future predictor: hand it one, read rho_between, and the ceiling follows without fitting
 anything.
+
+## What a table of coordinates plus statistics can and cannot fit (2026-09-16)
+
+Asked directly: does CBES fit on coordinates and peak statistics alone?
+
+No, and the failure is by design in one place and structural in another.
+
+  * **Sample size is required, no default.** `_focus_table` and `_all_sample_sizes` both raise.
+    A silence is evidence only against the precision of the study that stayed silent.
+  * **Threshold is not required**: default two-tailed p < .001 (z = 3.2905), lowered per study by
+    `clamp_threshold=True` to that study's `min|z|`.
+  * **Coordinates alone fit nothing in either estimator.** `g` comes from the images (#36);
+    `optimal_coefficient` raises below two image studies because lambda is a covariance. Both
+    estimators are for a mixed corpus, not a coordinate-only one.
+
+### Candidate defect in clamp_threshold: an order statistic that floats with signal
+
+`min_j |z_kj|` is the last order statistic of a study's reported heights. It falls as the peak
+count rises, and the peak count rises with the study's signal. So with the threshold assumed
+rather than declared, a peak-rich study's assumed cutoff is pulled near its true cut while a
+peak-poor study keeps the default, which may sit above its true cut.
+
+Nothing is capped, yet the effective threshold still floats with per-study signal -- the same
+mechanism the never-cap rule describes, reached through the order statistic instead of a cap.
+
+Status: **mechanism, not result.** The sign is unproven and is not to be asserted until the
+algebra is written. Calibration target is clean, because the clamp is documented bit-identical
+where no table contradicts the assumption: measure `clamp_threshold=True` against `False` on a
+corpus that carries statistics.
+
+Independent of the sign: declare the threshold per study from the paper's stated correction
+scheme, and let the clamp catch only contradictions. That removes the order statistic from the
+path.
