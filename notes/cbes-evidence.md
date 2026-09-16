@@ -2868,6 +2868,46 @@ substantive finding -- that heights add little beyond a correct reporting indica
 
 This does **not** undermine the section 8.1 agreement: all nine of those cells landed.
 
+### And its substantive claim reproduced analytically, with the condition it depends on
+
+`proofs/block_peak_selection.py`, 8 claims, is step 2 of the build order -- a block of M
+correlated elements whose maximum is reported if it clears a threshold, which is exactly the
+section 8.2 generative model. The reported height turns out to be a **location family** in the
+mean, so its mean-score is minus its height-score, which is why heights carry magnitude
+information at all and which turns the height's contribution into an ordinary location-family
+Fisher information. That makes the "how much do heights add" question answerable by computing two
+informations rather than running an experiment:
+
+    threshold  P(report)  I indicator  I with height  se ratio
+         0.00     0.9999        0.038          27.30    0.0375
+         0.40     0.9421        7.301          27.03    0.5198
+         0.75     0.3852       16.618          19.26    0.9289
+         1.10     0.0203        2.822           2.86    0.9933
+
+At the document's threshold of .75 the height buys a 7% narrower interval. Its own three regimes
+give se ratios of .050/.053 = 0.943, .010/.011 = 0.909 and .022/.024 = 0.917, bracketing the
+analytic 0.929. **So its substantive finding is reproduced, from the algebra, without simulating
+anything.**
+
+What the table adds is the condition. "Heights add little" is a property of a *high* threshold,
+not of heights: at a cut of 0 the height carries essentially all the information and the interval
+is 27 times narrower. The indicator's own information peaks where reporting is near a coin flip
+and falls away on both sides -- it is the probit information again, and the same evenness
+argument applies.
+
+This bears directly on the predictor question. A location-only predictor was useless on the pain
+corpus, and the reason is the same one that makes the indicator informative there: published
+peaks come from strict thresholds. But it also means tables produced under *liberal* thresholds
+have most of their magnitude information in the heights, and discarding them there is expensive
+in a way it is not at p < .001.
+
+One tool defect recorded rather than worked around silently: sympy 1.14 returns 1 for
+`limit((1 + erf((c-m-u)/s))/2, c, -oo)` while returning -1 for the erf alone, and substituting
+c = -1e6 into the CDF gives 1.2e-125. The nesting claim is stated on the erf, with a comment not
+to "simplify" it back -- it would then pass for the wrong reason. A claim of the correlation
+structure was also caught as `x - x` (a square root of a square) and replaced with a
+`sympy.stats` derivation of the covariance.
+
 Two harness defects found and fixed in the course of this, neither a finding: a binomial standard
 error of exactly zero used as a divisor, which turned a one-se miss into an infinite one; and
 uninformative records reaching the optimiser's starting values through a mean taken over every
