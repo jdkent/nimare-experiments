@@ -2243,3 +2243,57 @@ The lesson is the same one three times over today, now at its most expensive: a 
 is a pilot that sizes the real run. Reporting one as a finding, and worse, writing one into a
 shipped docstring, is how a session spends hours chasing an artefact. Simulation counts need a
 stated standard error before the number is written down anywhere.
+
+## The boundary test: calibrated above 20 tables, and starved of power by small studies
+
+`experiments/boundary_test_size_and_power.py`, 3000 replicates per cell, kill conditions stated
+before running. Two images, coordinate studies at n = 20.
+
+  tables   atom at 0   size @2.71   naive/boundary
+       5       0.828       0.0343             0.49
+      20       0.796       0.0390             0.51
+      80       0.786       0.0447             0.56
+     400       0.665       0.0523             0.62
+
+Kill condition 1 fires at 5 tables: 0.0343 is outside 0.05 +- 3 se. From 20 tables up the derived
+critical value is usable, and the factor-of-two claim holds. The pattern is asymptotic arrival,
+and the atom explains it -- Chernoff's mixture needs the boundary atom at 1/2 and it is 0.83 at 5
+tables, falling towards 1/2 as tables grow. The score at the boundary is a sum of 1 - f_0/f_1, and
+f_0/f_1 is a right-skewed likelihood ratio with mean 1, so its sample mean falls below 1 more than
+half the time and the maximum sits on the boundary too often.
+
+Power, though, is the problem:
+
+  prevalence   5 tables   20    80    400
+         0.9      0.060  0.095 0.110  0.103
+         0.8      0.083  0.118 0.140  0.161
+         0.6      0.096  0.137 0.158  0.178
+         0.4      0.081  0.094 0.112  0.108
+
+Never above 0.18, and not monotone in the departure: it peaks near 0.6-0.8 and falls at 0.4,
+because with two images and few active studies both images are likely null, mu-hat collapses
+toward zero and the mixture explains the data at any pi.
+
+### Why, and the answer is sample size, not table count
+
+At pi = 1 the per-table information about pi is v^2 / (s_a (1 - s_a)) with v = s_a - s_0. The null
+component's silence probability is free of the sample size entirely -- the cut in effect-size
+units is z/sqrt(n) and the null sd is 1/sqrt(n), so their ratio is z whatever n is. The whole gap
+is carried by s_a, whose sd tends to tau rather than to zero while the cut tends to zero. So:
+
+  n        12      20      40      80     120     200
+  I_pipi  0.124   0.309   1.079   3.873   8.284  21.237
+
+171x from n = 12 to n = 200. Spread helps too, by Jensen on a convex function, but only +32% over
+12-120 at fixed mean -- against two orders of magnitude for the level. That is the opposite
+balance from the mu/pi split, where the level is irrelevant (a uniform collection gives exactly
+zero at any size) and only the spread matters, because separation is a determinant of differences
+while this is a sum.
+
+Stated plainly: **you can only tell that some studies lack the effect if studies that have it
+would reliably report it.** A small study is silent either way, so its silence says nothing about
+which component it belongs to. And 400 tables at n = 20 carry the same information about pi as 15
+at n = 120 -- twenty-seven small studies are worth one large one for this question.
+
+Running: power against coordinate-study sample size at n = 20, 40, 80, 160, and against image
+count at 6 and 20 images.

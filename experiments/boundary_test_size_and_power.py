@@ -23,7 +23,7 @@ The statistic is computed on a grid rather than by the estimator's EM, deliberat
 here is whether the *test* is calibrated, not whether the optimiser finds the maximum. Confounding
 those two is how the max_iter result stayed hidden for so long.
 
-Environment knobs: REPS, NIMG, NTAB, MU, TAU, PREVS, NTABS.
+Environment knobs: REPS, NIMG, NTAB, MU, TAU, PREVS, NTABS, NSUBJ.
 """
 import os
 import sys
@@ -39,7 +39,12 @@ TAU = float(os.environ.get("TAU", "0.15"))
 PREVS = [float(x) for x in os.environ.get("PREVS", "1.0,0.9,0.8,0.6,0.4").split(",")]
 NTABS = [int(x) for x in os.environ.get("NTABS", "5,20,80").split(",")]
 
-N_SUBJ = 20
+#: Sample size of the coordinate studies. The per-table information about pi is v^2 / D with
+#: v = s_a - s_0, and s_0 is fixed at 2*Phi(z) - 1 whatever the sample size, because c / sigma_0
+#: is just z. So the whole of v is carried by s_a, which falls steeply as studies grow: a large
+#: study with the effect reports it, a small one stays silent either way and its silence says
+#: nothing about which component it came from. I_pipi runs 0.124 to 21.2 from n=12 to n=200.
+N_SUBJ = float(os.environ.get("NSUBJ", "20"))
 VAR_G = 1.0 / N_SUBJ
 CUT = 3.09 / np.sqrt(N_SUBJ)
 SD_A = np.sqrt(VAR_G + TAU**2)

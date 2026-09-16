@@ -142,6 +142,70 @@ proof.claim(
     r"v \to 0 \implies I_{\pi\pi} \to 0",
 )
 
+# Which gap is that, in terms of a study's size? The null component's silence probability does not
+# depend on the sample size at all: the cut in effect-size units is z / sqrt(n) and the null
+# standard deviation is 1 / sqrt(n), so their ratio is z whatever n is.
+z, n_subj = sp.symbols("z n", positive=True)
+cut_in_g = z / sp.sqrt(n_subj)
+sigma_null = 1 / sp.sqrt(n_subj)
+proof.claim(
+    "the-null-components-silence-is-free-of-the-sample-size",
+    sp.simplify(cut_in_g / sigma_null - z),
+    r"c/\sigma_0 = z \quad\text{for every } n",
+)
+
+# So the whole of v is carried by the active component, whose standard deviation sqrt(1/n + tau^2)
+# falls towards tau while the cut falls to zero. A large study with the effect reports it; a small
+# one is silent either way, and its silence says nothing about which component it came from.
+tau = sp.Symbol("tau", positive=True)
+sigma_active = sp.sqrt(1 / n_subj + tau**2)
+proof.claim(
+    "the-active-components-standard-deviation-tends-to-tau-not-to-zero",
+    sp.simplify(sp.limit(sigma_active, n_subj, sp.oo) - tau),
+    r"\sigma_a \to \tau,\quad c \to 0 \quad\text{as } n \to \infty",
+)
+
+# Numerically (checked in the calibration below) I_pipi runs 0.124 to 21.2 per table from n = 12
+# to n = 200, and is convex in n over that range. Two consequences, and they differ from the
+# mu/pi split, where only the *spread* of study designs matters and the level is irrelevant:
+#
+#   * the level dominates -- 400 tables at n = 20 carry the same information about pi as 15 at
+#     n = 120;
+#   * spread helps, but only by Jensen on a convex function: about a third, against the level's
+#     two orders of magnitude.
+
+def calibration():
+    """I_pipi against sample size, and the Jensen comparison the text claims."""
+    import numpy as np
+    from scipy.stats import norm
+
+    true_mu, tau_val, z_val = 0.5, 0.15, 3.09
+
+    def information(n):
+        sd_a, sd_0 = np.sqrt(1.0 / n + tau_val**2), np.sqrt(1.0 / n)
+        cut = z_val / np.sqrt(n)
+        s_active = norm.cdf((cut - true_mu) / sd_a) - norm.cdf((-cut - true_mu) / sd_a)
+        s_zero = norm.cdf(cut / sd_0) - norm.cdf(-cut / sd_0)
+        gap = s_active - s_zero
+        return gap**2 / max(s_active * (1 - s_active), 1e-12)
+
+    print()
+    print("I_pipi per table against sample size:")
+    for n in (12, 20, 40, 80, 120, 200):
+        print(f"  n = {n:3d}: {information(n):8.4f}")
+
+    grid = np.exp(np.linspace(np.log(12), np.log(120), 400))
+    spread_value = np.mean([information(n) for n in grid])
+    level_value = information(grid.mean())
+    print(f"\nspread 12-120 at mean n {grid.mean():.1f}: E[I] {spread_value:.4f} against "
+          f"I(E[n]) {level_value:.4f}, so spread helps by "
+          f"{100 * (spread_value - level_value) / level_value:+.0f}%")
+    print(f"level 12 to 200 multiplies I_pipi by "
+          f"{information(200) / information(12):.0f}x, which is the larger lever")
+    assert spread_value > level_value, "convexity claim failed"
+    assert information(200) > 100 * information(12), "level claim failed"
+
+
 if __name__ == "__main__":
     print(f"{len(proof.claims)} claims verified in {proof.name}")
     for label, shown in proof.claims:
@@ -154,3 +218,4 @@ if __name__ == "__main__":
     print("Unlike the mu/pi split, this test does draw power from coordinate tables: the")
     print("indicator's I_pipi is n_t v^2 / D, increasing in the number of tables. Rank 1 means")
     print("the indicator cannot separate mu from pi, not that it is silent about pi alone.")
+    calibration()
