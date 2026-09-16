@@ -148,6 +148,35 @@ proof.claim(
     r"\ \Rightarrow\ S(\hat m)\ \text{increases with}\ \rho,\ \hat m\ \text{with it}",
 )
 
+# ---------------------------- the retention score in the general interval form
+
+# The implementation does not special-case a one-sided threshold: a report contributes
+# rho * mass and an absence (1 - rho) + rho * mass for whatever interval the record implies.
+# These are the derivatives it codes, and they must reduce to the one-sided ones above.
+mass = sp.Symbol("Delta", positive=True)
+proof.claim(
+    "a-reported-record-scores-the-reciprocal-of-the-retention-whatever-its-interval",
+    sp.simplify(sp.diff(sp.log(rho * mass), rho) - 1 / rho),
+    r"\partial_\rho \log(\rho\Delta) = \frac{1}{\rho}",
+)
+general_absence = (1 - rho) + rho * mass
+proof.claim(
+    "and-an-absent-one-scores-the-interval-mass-shortfall-over-its-own-probability",
+    sp.simplify(sp.diff(sp.log(general_absence), rho) - (mass - 1) / general_absence),
+    r"\partial_\rho \log[(1-\rho) + \rho\Delta] = \frac{\Delta - 1}{(1-\rho) + \rho\Delta}",
+)
+# Substituting the one-sided absence mass Phi(z) = 1 - S recovers the -S/(1 - rho S) of the
+# directional case, so the general form is the same model and not a second one.
+proof.claim(
+    "which-recovers-the-directional-case-when-the-interval-is-the-one-sided-one",
+    sp.simplify(
+        ((mass - 1) / general_absence).subs(mass, 1 - survival)
+        + survival / (1 - rho * survival)
+    ),
+    r"\left.\frac{\Delta-1}{(1-\rho)+\rho\Delta}\right|_{\Delta = 1-S} "
+    r"= -\frac{S}{1-\rho S}",
+)
+
 # ------------------------------------------- what report rates alone cannot separate
 
 # A Bernoulli report indicator with success probability q = rho*S has information
