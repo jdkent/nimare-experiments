@@ -2059,3 +2059,31 @@ Still open and worth testing: whether the inflation is there at all with no coor
 2-study 2-image arm reads 0.080 at n=100, se 0.022, so 1.4 se above nominal -- suggestive, not
 decisive), and whether data-dependent early stopping breaks exchangeability, which the MAXITER=400
 arm will answer.
+
+## Why the naive count out-ranks the fitted prevalence (#51)
+
+`proofs/count_versus_fitted_prevalence.py`, 4 claims. Not a failure of the model -- a statement
+about what each quantity estimates.
+
+The expected report rate collapses to a single product:
+
+    P(report) = 1 - s_0 - pi * (s_a(mu) - s_0)
+
+affine in pi with slope s_0 - s_a and no curvature, and monotone in mu through the same term. So
+two voxels with the same pi(s_a - s_0) give the same expected count however different their
+prevalences.
+
+Hold mu roughly fixed across voxels and the product is affine in pi, so the count is a strictly
+monotone transform of the prevalence: its rank correlation with the truth is 1 up to binomial
+noise. Nothing can rank better, and an estimator that also fits mu must rank worse in finite
+samples, because it spends information separating two things that did not need separating. Where
+mu does vary, the count confounds them and the fit should win.
+
+So #51 is a measurement of the corpus, not a verdict on the estimator. It also makes a prediction
+worth testing: the count's ordering advantage should shrink as the spread of g across voxels
+grows. Untested.
+
+Two defects in my own proof, caught before committing. One claim duplicated another's expression.
+The level-set claim was a tautology -- I subtracted exactly the terms I had added, so it reduced
+to zero by construction -- and its stated conclusion was wrong as well, since the rate depends on
+pi(s_a - s_0) rather than pi*s_a. Suspect the proof as readily as the test.
