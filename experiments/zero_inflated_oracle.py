@@ -96,7 +96,7 @@ def cbes_arm(g_img, indicator, selection_model):
     full_indicator = np.zeros((n, width), dtype=np.int8)
     full_indicator[N_IMG:] = indicator
 
-    mu, pi, se, *_ = est._fit_chunk(
+    mu, pi, se, _se_marginal, _share, surviving, *_ = est._fit_chunk(
         weights=weights,
         g_obs=values,
         var_obs=variances,
@@ -106,7 +106,7 @@ def cbes_arm(g_img, indicator, selection_model):
         cutoffs=np.full(n, CUTOFF_G),
         start=g_img.mean(axis=0),
     )
-    return mu, pi, se
+    return mu, pi, se, surviving
 
 
 def _log_likelihood_surface(g_img, indicator):
@@ -205,7 +205,7 @@ def main():
     if CALIBRATE:
         rng = np.random.default_rng(11)
         g_img, indicator = draw(rng, 64, 1.0)
-        mu_c, _pi, se_c = cbes_arm(g_img, indicator, "none")
+        mu_c, _pi, se_c, _surviving = cbes_arm(g_img, indicator, "none")
         # At prevalence 1 the mixture is inert, so the non-mixture fit must equal the 1-D MLE.
         sd = np.sqrt(VAR_G + TAU**2)
         grid = MU_GRID[:, None]
@@ -225,9 +225,11 @@ def main():
 
     rng = np.random.default_rng(0)
     errors, reported_se, exact_se, ll_gap, fitted_pi = [], [], [], [], []
+    survivors = []
     for _ in range(REPS):
         g_img, indicator = draw(rng, VOXELS, PREV)
-        mu_c, pi_c, se_c = cbes_arm(g_img, indicator, "zero-inflated")
+        mu_c, pi_c, se_c, surviving_c = cbes_arm(g_img, indicator, "zero-inflated")
+        survivors.append(surviving_c)
         errors.append(mu_c - MU)
         reported_se.append(se_c)
         exact_se.append(exact_se_at(mu_c, pi_c, g_img, indicator))
@@ -267,6 +269,25 @@ def main():
           f"exact {exact[usable].mean() / err.std():.2f}")
     print("     se/sd above 1 with the exact Hessian means the width is the likelihood's,")
     print("     not the estimator's arithmetic.")
+
+    # The diagnostic the algebra predicts: identified_share is 1 - I_mupi^2 / (I_mumu I_pipi),
+    # the fraction of the information about mu that survives estimating the prevalence. The Wald
+    # interval should fail exactly where it is small. If coverage does not track it, the
+    # diagnostic does not earn its place in the estimator.
+    share = np.concatenate(survivors)
+    covered = np.abs(err) <= 1.96 * reported
+    print()
+    print("3. does identified_share predict where the Wald interval fails?")
+    edges = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0001]
+    print(f"     {'identified_share':>18s} {'voxels':>8s} {'coverage':>9s} {'mean se':>9s} "
+          f"{'sd of err':>10s}")
+    for lo, hi in zip(edges[:-1], edges[1:]):
+        band = (share >= lo) & (share < hi) & np.isfinite(reported)
+        if band.sum() < 20:
+            continue
+        print(f"     {f'{lo:.1f}-{hi:.1f}':>18s} {int(band.sum()):8d} "
+              f"{covered[band].mean():9.3f} {reported[band].mean():9.4f} "
+              f"{err[band].std():10.4f}")
 
 
 if __name__ == "__main__":

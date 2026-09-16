@@ -2087,3 +2087,33 @@ Two defects in my own proof, caught before committing. One claim duplicated anot
 The level-set claim was a tautology -- I subtracted exactly the terms I had added, so it reduced
 to zero by construction -- and its stated conclusion was wrong as well, since the rate depends on
 pi(s_a - s_0) rather than pi*s_a. Suspect the proof as readily as the test.
+
+## WITHDRAWN before shipping: identified_share does not flag a bad Wald interval
+
+The algebra gives Schur = I_mumu - I_mupi^2 / I_pipi, which goes to zero at the ridge. I inferred
+a diagnostic from that -- report identified_share = Schur / I_mumu, the fraction of information
+about mu surviving the prevalence, and distrust the Wald interval where it is small -- wrote it
+into the estimator, and then simulated it, in that order.
+
+The simulation says the opposite. 150 reps, 32 voxels, prevalence 0.6:
+
+  identified_share   voxels  coverage  mean se  sd of err
+           0.0-0.2     1299     0.943   0.5213     0.3791
+           0.2-0.4     2229     0.935   0.2354     0.3373
+           0.4-0.6      473     0.924   0.2865     0.4865
+           0.6-0.8      201     0.955   0.7445     0.9719
+           0.8-1.0      219     0.630   0.5860     0.8669
+
+A flat ridge makes the standard error *large*, so coverage there is fine or conservative. The
+interval fails at high identified_share, where the prevalence costs nothing and mu wanders anyway.
+Reverted, uncommitted, nothing shipped.
+
+The algebra was not wrong. The step from "Schur goes to zero" to "therefore small Schur flags a
+bad interval" was an extra inference I never proved, and it happens to be false: a wide interval
+is not a wrong one. That step is exactly what the algebra-first rule is for, and the simulation
+stage caught it before real data or the repository.
+
+What would be needed instead: a proof about Var(mu_hat) rather than about the information at the
+fitted point -- the failure at high identified_share is between-collection wandering that the
+observed information does not see, which is a statement about the sampling distribution of the
+estimator, not about the curvature of one likelihood.
