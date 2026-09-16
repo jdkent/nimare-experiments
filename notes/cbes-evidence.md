@@ -2340,3 +2340,57 @@ less (0.128 to 0.169 going from 20 to 80 tables at n = 20).
 Still not a usable test at realistic sizes -- 0.44 power to detect prevalence 0.6 needs 80 tables
 of 160 subjects each -- but the mechanism is confirmed and the design implication is clear: for
 this question, recruit larger studies rather than more of them.
+
+## The interval is fine where the data identify mu, and bad where they do not
+
+`experiments/does_the_profile_interval_cover.py`, 12,800 fits, prevalence 0.6, 2 images, 20
+tables. A 40-rep pilot read profile 0.958 against Wald 0.928 and looked like a fix. It was a
+selection confound: the profile bound is finite at only 52% of voxels, and those are selected for
+being informative, so scoring profile there against Wald everywhere flatters profile.
+
+Scored on the same voxels:
+
+  max_iter   Wald (all)   Wald (bounded)   profile   width ratio
+        25        0.922            0.969     0.964          0.98
+       400        0.932            0.967     0.964          1.02
+
+Wald and profile are indistinguishable once compared like with like, so kill condition 1 is met in
+substance: the profile interval is not the fix, and swapping the default would buy nothing.
+
+The useful result is what falls out of the two Wald columns. Backing out the unbounded half at
+max_iter 25: coverage is about **0.87 where the profile bound is infinite and 0.97 where it is
+finite**. The anti-conservatism that se/sd 0.80 was pointing at is entirely concentrated in the
+voxels where the data do not identify mu -- and the finiteness of the profile bound already flags
+exactly those, at no new cost, in code that already ships.
+
+That is the diagnostic I went looking for earlier and got wrong. identified_share failed because a
+flat ridge makes the interval *wide*, not wrong. The profile bound's finiteness is a different
+quantity -- whether the data reject pi = 0 at all -- and it is the one that tracks coverage.
+
+Actionable and needing no code: read ``g`` and its interval where ``g_lower``/``g_upper`` are
+finite. Elsewhere the point estimate is still the MLE but the interval under-covers by about 8
+points.
+
+## The regime question is answerable, with about twenty images
+
+`experiments/boundary_test_size_and_power.py`, 2000-3000 replicates per cell. Power at prevalence
+0.6, coordinate studies at n = 20:
+
+  images    20 tables   400 tables
+       2        0.128        0.178
+       6        0.346        0.407
+      20        0.624        0.749
+
+Levers at prevalence 0.6, ranked: images 2 to 20 takes power 0.128 to 0.624; coordinate-study
+sample size 20 to 160 takes 0.169 to 0.443 (at 80 tables); table count 20 to 400 takes 0.128 to
+0.178. Images dominate, which is what the rank-1 theorem requires -- the separating information is
+theirs and the indicator's is rank 1.
+
+Size is conservative everywhere measured, 0.030 to 0.044 against a nominal 0.05, and never
+liberal. The cause is the boundary atom: Chernoff's mixture needs 1/2 and the measured atom runs
+0.66 to 0.83, falling as information grows. So the derived critical value 2.7055 is *safe* and
+leaves power on the table; calibrating the atom empirically would recover some.
+
+The practical statement for the worst failure mode: a collection with two images cannot be told
+whether its prevalence is below 1 -- power 0.13 at a true 0.6. A collection with twenty can, at
+0.62 to 0.75. That is a design answer, and it is the first one this failure mode has had.
