@@ -2027,3 +2027,35 @@ number, and the proof carries the check so it cannot drift.
     _observed_information, so it can report how close I_mupi^2 is to I_mumu * I_pipi and refuse
     the Wald interval where the ridge is flat. interval="profile" is already implemented for
     exactly that case.
+
+## A rougher null cannot make a max-statistic test liberal
+
+`proofs/roughness_cannot_be_liberal.py`, 6 claims. Closes a direction rather than re-measuring it.
+
+Discrete version, airtight: for n independent standard normals, P(max > u) = 1 - Phi(u)^n, whose
+derivative in n is -Phi^n log Phi > 0. Differentiating Phi(q)^n = 1 - alpha implicitly gives
+dq/dn = -log Phi(q) Phi(q) / (n phi(q)) > 0, so the critical value rises with the number of
+locations.
+
+Field version: at a high threshold the exceedance probability is the expected Euler
+characteristic, sum over d of R_d rho_d(u), linear in each resel count. In a volume rho_3 factors
+as k_3 (u-1)(u+1) exp(-u^2/2) with k_3 > 0, so every EC density is positive above u = 1 and a
+max-statistic threshold sits far above 1. Resel counts go as V / f^3, whose derivative in the FWHM
+is -3V/f^4 < 0, so roughening adds resels in every dimension at once.
+
+Chain: rougher null -> more resels -> larger expected EC at any threshold -> larger null maximum
+-> higher critical value -> fewer rejections. **A permutation that roughens the map is
+conservative.** The observed statistic maps are 2.5x smoother than the permuted ones, which pushes
+the test the wrong way to explain a family-wise rate of 0.150, and spatial-images already returned
+identical rates. The mechanism is doubly dead: wrong empirically and wrong in sign.
+
+#82 still needs a mechanism. What is now excluded: the boundary artefact (#79, fixed by eroding),
+a degenerate null (197-200 distinct maxima of 200, cv 0.07-0.11), the Pareto tail (identical with
+TAIL=0), the null being too narrow (percentile 0.467 against 0.462), the p-value arithmetic (it is
+the exact (1 + #{null >= obs}) / (1 + B), and the histogram is used only for cluster forming), and
+now roughness in both directions.
+
+Still open and worth testing: whether the inflation is there at all with no coordinate tables (the
+2-study 2-image arm reads 0.080 at n=100, se 0.022, so 1.4 se above nominal -- suggestive, not
+decisive), and whether data-dependent early stopping breaks exchangeability, which the MAXITER=400
+arm will answer.
