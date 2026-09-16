@@ -1,5 +1,82 @@
 # Where CBES stands — estimands and uncertainty
 
+## Current state, latest session
+
+Everything below this section predates it and several of its numbers have since been retracted;
+the retractions are listed here and the detail is at the end of `notes/cbes-evidence.md`.
+
+### Shipped to the PR
+
+  aaf1557  two bugs found by a brute-force oracle: the EM retiring at its start value where the
+           reported limb makes the curvature positive, and selection_model="none" profiling out a
+           prevalence it never fitted
+  6d4252f  cite MetaNSUE, SDM-PSI and ES-SDM as antecedents
+  fca72c9  document max_iter as shrinkage; drop a null_method explanation whose sign was backwards
+  4bd49c9  se is not reliably conservative; which way it errs depends on the prevalence
+  79d914f  retract the family-wise inflation figures
+  f55b919  call the small-collection family-wise rate unverified
+  f33b630  the profile bound's finiteness is the diagnostic; the regime usually cannot be tested
+  fd6d1fb  correct the prior-art claim: SDM-PSI maximises the same censored likelihood
+  275b5fc  cover the generator's preconditions and its per-study variation
+
+### Proofs, in `proofs/`, each with a calibration check
+
+  mixture_identification            the reporting indicator's information matrix is rank 1, so
+                                    tables cannot separate mu from pi however many there are;
+                                    for unlike studies det I = pi^2 sum (u_j v_k - u_k v_j)^2,
+                                    which reproduces #73's measured 35x sample-size advantage
+  roughness_cannot_be_liberal       roughening a null raises its maximum, so destroying spatial
+                                    autocorrelation makes a max-statistic test conservative
+  count_versus_fitted_prevalence    P(report) = 1 - s_0 - pi(s_a - s_0), so the naive count ranks
+                                    perfectly wherever the magnitude is flat
+  boundary_test_for_full_prevalence testing pi = 1 is a boundary problem; the level-0.05 cut is
+                                    2.7055, not 3.8415
+  early_stopping_is_shrinkage       t EM iterations give (1 - rho^t) theta* + rho^t theta_0, a
+                                    ridge whose weight grows with the missing information
+
+### Retracted this session, all of them mine
+
+  * the family-wise inflation. Every 0.150 came from 40 simulations, where the binomial se is
+    0.034. Three estimates (0.150 at 40, 0.055 at 200 pre-fix, 0.100 at 100 post-fix) do not
+    separate. **Unverified below about 20 studies**, neither sound nor broken.
+  * "the censored likelihood beats imputation". The point estimates tie at 25,600 fits; only the
+    interval differs, and partly through finite M.
+  * "converging fixes the prevalence". It overshoots: 0.541 to 0.723 against a true 0.6. The
+    ordinality caveat stands.
+  * "se is conservative". 1.25 to 1.52 at prevalence 1, 0.80 to 0.83 at 0.6 — anti-conservative
+    in the regime the estimator is for.
+  * the identified_share diagnostic, withdrawn before shipping when simulation contradicted it.
+  * "the mu bias is O(1/k)". It is a fixed 22% of the sd, a boundary effect, worth 5% of MSE.
+  * "SDM-PSI imputes rather than using a censored likelihood". It uses one, citing Tobin.
+  * "a defaulted sample size misreports g". Flattening a real 3.56x spread left g unharmed.
+
+Each failed the same way: a ratio looked constant or a difference looked large, and I had not
+checked the denominator. **No rate goes into documentation without its standard error, and 40
+replicates sizes a run rather than producing a result.**
+
+### Failure modes as they now stand
+
+  1. The estimand collapses where every study has the effect, and the collection cannot tell you
+     which regime it is in — the boundary test needs about 20 images for 0.62 power at a true 0.6.
+  2. The interval is wrong in both directions and no setting fixes it; read it only where
+     g_lower/g_upper are finite, where coverage is 0.97 against 0.87 elsewhere.
+  3. The default does not converge, and that early stopping is buying real accuracy on mu.
+  4. Coordinate tables cannot separate mu from pi. Proven, not measured.
+  5. Reported peak heights are discarded, so the report limb is over-stated by up to a factor of
+     two, and that is not correctable from tables.
+
+### Open
+
+  #31 NeuroVault validation not protocol-compliant. #40/#41 point-process estimator.
+  #58 residual study-count drift. #62 dof for a censored-likelihood se. #66 q(mu) routes blocked.
+  #86 match SDM-PSI's post-fit imputation. #88 re-measure every quoted rate at a stated se.
+
+Wanted, and not obtainable here: Costafreda 2012 (doi:10.1016/j.jneumeth.2012.07.016), which may
+already contain the rank-1 result; the MetaNSUE methods paper (doi:10.1177/0962280218811349);
+Schnedler 2005 on censored random vectors.
+
+---
+
 Written for a check-in. Everything is measured in this repo; the PR carries only the algorithmic
 conclusions. Detail in `notes/cbes-open-program.md`, `notes/cbes-first-principles.md`,
 `notes/cbes-success-criteria.md`.
