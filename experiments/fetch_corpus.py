@@ -19,6 +19,22 @@ def get(url, timeout=45):
     except Exception:
         return None
 
+def normalise_map_type(raw):
+    """NeuroVault reports `T map`/`Z map`; it once reported the short codes assumed below.
+
+    Without this the filter matches nothing and the fetch returns an empty corpus with a
+    zero exit status, which is the worst way for a fetcher to fail.
+    """
+    text = str(raw or "").strip().lower()
+    if text in ("t", "z"):
+        return text
+    if "t map" in text or "t-map" in text or "tmap" in text:
+        return "t"
+    if "z map" in text or "z-map" in text or "zmap" in text:
+        return "z"
+    return None
+
+
 base = json.load(open("/tmp/claude-0/cmp/neurostore_images.json"))["results"]
 candidates = [r for r in base
               if r.get("level") == "group" and (r.get("has_t_maps") or r.get("has_z_maps"))]
@@ -49,9 +65,9 @@ for study_id, cid, name in collections:
         break
     page = get(f"https://neurovault.org/api/collections/{cid}/images/?format=json")
     for img in ((page or {}).get("results") or []):
-        kind = str(img.get("map_type", "")).lower()
+        kind = normalise_map_type(img.get("map_type"))
         n = img.get("number_of_subjects")
-        if kind not in ("t", "z") or not n or int(n) < 8:
+        if kind is None or not n or int(n) < 8:
             continue
         if str(img.get("analysis_level", "group")).lower() not in ("group", "", "none"):
             continue

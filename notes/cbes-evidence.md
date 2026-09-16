@@ -1099,3 +1099,724 @@ def _hartung_knapp_se(*, g_hat, sum_a, sum_a_g2, n_eff, covered, fallback):
     se[usable] = np.sqrt(residual / ((n_eff[usable] - 1.0) * sum_a[usable]))
     return se
 ```
+
+## When do the coordinates stop helping?
+
+`when_do_coordinates_start_hurting.py`, pain, published tables, 8 splits, paired: the same
+permutations and the same held-out reference at every image count, so only the division of the
+working half into image donors and table donors changes.
+
+| images | tables | rmse CBES | rmse pool | diff | p | err at top CBES | pool | diff | p |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | 9 | 0.271 | 0.363 | −0.092 | 0.000 | −0.047 | +0.141 | −0.188 | 0.000 |
+| 2 | 8 | 0.230 | 0.269 | −0.040 | 0.002 | +0.005 | +0.137 | −0.132 | 0.000 |
+| 3 | 7 | 0.210 | 0.217 | −0.007 | 0.432 | −0.038 | +0.054 | −0.092 | 0.003 |
+| 4 | 6 | 0.207 | 0.196 | +0.011 | 0.152 | −0.043 | +0.020 | −0.064 | 0.017 |
+| 5 | 5 | 0.198 | 0.171 | +0.027 | 0.001 | −0.023 | +0.020 | −0.044 | 0.037 |
+| 6 | 4 | 0.200 | 0.161 | +0.039 | 0.001 | −0.020 | −0.014 | −0.006 | 0.524 |
+| 7 | 3 | 0.203 | 0.147 | +0.056 | 0.000 | −0.017 | −0.027 | +0.011 | 0.290 |
+| 8 | 2 | 0.203 | 0.143 | +0.060 | 0.000 | −0.014 | −0.041 | +0.027 | 0.022 |
+| 9 | 1 | 0.196 | 0.142 | +0.054 | 0.000 | −0.015 | −0.058 | +0.043 | 0.002 |
+
+**The crossing on rmse is 3 images; on bias at the top it is 6.** The image pool's rmse keeps
+falling, 0.363 to 0.142, because its error is all variance. CBES flattens at about 0.20 — that
+floor is the coordinate channel's bias, and it does not shrink with anything. Which crossing
+matters depends on the question: the pool swings from +0.141 to −0.058 at the top decile as
+images accumulate, while CBES holds −0.015 to −0.047 throughout, so for a calibrated magnitude at
+the peaks the coordinates pay for twice as long as they do for whole-map error.
+
+### The crossing condition, in closed form
+
+`micro_when_coordinates_hurt.py`. Two channels: images unbiased with variance `1/(k n)`, falling
+with image count; coordinates with variance `1/(m I)` that falls with table count, plus a bias
+`b` from the assumptions they are read through, which does not fall with anything. Inverse-
+variance weighting puts `w = R/(1+R)` on the coordinates, `R = m I/(k n)`. Writing out the mean
+squared error of the combination and asking when it beats `1/(k n)`, every term in `R` cancels:
+
+    coordinates help   <=>   b^2 < 1/(m I) + 1/(k n)
+
+Squared channel bias below the **sum** of the two channels' variances, which is the variance of
+their difference. So the crossing is a Hausman statistic, `Q = (g_c - g_i)^2/(var_i + var_c) < 1`,
+and `k* = 1/(n (b^2 - 1/(m I)))` — **infinite whenever the coordinate channel's own variance
+already exceeds its squared bias**, so a well-specified threshold never hurts at any image count.
+
+Verified in the scalar bed, where the reports are generated at a true cut and the estimator reads
+them at a wrong one. The `Q > 1` crossing matched the measured MSE crossing in all five
+scenarios, and predicted `k*` 1.7/0.4/0.1 landed on observed 2/1/1. Median Q is 0.455 when the
+bias is exactly zero, which is the median of a chi-square on 1 df, as it must be.
+
+### Q on real data: read it at the strong voxels, and do not trust the absolute threshold yet
+
+In terms of what CBES reports, with `w = coordinate_share` and `T = 1/se^2`:
+
+    Q = (g - g_selection_off)^2 / se^2 * (1 - w)/w
+
+Two things went wrong on first contact with real data, both in the estimator of Q rather than
+the condition. **Algebraically `Q -> 0` as `w -> 0`, because `delta = w (g_c - g_i)`; but delta is
+a difference of two separately fitted maps and carries float noise that does not shrink with
+`w`, so dividing it by `w^2` manufactures values in the thousands.** Restricting to `w >= 0.10`
+fixes most of it, and is not enough at 9 images where only 6% of voxels act and the reading is
+2e17. And the **map median does not locate the crossing** — it sits at 0.09 to 0.38 throughout,
+far below 1 — while **Q at the strongest decile does**: 0.966, 0.661, 0.844, 0.996, 1.067, 1.136,
+1.031, 1.051, 3.790 for 1 to 9 images, crossing 1 between 4 and 5, where the rmse penalty turns
+significant.
+
+That agreement is provisional, and the reason turned out to be decisive. Under no channel bias Q
+has median 0.455, and an se inflated by `f` deflates Q by `f^2`. The scalar bed was given an
+`INFLATE` knob to measure how much that matters, at the marginal scenario whose true crossing is
+two images:
+
+| se inflation | median Q at k = 1, 2, 4, 8, 16, 32 | Q > 1 crosses | truth |
+|---|---|---|---|
+| 1.0 | 0.809, 1.077, 2.061, 2.951, 4.388, 5.403 | **2** | 2 |
+| 1.5 | 0.359, 0.479, 0.916, 1.311, 1.950, 2.401 | **8** | 2 |
+| 2.2 | 0.167, 0.223, 0.426, 0.610, 0.907, 1.116 | **32** | 2 |
+
+**A 1.5x inflation moves the recommended image count from two to eight, and a 2.2x from two to
+thirty-two.** Across the three bias scenarios, the image count at which `Q > 1` fires:
+
+| se inflation | cut 0.70 (true 2) | cut 0.85 (true 1) | cut 1.10 (true 1) |
+|---|---|---|---|
+| 1.0 | **2** | **1** | **1** |
+| 1.5 | 8 | **1** | **1** |
+| 2.2 | 32 | 4 | **1** |
+
+At the bottom of the measured `se/sd` range the criterion is exact; at the top only the most
+extreme bias still locates the crossing. It is not that the statistic is fragile only in the
+marginal regime -- across the measured range it is unusable absolutely anywhere.
+
+The correction is exact in the algebra: reported `Q = Q_true / f^2`, so the threshold is
+`Q > 1/f^2`, and at `f = 1.5` the threshold 0.444 recovers `k = 2` from the inflated series. It
+still cannot be applied to pain, because `f = 1.5` there would put the crossing at one image
+against a directly measured tie at three. Either the inflation at those voxels is well below 1.5
+or `Q@top` is not deflated the way a uniform model says; `se/sd` is not known per voxel, so the
+question is not decidable from what is measured.
+
+**So Q is ordinal, not absolute.** Its rise with image count, and `coordinate_share`'s fall, flag
+the direction reliably. The decision itself should be measured directly, which is cheap and needs
+no calibrated `se`: fit with `selection_model="none"` and with it on at the real image count and
+score both against a held-out subset. A calibrated `se` is the blocker for any absolute form of
+the criterion, which is the practical reason the `se` work matters.
+
+### The radius is an exclusion zone, and a wider one means *less* silence
+
+First, the semantics, because getting them backwards inverts every prediction. From
+`effectsize.py`, `sign = where(at_focus, -1, where(reached, 0, 1))`: the named voxel is reported,
+a voxel within `coverage_radius` of one of that study's peaks but not named gets **no indicator
+at all**, and everything else the study examined is silent. So the radius is an *exclusion zone*
+around reported peaks, not the reach of the silence. **A wider radius means less silence**, hence
+less coordinate information and less misassignment bias -- the opposite of the reading that comes
+naturally from the parameter's name.
+
+The measured `coordinate_share` confirms which way it runs: 0.472 at 4 mm falling to 0.443 at
+20 mm with one image, 0.229 to 0.201 with five. It could only fall if wider means less silence.
+
+`does_shrinking_the_omission_help.py`, pain, published tables, 6 splits, `coverage_radius` swept
+4 to 20 mm:
+
+| radius | rmse, 1 image | err at top | rmse, 5 images | err at top |
+|---|---|---|---|---|
+| 4 mm | 0.282 | −0.075 | **0.199** | −0.038 |
+| 8 mm | 0.282 | −0.072 | 0.199 | −0.034 |
+| 14 mm | **0.281** | −0.062 | 0.201 | −0.019 |
+| 20 mm | 0.281 | −0.049 | 0.204 | −0.002 |
+
+The nominal best radius is 14 mm at one image and 4 mm at five, but **that shift is not a
+finding**: the rmse spread across radii is 0.001 to 0.005 over six splits, which is noise, and
+0.4% to 2.5% of rmse against the 35% the image count moves. Claiming it confirmed a predicted
+inward shift would have been reading a direction into noise, and with the semantics the right way
+round the prediction pointed outward anyway.
+
+What is clean is the **top-decile bias, monotone in the radius in both regimes**: −0.075 to
+−0.049 at one image, −0.038 to −0.002 at five, improving as the radius widens. That is exactly
+what less misassigned silence should do. So the defensible statement is the narrow one: widening
+the radius trades coordinate information for centring at the peaks, and rmse is nearly flat in
+it. There is no single best radius, and the knob is worth far less than the image count.
+
+The asymmetry between silence and reporting is not a knob at all, and should not be softened. A
+report contributes `P(|g| > c)`, which saturates: once `mu sqrt(n)` is past `c sqrt(n)` the factor
+is nearly 1 and its derivative in mu nearly 0. A report genuinely says only that the effect is
+not small, so the confidence at a reported voxel is carried by the images. Down-weighting the
+omission would add nothing where coordinates are reported, remove information where they are
+silent, and cost the observed-information SE its meaning as the curvature of a real likelihood.
+
+## A working-memory studyset from the NeuroStore base-study endpoint
+
+`fetch_working_memory.py` and `wm_sdm_vs_cbes.py`. Pain is one hand-curated collection and HCP is
+one task cut into synthetic studies; neither says what happens on a studyset assembled the way a
+meta-analyst assembles one, by asking an index for the studies on a topic and taking whatever
+maps they shared. Eighteen of NeuroStore's 684 base studies name a working-memory paradigm in
+their title, abstract or keywords and carry group t or z maps.
+
+Three things about that studyset are worth more than the estimator comparison run on it.
+
+**The corpus is barely coherent.** Median pairwise spatial correlation between the 18 study maps
+is +0.081, 71% positive; curating to the 13 that are activation contrasts rather than searchlight
+decoding accuracy, white-matter FA association or resting fALFF moves it only to +0.087. A
+held-out reference pooled over such maps is mostly noise, which caps what any comparison here can
+resolve — measured r against the reference is 0.15 uncurated and 0.20 to 0.26 curated, against
+0.5-plus on pain.
+
+**Sample sizes span 21 to 1369**, so one study carries more inverse-variance weight than all the
+others together. In 17 of 24 splits the largest held-out study holds over 80% of the reference
+weight, making the reference very nearly that one study. Any summary averaged over that and the
+pooled-reference splits describes neither, so the bed reports them separately.
+
+**Most studies do not survive their own correction.** Only 2 to 5 of 5 table donors report
+anything under cluster/max, and the two maps whose |z| never exceeds 1 report nothing at all,
+correctly dropping out.
+
+The consequence for CBES is a clean null result. Curated, 24 splits, 1 image:
+
+| estimate | r | rank r | AUC | magnitude |
+|---|---|---|---|---|
+| images only | +0.201 | +0.233 | 0.622 | 0.901 |
+| CBES g | +0.196 | +0.231 | 0.623 | 0.779 |
+
+Identical on pattern, in both reference regimes separately as well as pooled. The estimator's own
+diagnostic says why: `coordinate_share` at the strongest decile is 0.000 in three of six splits.
+With only two to five studies contributing an indicator at all, the coordinate channel is roughly
+ten times thinner than pain's 267 transcribed peaks over ten studies, and there is nothing for it
+to add. The one place CBES still differs is calibration — magnitude 0.78 against the pool's 0.90.
+
+### Two harness defects this bed uncovered
+
+**NeuroVault changed its `map_type` encoding** from short codes to `T map`/`Z map`. Both
+`fetch_corpus.py` and the first version of `fetch_working_memory.py` filtered on `("t", "z")`,
+matched nothing, and exited zero with an empty corpus — the worst way for a fetcher to fail. Both
+now normalise.
+
+**`sdm_parse` cannot find a silent study whose name carries two or more digits.** `c16` and `c99`
+are reported missing while `c16.no_peaks.txt` sits next to the table; `c3`, `c7` and any
+digit-free name are found. Studies that report peaks are unaffected, so the bug bites only the
+silent studies, which is the arm that matters here, and it is why the pain bed never hit it: its
+published tables always had peaks. Study labels are now letters only. Worth noting that the first
+three diagnoses were all wrong — a zero-byte file, then row order, then a nine-study limit — and
+one run passed on input that fails deterministically, which was stale state in the install
+directory, not evidence.
+
+## The familywise defect was the bed, not the estimator
+
+`fpr_after_redesign.py` on the whole simulated cube: uncorrected 0.0533, **familywise 0.375**
+against a nominal 0.05, binomial SE 0.034. A defect that spares the marginal and wrecks the
+maximum lives in the dependence structure, and for this estimator there is only one candidate.
+
+The argument, which is sound and worth keeping: the fit is voxelwise, so permuting an image's
+values among its own voxels changes no value, only which voxel each is paired with. Were the
+indicator spatially constant, the permuted `z` map would be a permutation of the observed one and
+the maxima would agree exactly. They can differ only because the indicator is held fixed while
+the image moves — so the observed map is scored on the *actual* pairing of image magnitude to
+indicator, and every permutation on a random one. The null is therefore exchangeable if and only
+if, across voxels, a study's image magnitude is independent of how many studies were silent there.
+
+`is_the_image_permutation_exchangeable.py` measures that in seconds, with no CBES, no permutations
+and no correction — just the simulator's studyset and a spatial query. Mean Spearman rho −0.115,
+negative in all eight realisations, per-realisation p from 4e-09 to 1e-29. The competing
+explanation fails on direction: scrambling destroys smoothness, which gives the permuted field
+*more* effectively independent tests and a *larger* maximum, making a test conservative rather
+than liberal.
+
+**And then the interior-shell check overturned the diagnosis.**
+
+| voxels used | mean rho(&#124;g&#124;, silent count) |
+|---|---|
+| all of the simulated cube | −0.125 |
+| beyond 2 voxels (8 mm) from the edge | **−0.0005** |
+| beyond 4 voxels (16 mm) | +0.032 |
+
+with `corr(|g|, edge distance) = −0.212` and `corr(silent count, edge distance) = +0.469`. Both
+are what smoothing a field inside a finite cube does: the kernel runs off the edge and leaves the
+outer shell with inflated variance and inflated peak density, which couples magnitude to peak
+density there and nowhere else.
+
+So `permute-images` is non-exchangeable **in the bed that measured the false-positive rate**, for
+reasons belonging to the bed. `fpr_after_redesign.py` now takes `ERODE`, and the rate is being
+re-measured with 8 mm off every face. What the erosion cannot settle either way: a real brain mask
+also has a boundary, and smoothing near it inflates variance the same way, so whether a real
+analysis's familywise correction is affected is a question about data preparation that needs
+measuring on a real collection.
+
+This is the third harness defect in this project mistaken for a model defect. The check that
+overturned it took ninety seconds and should have run before any mechanism was reported at all.
+
+## SDM-PSI on the working-memory studyset, and HCP emotion as a second task
+
+Both run at one image, the configuration under question, with the same parity: the same studies
+supply images, the rest supply coordinates, and the reference is held out from both.
+
+**Working memory** (curated to 13 activation contrasts, 4 splits, cluster/max extraction):
+
+| estimate | r | rank r | AUC |
+|---|---|---|---|
+| images only | +0.337 | +0.369 | 0.733 |
+| CBES g | +0.328 | +0.363 | 0.732 |
+| SDM-PSI | +0.075 | +0.139 | 0.580 |
+
+CBES tracks the donated image and SDM-PSI is far behind both. SDM's magnitude column is not
+comparable, its coefficient not being on a `g` scale. This needed a harness fix first: `sdm_parse`
+cannot find a silent study whose name carries two or more digits, so every `no_peaks` study was
+being dropped.
+
+**HCP EMOTION_FACES**, 30 subjects x 16 studies, 3 splits, scored against 306 held-out subjects:
+
+| estimate | r | rank r | AUC | mag ratio |
+|---|---|---|---|---|
+| SDM-PSI coeff | +0.482 | +0.463 | 0.737 | 0.15 |
+| images only | +0.879 | +0.676 | 0.984 | **0.96** |
+| CBES g | **+0.882** | **+0.680** | 0.984 | 0.68 |
+| CBES g_marginal | +0.312 | +0.439 | 0.552 | 0.28 |
+
+This reproduces the prevalence-1 failure on a second HCP task, independently of MOTOR_LH. CBES
+matches the image pool on pattern and beats SDM-PSI on every metric, but the pool recovers 0.96 of
+the true magnitude where `g` recovers 0.68 -- on MOTOR_LH, 0.85 against 0.63. The cause is the same
+and it is not subtle: every HCP study genuinely carries the effect, so there is no absence to find
+and the correction can only shrink. The fitted prevalence is 0.626 at the median against a true
+1.0 and **0.077 at the strongest decile**, so it is worst exactly where the estimate matters most.
+
+`g_marginal` is unusable here for the same reason -- it multiplies by that biased prevalence, and
+its AUC of 0.552 is barely above chance on a task where the image pool reaches 0.984.
+
+## Global-null error rates on the redesigned null, all three arms
+
+`fpr_after_redesign.py`, 40 simulations, 200 permutations, nominal 0.05, binomial SE 0.034:
+
+| arm | uncorrected | familywise |
+|---|---|---|
+| 20 studies, 2 images | 0.0533 | **0.375** |
+| 20 studies, 1 image | 0.0496 | **0.200** |
+| 12 studies, 2 images | 0.0534 | **0.350** |
+
+The voxelwise rate is calibrated in every arm. The familywise rate is four to seven times
+nominal, and scales with the image count, which is what the exchangeability argument predicts --
+the non-exchangeable pairing enters only through the image channel.
+
+**Eroding the boundary removes most of it**, confirming that the coupling was the cube's edge.
+`ERODE=2` drops 8 mm from every face, leaving 3,375 of 6,859 voxels, and changes nothing about how
+the data are generated -- the simulator works from `noise_extent`, so the same studies report the
+same peaks and the edge voxels are simply not read:
+
+| arm | uncorrected | familywise, whole cube | familywise, interior |
+|---|---|---|---|
+| 20 studies, 2 images | 0.0508 | 0.375 | **0.075** |
+| 20 studies, 1 image | 0.0498 | 0.200 | **0.025** |
+| 12 studies, 2 images | 0.0501 | 0.350 | **0.150** |
+
+With a binomial standard error of 0.034, the two 20-study arms are within noise of nominal: 0.075
+is 0.7 SE above 0.05, and 0.025 is conservative. **These are the numbers to quote**, and they say
+the estimator's null is sound where the field is stationary.
+
+**A residual remains in the 12-study arm at 0.150**, which is 2.9 SE above nominal and not the
+boundary. Adding two arms discriminates what drives it:
+
+| arm | image share of the roster | familywise |
+|---|---|---|
+| 20 studies, 1 image | 5% | **0.025** |
+| 20 studies, 2 images | 10% | 0.075 |
+| 12 studies, 1 image | 8.3% | **0.100** |
+| 12 studies, 2 images | 16.7% | **0.150** |
+
+Not purely the image share -- 8.3% gives 0.100 where 10% gives 0.075, and those two are within
+noise of each other. It reads as roughly additive: dropping 20 studies to 12 adds about 0.075, and
+a second image adds about 0.05. **The study count is the larger driver**, with the image count
+secondary, which is consistent with the non-exchangeable pairing entering through the image channel
+while the max-statistic null gets coarser with fewer studies.
+
+So the shipping statement has to be that the familywise correction is calibrated at twenty studies
+and anti-conservative below that, with these numbers, rather than calibrated. Whether the
+degenerate-null guard is firing at all in the 12-study arm is a separate question: `refused` reads
+0 for all 40 simulations, and the first attempt to record the distinct-maxima count returned `nan`
+because `correct_fwe_montecarlo` writes its diagnostics onto the result's own estimator rather than
+the one the bed holds. Re-measuring with that fixed.
+
+## One image against a wall of tables: where the estimator earns its keep, and its bias floor
+
+jdkent's configuration, and the one that actually arises: the literature is fixed and large, and
+what a meta-analyst gains over time is images. `build_pain_table_corpus.py` takes the NeuroStore
+2026-09 release (32,444 studies, 871,671 coordinates), keeps the 1,522 studies naming pain, and
+`one_image_many_tables.py` holds that wall constant while adding NIDM pain images one at a time.
+Ten of the 21 NIDM images are held out as a reference that is fixed within a draw, so every row is
+paired.
+
+**The contamination guard earned its place.** The NIDM study ids are anonymised, so overlap cannot
+be matched by name, but the NIDM collection carries each study's published peaks -- so a NeuroStore
+study reporting the same peaks in the same places is the same study. Twelve were found and dropped.
+Without that the reference would have been inside the coordinate channel.
+
+Three draws, rmse against the held-out pool, paired:
+
+| tables | 1 img | 2 | 3 | 5 | 8 | 11 | crossing |
+|---|---|---|---|---|---|---|---|
+| 25 | **−0.118** (p=.020) | −0.010 | −0.005 | −0.004 | +0.001 | +0.003 | ~8 images |
+| 200 | **−0.124** (p=.051) | +0.007 | +0.011 | +0.011 | +0.021 | +0.025 | 2 images |
+| 1443 | **−0.131** (p=.057) | +0.020 | +0.026 | +0.050 | +0.078 | **+0.085** (p=.022) | 2 images |
+
+**The crossing moves to fewer images as the wall grows** -- eight at 25 tables, two at 200 and at
+1,443 -- which is what `b^2 < 1/(m I_c) + 1/(k n)` predicts once the first term vanishes. And the
+estimate stops responding to images at all: at 1,443 tables rmse goes 0.236 to 0.224 across one to
+eleven images while the pool falls 0.366 to 0.138. With `coordinate_share` at 0.98, eleven images
+cannot outvote the wall. **A large table wall does not average away its own bias; it protects it.**
+
+At eleven images the ranking inverts by wall size -- 0.141 at 25 tables, 0.163 at 200, 0.224 at
+1,443 -- so more coordinate studies is strictly worse once images are available, which is the
+opposite of the usual meta-analytic intuition.
+
+### The rmse win at one image is shrinkage, not centring
+
+| tables | CBES err at top, 1 image | pool |
+|---|---|---|
+| 25 | −0.193 | +0.065 |
+| 200 | −0.289 | +0.065 |
+| 1443 | −0.326 | +0.065 |
+
+reaching −0.469 at 1,443 tables and eleven images. So at one image CBES beats the pool on rmse by
+shrinking an estimate that is mostly noise, while being badly biased low at the strong voxels --
+where the pool is nearly unbiased. **The over-shrinkage grows with the wall.** This is the opposite
+of the pain-collection result, where CBES was *better* centred at the top (+0.005 against +0.137),
+and the difference is the coordinate set: there, nine tables of the same studies' own published
+peaks; here, 1,443 foreign studies.
+
+One explanation was checked and is wrong in direction. 56% of the corpus's studies report a peak
+below the assumed z of 3.09, so the assumed cut is too high -- but a cut that is too high makes the
+bound `|g| <= c` *weaker*, which would shrink less, not more. Fixing it would deepen the problem.
+
+### It is not a population mismatch, and the cause is an assumption I made
+
+A population mismatch was the live explanation: `mu` is the effect among studies whose effect is
+non-null, and 1,443 heterogeneous pain studies (analgesia, chronic-pain contrasts, modulation)
+genuinely do not carry this contrast's effect, so their silence is truthful for them while the
+reference is a different population. That predicts **small `pi` with `mu` staying large**. The
+prevalence diagnostic falsifies it. At the top decile, against a truth of 0.622:
+
+| tables | images | pi | pi at top | &#124;g&#124; at top |
+|---|---|---|---|---|
+| 25 | 11 | 0.658 | **0.933** | **0.472** |
+| 200 | 11 | 0.487 | 0.506 | 0.312 |
+| 1443 | 1 | 0.490 | 0.324 | 0.232 |
+| 1443 | 11 | 0.425 | **0.295** | **0.159** |
+
+The wall drags *both* down together. At 1,443 tables `pi` at the top is 0.295 **and** `g` is 0.159,
+a quarter of the truth; at 25 tables with eleven images the fit recovers `pi` at 0.933 and `g` at
+0.472, close to right.
+
+The cause is almost certainly the bed rather than the estimator, and it is the identifiability
+result already on record. Every one of the 1,443 coordinate studies was given the same assumed
+`n = 20`, because the release reports a sample size for 0.5% of its analyses. A silence constrains
+`(pi, mu)` through one scalar per distinct *(sampling error, cutoff)* pair, and only sample-size
+spread separates the components -- so 1,443 studies at one shared `n` and one clamped threshold
+supply **one constraint repeated 1,443 times**. That is a tight ridge in `(pi, mu)` with nothing
+fixing the position along it, and the fit slides down it to low `pi` and low `mu` while
+`coordinate_share` at 0.98 stops the images pulling back.
+
+**That prediction was wrong too, and in an informative direction.** `NSPREAD=1` draws each
+coordinate study's `n` from 12 to 120, and it makes everything worse:
+
+| 1,443 tables | images | rmse CBES | pool | diff | pi at top | &#124;g&#124; at top | share |
+|---|---|---|---|---|---|---|---|
+| n = 20 fixed | 1 | 0.236 | 0.366 | −0.131 | 0.324 | 0.232 | 0.982 |
+| n drawn 12–120 | 1 | 0.306 | 0.408 | −0.102 | **0.100** | 0.156 | 0.998 |
+| n = 20 fixed | 11 | 0.224 | 0.138 | +0.085 | 0.295 | 0.159 | 0.937 |
+| n drawn 12–120 | 11 | 0.291 | 0.120 | **+0.172** | **0.019** | 0.236 | **1.000** |
+
+I had the bound's direction backwards. A silence from a study with `n = 120` says
+`|g| < 3.09/sqrt(120) = 0.28`, where `n = 20` says `|g| < 0.69`: **a larger assumed sample size
+makes each silence a tighter bound.** Spreading `n` upward therefore adds hundreds of very tight
+bounds, the likelihood is told the effect is small nearly everywhere, and `pi` collapses to 0.019
+while `coordinate_share` reaches 1.000.
+
+### The structural reason: the wall is silence, not information
+
+Counting what a 1,443-study wall actually contributes per voxel, at `coverage_radius` 20 mm:
+
+| | studies saying something | silent |
+|---|---|---|
+| median voxel | 316 (21.9%) | 1,127 |
+| 99th percentile voxel | 651 (45.1%) | 792 |
+| best voxel | 724 (50.2%) | 719 |
+
+and only **8.8% of voxels are named by any study at all, with at most 4 studies naming the same
+voxel.** The report limb -- the only limb that says the effect here is at least this big -- is four
+studies against a thousand silences, a ratio near 1:280. On the pain collection, where the
+estimator works well, a named voxel has one report against about eight silences.
+
+So the count of coordinate studies is not the currency. What decides whether a coordinate corpus
+can carry a magnitude is the ratio of studies reporting *at a voxel* to studies silent there, and
+adding topically-related-but-different studies makes that ratio worse rather than better. Silence
+can shrink a noisy estimate in the right direction, which is exactly what the one-image win is; it
+cannot supply a magnitude. That is the honest statement of what the extreme configuration does.
+
+## Widening the report limb fixes the wall's over-shrinkage
+
+jdkent's suggestion: assert the report over a small radius, 4 to 8 mm, so a peak says the effect is
+at least this large *somewhere here* rather than at one named voxel, with the ring out to
+`coverage_radius` still carrying no indicator. Three zones rather than two.
+
+The sweep on record said no -- rmse 0.070 at the named voxel against 0.113 at 4 mm -- but that was
+measured on a small collection where the report limb was already well fed, about one report per
+eight silences. It does not transfer to a corpus running at 1089:1, and the bias widening adds is
+*positive*, which is the direction the wall's error needs.
+
+Shipped as `report_radius`, default `None` (named voxel, bit-identical). On the 1,443-study pain
+corpus against one image, three draws:
+
+| report radius | rmse | against pool | error at top | &#124;g&#124; at top (truth 0.622) | pi at top |
+|---|---|---|---|---|---|
+| named voxel | 0.234 | −0.137 (p=.037) | **−0.303** | 0.250 | 0.289 |
+| 4 mm | **0.216** | **−0.155** (p=.021) | −0.122 | 0.450 | 0.306 |
+| 6 mm | 0.256 | −0.115 (p=.044) | −0.031 | 0.559 | 0.330 |
+| 8 mm | 0.289 | −0.082 (p=.094) | **+0.022** | **0.622** | 0.351 |
+
+**The over-shrinkage is cured.** Error at the strongest voxels goes −0.303 to +0.022, and `g` there
+goes 0.250 to 0.622 against a truth of 0.622. Whole-map rmse is lowest at 4 mm, so 4 mm minimises
+error while 8 mm centres the peaks, and there is no single best radius -- the same shape as the
+`coverage_radius` trade-off but an order of magnitude larger.
+
+It also moves the crossing later. At three images the named voxel has already lost (+0.023) while
+4 mm still wins (−0.013); at eleven images the deficit halves, +0.087 to +0.050. And `g_marginal`
+improves monotonically with the radius, 0.269 to 0.205 at one image.
+
+So the radius is not a free parameter but a function of the corpus: small where the coordinate
+studies are few and their peaks trustworthy, larger where the silence limb would otherwise swamp
+the reports. The quantity that decides it is the silence-to-report ratio, which is measurable
+before fitting.
+
+## Calibrating the adaptive report radius
+
+The report extent is not a free parameter and not a constant either: which setting wins depends on
+how badly the reports are outnumbered, and that spans two orders of magnitude across real
+collections. Measured as the median silences per report over the voxels some study named:
+
+| collection | ratio |
+|---|---|
+| NIDM pain, 9 tables | 5 |
+| NeuroStore pain, 25 tables | 18 |
+| NeuroStore pain, 200 tables | 140 |
+| NeuroStore pain, 1,443 tables | 604 |
+
+Sweeping the radius at each, as rmse for the named voxel against 4 mm:
+
+| ratio | 1 image | 3 images | error at top, 1 image |
+|---|---|---|---|
+| 5 | named by 0.006 | -- | named by 0.008 |
+| 18 | named by 0.006 | named by 0.003 | **4 mm by 0.022** |
+| 140 | tie | **4 mm by 0.017** | **4 mm by 0.123** |
+| 604 | **4 mm by 0.018** | **4 mm by 0.035** | **4 mm by 0.181** |
+
+**The rmse crossing is bracketed between 18 and 140**, whose geometric midpoint is 50.2, and
+`ADAPTIVE_REPORT_RATIO` is 50. Centring at the strongest voxels crosses earlier -- 4 mm is better
+centred from 18 upward, and at 140 it takes `|g|` at the top from 0.271 to 0.433 against a truth of
+0.640 -- so a user who cares about the peaks more than the whole map should lower the threshold.
+
+Shipped as `report_radius="adaptive"`, which measures the ratio from the tables and picks, records
+the choice on `report_radius_`, and logs it.
+
+### Two harness defects this uncovered
+
+The first mid-scale sweep returned **byte-identical results for 0 mm and 4 mm**, which is
+impossible. It had caught the file between adding `report_radius` as a parameter of
+`_indicator_entries` and updating the call site to pass it, so both arms silently ran at the named
+voxel. Identical numbers across a swept parameter are the cheapest possible signal that the
+parameter is not connected, and worth checking for deliberately.
+
+Then `pkill -f hcp_sdm_vs_cbes`, meant to clear a contaminated run, matched its own shell's command
+line -- the pattern appears in it -- and killed the replacement runs along with it.
+
+### The adaptive rule across all four datasets, including where it misses
+
+| collection | ratio | adaptive picks | better option | cost of the pick |
+|---|---|---|---|---|
+| NIDM pain, 9 tables | 5 | named voxel | named voxel | — |
+| HCP MOTOR_LH / EMOTION_FACES | 10 | named voxel | **4 mm** | 0.02 of magnitude |
+| working-memory studyset | thin | named voxel | tie | — |
+| NeuroStore pain wall, 1,443 tables | 604 | 4 mm | 4 mm | — |
+
+HCP, named voxel against 4 mm:
+
+| task | r | AUC | magnitude | `g_marginal` magnitude |
+|---|---|---|---|---|
+| MOTOR_LH | +0.772 / +0.774 | 0.939 / 0.941 | 0.62 / **0.64** | 0.42 / 0.44 |
+| EMOTION_FACES | +0.882 / +0.883 | 0.984 / 0.983 | 0.68 / **0.70** | 0.28 / 0.29 |
+
+4 mm is consistently a little better on HCP, across both tasks and both maps, in the direction the
+mechanism predicts: HCP under-recovers and a wider report adds positive bias. But it is 0.02 of
+magnitude against a shortfall of 0.28, so it does not touch the actual problem, which is that
+every HCP study genuinely has the effect and any fitted prevalence below 1 is error.
+
+The threshold stays at 50. Moving it to catch HCP would chase 0.02 on a bed of synthetic studies
+at the cost of the bracketing evidence from four real ratios, and the win it protects at the other
+end is an order of magnitude larger. Recorded as a known miss rather than presented as
+four-for-four.
+
+### A third knob that was defined but never connected
+
+`hcp_sdm_vs_cbes.py` reads `SKIP_SDM`, and the `SDM=0` switch added to match the other beds was
+never wired to the call site, so four arms of a CBES-only comparison each ran the full SDM-PSI
+pipeline. The symptom was duration -- one arm still going after nineteen minutes -- with no error.
+That is the third instance in this session of a parameter that existed and did nothing: the
+others were `report_radius` unplumbed through `_indicator_entries`, caught by 0 mm and 4 mm
+returning byte-identical results, and this same import leaving `DEFAULT_REPORT_RADIUS_MM`
+undefined on the default path only, because the ternary short-circuits for every value except the
+default. **Sweeping a parameter and checking the results actually differ is the cheapest guard
+available, and none of these three would have been caught by a test suite or a linter.**
+
+## Prior art: does this estimator already exist?
+
+Searched PubMed. The premise is not new; the estimator is a different treatment of it.
+
+**MetaNSUE** (Albajes-Eizagirre, Solanes, Radua, Stat Methods Med Res 2018,
+doi:10.1177/0962280218811349) states the exact premise: a study that reports "not significant"
+without an effect size cannot be dropped (biased) and cannot be entered as zero (also biased).
+Indexed under "interval censoring" and "multiple imputation". Reaches neuroimaging as SDM-PSI.
+
+The difference is what happens to the bound. MetaNSUE draws plausible values inside it and pools
+with Rubin's rules. CBES writes it into the likelihood as a censored term and maximises by EM.
+Nothing is drawn. Consequences: no proposal distribution to misspecify, and the observed
+information falls out directly, which is where the CBES standard errors come from. The PR
+docstring's "Non-reporting is censoring, not imputation" survives contact with the literature.
+
+Other ingredients, all previously published:
+
+  * images + coordinates in one model -- ES-SDM, Radua et al. Eur Psychiatry 2011,
+    doi:10.1016/j.eurpsy.2011.04.001
+  * voxelwise effect size from sparse peaks -- Salimi-Khorshidi, Nichols, Smith, Woolrich,
+    IEEE TMI 2011, doi:10.1109/TMI.2011.2122341 (GPR; interpolates from peak *height*, which
+    CBES deliberately does not read)
+  * filling in around a peak -- anisotropic kernels, Radua et al. Front Psychiatry 2014,
+    doi:10.3389/fpsyt.2014.00013 (same problem as report_radius, solved by spatial correlation
+    rather than an inequality)
+  * random-effects CBMA using height, and the subsample-vs-high-powered-group validation design
+    we are using -- Bossier et al. Front Neurosci 2018, doi:10.3389/fnins.2017.00745
+  * point-process CBMA -- Montagna, Wager, Barrett, Johnson, Nichols, Biometrics 2018,
+    doi:10.1111/biom.12713
+
+Outside neuroimaging the machinery is routine and older: Tobit regression, survival
+right-censoring, astronomical upper limits, environmental non-detects. PubMed does not index
+those fields.
+
+What appears new is the combination:
+
+  1. censored likelihood instead of imputation
+  2. silence as a spatial pattern read at every voxel, with the three-zone indicator
+     (named / ambiguous ring / silent), rather than one per-study "this contrast was null"
+  3. zero inflation as a separate parameter, so pi and mu are distinct reportable quantities
+     (ES-SDM and MetaNSUE estimate one pooled effect)
+  4. the declared correction threshold as the censoring bound, rather than inferring it from
+     the smallest reported peak
+
+Caveat, recorded so it is not forgotten: this cannot prove absence. English-language PubMed,
+keyword search, and PubMed ANDs every term so the first two attempts returned zero. A
+censored-likelihood CBMA in a statistics journal without neuroimaging keywords would not appear.
+Before write-up: Google Scholar forward citations of MetaNSUE, and arXiv stat.ME.
+
+Positioning for the PR and any paper: CBES is the censored-likelihood, voxelwise, zero-inflated
+version of the idea MetaNSUE introduced. Cite Albajes-Eizagirre 2018 and Radua 2011 as direct
+antecedents. Do not present the premise as novel.
+
+## The spatial null does not fix the small-collection familywise rate
+
+Ran the global-null bed with NULL=spatial-images (Fourier phase randomisation, autocorrelation
+preserved) against the shipped permute-images, 40 sims, 200 permutations, mask eroded by 2.
+
+  arm                       permute-images    spatial-images
+  12 studies, 2 images          0.150             0.150
+  20 studies, 2 images          0.075             0.075
+  12 studies, 1 image           0.100             0.100
+
+Identical to three decimals on every arm, with uncorrected rates at 0.050 throughout. Binomial se
+on the familywise rate is 0.034, so this cannot resolve a difference smaller than about 0.07, but
+there is no hint of one.
+
+Conclusion: the residual inflation at 12 studies is not the permutation destroying spatial
+structure. spatial-images stays available -- it is the right null to reach for if the question is
+ever about spatial specificity -- but it does not become the default, since the randomiser costs
+8-10x for no change in calibration. #82 needs a different mechanism.
+
+## Censored likelihood against multiple imputation, and two bugs it found
+
+`experiments/censoring_versus_imputation.py`. Scalar bed, truth known exactly, 25,600 fits per
+arm: true mu 0.5, tau 0.15, 2 image studies, 20 coordinate studies, cut 0.691 in g units. Four
+arms plus a brute-force grid MLE as an oracle, so a disagreement can be attributed rather than
+argued about. The censored arm is not a reimplementation -- it calls CBES._fit_chunk on
+hand-built arrays.
+
+  arm                       bias      sd    rmse   CI width  coverage
+  grid MLE (oracle)      -0.0112  0.0999  0.1006     0.3047     0.954
+  censored (CBES)        -0.0112  0.0999  0.1006     0.3047     0.954
+  imputation (MetaNSUE)  -0.0115  0.1001  0.1008     0.2721     0.910
+  drop silent            +0.2364  0.0745  0.2478         --        --
+  zero fill              -0.2705  0.0750  0.2807         --        --
+
+The point estimates tie. A 20-rep pilot showed the censored arm 3.7% better on rmse; at 400 reps
+that is 0.2%, i.e. nothing. Both methods are Monte Carlo and closed-form evaluations of the same
+integral, so a tie is what theory predicts, and the pilot's margin was noise.
+
+What survives is the interval: the imputation arm's is 11% too narrow and covers 0.910 against
+nominal 0.95. Part of that is finite M -- Rubin's (1 + 1/M) correction is asymptotic and a
+Barnard-Rubin df adjustment would recover some of it. So the defensible claim is narrower than
+the docstring's "censoring, not imputation": the censored likelihood gets the interval right with
+no tuning, where imputation needs M large enough and a df correction. Not "imputation is worse".
+
+Both beat the two estimators MetaNSUE's abstract warns about by a wide margin: +0.24 and -0.27
+bias against -0.011.
+
+### Two shipped bugs the oracle exposed
+
+**The EM retired at its start value.** Where a study reported, log(1 - P(silent)) is convex in mu,
+so at a voxel with enough reporters the total observed curvature is positive and `-score /
+curvature` points uphill. The `curvature < 0` guard then set the step to 0, `settled` fired, and
+the voxel kept its start value with an se taken at a non-stationary point. 2.2% of voxels, mean
+|error| 0.34 at each -- exactly the gap between the estimator's sd of 0.095 and the MLE's 0.080.
+Elsewhere the EM matched the grid to 0.0006, so the EM was never wrong, only stalled. Fixed with a
+Fisher-information denominator, non-negative by construction, same fixed point. A scan finds 48
+stalling configurations; they all sit at small start values, where the reported limb's convexity
+outweighs everything else.
+
+**selection_model="none" profiled out a prevalence it never estimated.** It passed
+identified=None, which skips the guard that stops the Schur complement subtracting for an unfitted
+parameter. Information understated about eightfold, nominal-95% coverage 0.998. Fixed by always
+passing the array: all-False without a mixture, which is the truth. The default zero-inflated path
+was never affected.
+
+After both, CBES matches the oracle to four decimals on estimate and interval alike.
+
+### Three of my own errors on the way, all in the bed
+
+  * started the EM at zero, where the same convexity refuses the first step. The shipped code
+    starts at the pooled estimate (`start=fit["g"]`). A bed that does not copy the caller's start
+    is measuring a different algorithm.
+  * passed inverse-variance weights where `_accumulate` supplies unit weights ("Every image
+    contributes weight 1"). The point estimate was unaffected -- weights scale the whole score, so
+    the root does not move -- but the information was multiplied by the weight.
+  * with those weights the bed read se/sd 0.745, and #71 records the old scalar bed reading 0.74.
+    I thought I had found #71. I had not: both older scalar beds (censored_se.py,
+    observed_information_se.py) already use unit weights. Coincidence, withdrawn.
+
+## How a CBES impute() would differ from SDM-PSI's
+
+SDM-PSI's algorithm, from Albajes-Eizagirre, Solanes, Vieta & Radua, NeuroImage 2019,
+doi:10.1016/j.neuroimage.2018.10.077: "a) multiple imputation of study images; b) imputation of
+subject images; and c) subject-based permutation test to control the familywise error rate."
+
+Three differences, all of which have to be stated rather than glossed:
+
+  1. Two imputation levels against one. SDM imputes study maps and then synthetic subject images,
+     which is what lets it run Freedman-Lane permutation with TFCE. A CBES impute() gives level
+     (a) only: downstream meta-analytic tools, not subject-level permutation.
+  2. SDM conditions on reported peak heights and recreates the map with the anisotropic kernel.
+     CBES reads only the +-1 indicator, so its bounds are |g| < c at a silence and |g| >= c at a
+     report, with no point value anywhere. Imputed CBES maps are necessarily more diffuse. That is
+     the price of refusing heights, made visible rather than hidden.
+  3. CBES fits pi, so a completed value must come from the mixture: with probability 1 - pi the
+     study has no effect at this voxel and the draw belongs to the null component. SDM imputes
+     from a single distribution. This is a structural difference and probably an improvement -- a
+     completed dataset can represent "this study genuinely had nothing here".
+
+Do not smooth after imputing. A smoothed draw can leave its own interval, and the marginal
+variance shrinks, so the completed values stop satisfying the censoring they were built from. SDM
+avoids this because its kernel is part of the imputation model, not a post-hoc filter. The
+construction that works is a Gaussian copula: draw a smooth GRF with the target covariance, map
+through Phi to uniforms, then through each voxel's truncated-normal inverse CDF. Exact on the
+marginal truncation, approximate on the correlation, and about as cheap as drawing the field.
+Gibbs under a GMRF prior is exact and much slower.
+
+Noted for #82: SDM-PSI's own validation found its FWER control "might be too conservative". Ours
+is liberal at small collections, so their diagnosis will not transfer.

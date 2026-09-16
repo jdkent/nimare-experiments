@@ -43,6 +43,7 @@ from nilearn.datasets import load_mni152_brain_mask
 from nilearn.image import resample_to_img
 from nilearn.maskers import NiftiMasker
 from nimare.meta.cbma import CBES
+from nimare.meta.cbma.effectsize import DEFAULT_REPORT_RADIUS_MM
 from nimare.studyset import Studyset
 from nimare.transforms import t_to_z, z_to_t
 from reporting import report_peaks
@@ -55,6 +56,13 @@ N_PER_STUDY = int(os.environ.get("NPER", 30))
 N_STUDIES = int(os.environ.get("NSTUDIES", 16))
 N_IMAGES = int(os.environ.get("NIMAGES", 2))
 N_SPLITS = int(os.environ.get("NSPLITS", 3))
+#: SKIP_SDM is kept because earlier runs used it; SDM=0 matches the other beds.
+RUN_SDM = os.environ.get("SDM", "1") == "1" and not os.environ.get("SKIP_SDM")
+#: Radius over which a report asserts its lower bound; None is the named voxel alone.
+REPORT_RADIUS = (None if os.environ.get("REPORTR", "default") in ("none", "None")
+                 else (float(os.environ["REPORTR"]) if os.environ.get("REPORTR", "default")
+                       not in ("default", "") else DEFAULT_REPORT_RADIUS_MM))
+
 SDM_HOME = "/tmp/claude-0/sdm/SdmPsiGui-linux64-v6.23"
 CACHE = f"/tmp/claude-0/hcp/{CONTRAST}_masked.npy"
 
@@ -214,7 +222,7 @@ if __name__ == "__main__":
         # The plain-Tobit arm (prevalence pinned at 1) was measured here and was *worse* --
         # 0.60 against 0.63 -- so the option was reverted from the estimator rather than
         # shipped. See notes: the censoring term over-shrinks mu whatever the prevalence does.
-        result = CBES(mask=masker, null_method="none",
+        result = CBES(mask=masker, null_method="none", report_radius=REPORT_RADIUS,
                       threshold="reporting_threshold").fit(collection)
         cbes_g = np.abs(result.get_map("g", return_type="array").ravel())
         covered = result.get_map("n_studies", return_type="array").ravel() > 0
@@ -246,7 +254,7 @@ if __name__ == "__main__":
         else:
             # Parity: SDM gets the same studies as maps that CBES does, as t maps rather than
             # g maps, which is each method's native input for the same information.
-            sdm = None if os.environ.get("SKIP_SDM") else run_sdm(
+            sdm = None if not RUN_SDM else run_sdm(
                 tables, work, images=[f"s{k:02d}" for k in range(N_IMAGES)])
         use = covered & np.isfinite(truth) & np.isfinite(cbes_g)
         if sdm is not None:

@@ -28,6 +28,7 @@ from scipy import stats
 from nilearn.datasets import load_mni152_brain_mask
 from nilearn.maskers import NiftiMasker
 from nimare.meta.cbma import CBES
+from nimare.meta.cbma.effectsize import DEFAULT_REPORT_RADIUS_MM
 from nimare.studyset import Studyset
 from nimare.transforms import d_to_g, t_to_d
 from load_pain import load_pain
@@ -40,6 +41,26 @@ SCHEME, FOCUS = "cluster", "max"
 # assumed -- cluster recovers 23% of published peaks within 8 mm -- so which one the headline
 # result rests on is a question about the claim, not a detail.
 TABLES = os.environ.get("TABLES", "extracted")
+def _report_radius_from_env(default=DEFAULT_REPORT_RADIUS_MM):
+    """Read REPORTR as a single radius, tolerating the comma list other beds sweep over.
+
+    `one_image_many_tables` imports this module and sweeps REPORTR over several radii, so a
+    value meant for it must not blow up here at import time.
+    """
+    raw = os.environ.get("REPORTR", "").strip()
+    if not raw or "," in raw:
+        return default
+    if raw in ("none", "None"):
+        return None
+    try:
+        return float(raw)
+    except ValueError:
+        return default
+
+
+#: Radius over which a report asserts its lower bound; None is the named voxel alone.
+REPORT_RADIUS = _report_radius_from_env()
+
 N_SPLITS = int(os.environ.get("NSPLITS", 8))
 WORKDIR = f"/tmp/claude-0/validate_{os.getpid()}"
 os.makedirs(WORKDIR, exist_ok=True)
@@ -142,16 +163,22 @@ def fit(studies, **kwargs):
     # hard upper bound on whatever cut it really used. That asymmetry is unavoidable and is
     # exactly the situation the clamp was built for.
     threshold = "reporting_threshold" if TABLES == "extracted" else 3.09
+    kwargs.setdefault("report_radius", REPORT_RADIUS)
     est = CBES(mask=masker, null_method="none", threshold=threshold, **kwargs)
     res = est.fit(Studyset({"id": "x", "name": "x", "studies": studies},
                            target=None, mask=mask_img))
     have = set(res.maps)
     marginal = (np.abs(res.get_map("g_marginal", return_type="array").ravel())
                 if "g_marginal" in have else None)
+    # Appended, not inserted: callers index this tuple positionally.
+    share = (res.get_map("coordinate_share", return_type="array").ravel()
+             if "coordinate_share" in have else None)
     return (np.abs(res.get_map("g", return_type="array").ravel()),
             res.get_map("n_studies", return_type="array").ravel() > 0,
             marginal,
-            res.get_map("dof", return_type="array").ravel())
+            res.get_map("dof", return_type="array").ravel(),
+            share,
+            res.get_map("se", return_type="array").ravel())
 
 
 def score(est, truth, use):
