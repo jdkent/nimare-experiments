@@ -2297,3 +2297,46 @@ at n = 120 -- twenty-seven small studies are worth one large one for this questi
 
 Running: power against coordinate-study sample size at n = 20, 40, 80, 160, and against image
 count at 6 and 20 images.
+
+## CORRECTION to the retraction: the family-wise rate is unverified, not nominal
+
+I retracted the inflation on the strength of a 200-simulation run reading 0.055. That run was
+launched **before** the Fisher-denominator fix, so it does not describe the shipped code. A
+100-simulation run after the fix reads 0.100. Three estimates at 12 studies and two images:
+
+  sims   code        familywise   se
+    40   pre-fix          0.150   0.034
+   200   pre-fix          0.055   0.016
+   100   post-fix         0.100   0.022
+
+The 40 and 200 are nested in seeds and consistent (6 rejections in the first 40, 11 in 200, so the
+early clustering was chance). The 100-simulation post-fix run is a different revision. 0.055 and
+0.100 differ by 1.7 standard errors -- not a separation -- and neither separates from 0.05.
+
+So the honest state is **unverified**, not "nominal" and not "inflated". I swung from one
+confident conclusion to the opposite one within an hour, on runs that could not support either.
+The docstring now says unverified below about 20 studies. A 500-simulation post-fix run is going.
+
+Also worth recording: the no-tables arms were measured post-fix and read 0.080 (2 studies, 2
+images) and 0.030 (6 studies, 6 images) at 100 simulations each, se 0.022. Both within noise of
+nominal, and they do not isolate the coordinate channel as the cause of anything, because there is
+not yet an established effect to attribute.
+
+## Boundary power against sample size: the prediction holds
+
+`experiments/boundary_test_size_and_power.py`, 2000 replicates per cell, 2 images.
+
+  n of coordinate studies    size@20 tab   power(pi=0.8)   power(pi=0.6)   [80 tables]
+                       20         0.0415           0.141           0.169
+                       40         0.0525           0.206           0.276
+                       80         0.0440           0.259           0.350
+                      160         0.0370           0.338           0.443
+
+Size stays calibrated across the range (0.036 to 0.055 against 0.05). Power at prevalence 0.6 goes
+from 0.169 to 0.443 as the coordinate studies grow from 20 to 160 subjects, which is what
+I_pipi = v^2 / D predicted: 0.309 to about 14 per table over that range. Table count buys much
+less (0.128 to 0.169 going from 20 to 80 tables at n = 20).
+
+Still not a usable test at realistic sizes -- 0.44 power to detect prevalence 0.6 needs 80 tables
+of 160 subjects each -- but the mechanism is confirmed and the design implication is clear: for
+this question, recruit larger studies rather than more of them.
