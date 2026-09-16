@@ -1881,3 +1881,45 @@ shrinkage is buying real accuracy on mu -- up to 0.26 of rmse -- and costing the
 
 A full sweep over max_iter at four regimes is running, plus pain at 400. Nothing changes until
 those land, and max_iter must not be tuned to a collection.
+
+## CORRECTION: converging does not fix the prevalence, it overshoots
+
+The 20-rep pilot above read a fitted prevalence of 0.611 at true 0.6 with max_iter=400, and I
+wrote that the "prevalence is ordinal, not a fraction" caveat might be an artefact of stopping at
+25. At 200 reps it reads 0.723. The pilot was noise. Full sweep, 6,400 fits per cell, 2 image
+studies and 20 tables:
+
+  max_iter | true pi 1.0: pi hat  rmse(mu)  short% | true pi 0.6: pi hat  rmse(mu)  short%
+        10 |               0.709     0.183   0.943 |               0.541     0.410   0.885
+        25 |               0.854     0.205   0.852 |               0.576     0.459   0.763
+        50 |               0.955     0.243   0.412 |               0.615     0.540   0.504
+       100 |               0.996     0.281   0.111 |               0.657     0.654   0.208
+       200 |               0.998     0.287   0.022 |               0.699     0.695   0.073
+       400 |               0.998     0.289   0.007 |               0.723     0.707   0.035
+
+pi hat climbs monotonically with the iteration cap and simply crosses the truth on the way past.
+It lands on 1.0 only because 1.0 is a boundary. The ordinality caveat stands.
+
+What survives: max_iter is an undeclared shrinkage parameter, monotone in both directions, and 25
+is a point on a bias-against-ordering trade rather than a convergence criterion. On published
+pain, 25 to 400 gives mean error 0.073 to 0.069 and error at the top 0.014 to 0.004 (better
+level), against r 0.575 to 0.560, AUC 0.886 to 0.882 and rmse 0.240 to 0.244 (worse ordering).
+Documented in the max_iter entry; the default is unchanged, because nothing here says a different
+value is better overall.
+
+Third time this session a 20-rep pilot has pointed the wrong way (the others: the censored arm's
+"3.7% better rmse" than imputation, which was 0.2% at 400 reps; and reading the post-fix pain run
+as weaker when the comparison run was differently configured). Pilots size a run. They are not
+findings.
+
+## A docstring claim, falsified by my own measurement
+
+The null_method entry said the family-wise rate is liberal in small collections because
+permute-images destroys the image's spatial autocorrelation, so "the observed map can lay a
+coherent blob of large values over a region where few studies were silent and a scattered map
+cannot". It does destroy the autocorrelation. That is not the cause: spatial-images preserves it
+and returns 0.150, 0.075 and 0.100, identical to permute-images on all three arms. Replaced with
+the measurement and an explicit statement that the mechanism is unknown.
+
+Worth noting the direction was never right either. A rougher null field has more effective resels,
+so its maximum is larger, which would make the test conservative rather than liberal.
