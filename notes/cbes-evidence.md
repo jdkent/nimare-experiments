@@ -1970,3 +1970,60 @@ when the mixture is real.
 
 The Notes entry has to change: se/sd is not a property of the estimator, it is a property of the
 configuration, and the direction flips.
+
+## The coordinate channel's information about (mu, pi) is rank 1
+
+`proofs/mixture_identification.py`, 10 sympy claims plus a calibration check against #73.
+
+A reporting indicator is a Bernoulli whose silence probability is the mixture integrated over
+(-c, c): S = pi*s_a(mu) + (1-pi)*s_0. Its two scores are
+
+    dS/dmu = pi * u      with u = d s_a / d mu
+    dS/dpi = v           with v = s_a - s_0
+
+so every block of its information matrix is built from the same two scalars, and
+
+    I_mumu * I_pipi - I_mupi^2 = 0     identically
+
+whatever the number of coordinate studies. The Schur complement from indicators alone is exactly
+zero. **Coordinate tables cannot separate mu from pi at all.** Every bit of that separation comes
+from the images, whose two scores are not proportional: the mu score carries a factor (g - mu)
+that vanishes at g = mu while the pi score does not.
+
+That is the algebraic version of the wall result (#81). A corpus of 1,443 tables adds no ability
+to tell a large effect in few studies from a small effect in many, because it adds rank-1 matrices
+to a rank-1 matrix.
+
+### Unless the studies differ, and then Lagrange's identity says by how much
+
+For heterogeneous studies the determinant is not zero but
+
+    det I = pi^2 * sum_{j<k} w_j w_k (u_j v_k - u_k v_j)^2
+
+so the entire identifying power of the coordinate channel is the spread of u/v across studies, and
+nothing else. Evaluated on the two designs #73 measured:
+
+  sample sizes 12-120 at z=3.09    3.0864e+00
+  thresholds 2.3-4.5 at n=20       8.8768e-02
+  no spread at all                 0
+
+35x in favour of spreading sample sizes, which is the measured direction: sample-size spread
+lifted the bounded fraction from 0.42 to 0.69 and threshold spread changed nothing. The ratios u/v
+spread about equally in the two designs (1.23 against 0.93), so the factor is not about the ratio.
+Spreading the threshold moves both mixture components together and leaves v = s_a - s_0 small,
+which is what the cross-product is built from. That was the verbal explanation in #73; it is now a
+number, and the proof carries the check so it cannot drift.
+
+### What this decides
+
+  * #81, algebraically: the wall of tables is rank 1 and cannot be anything else.
+  * #73 explained rather than recorded, with a design rule: to identify the magnitude, collect
+    studies of differing *sample size*. Differing thresholds are worth about 3% as much.
+  * The se/sd problem: the Wald se inverts I_mumu - I_mupi^2 / I_pipi, which goes to zero exactly
+    at the ridge. With two images the non-degenerate part of the information is rank 2 from two
+    observations, so the Schur complement is near zero and the Wald interval is unstable in both
+    directions -- which is what 0.80 at the default and 2.55 at convergence are.
+  * A shippable diagnostic follows: the estimator already computes all three blocks in
+    _observed_information, so it can report how close I_mupi^2 is to I_mumu * I_pipi and refuse
+    the Wald interval where the ridge is flat. interval="profile" is already implemented for
+    exactly that case.
