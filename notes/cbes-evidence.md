@@ -1923,3 +1923,25 @@ the measurement and an explicit statement that the mechanism is unknown.
 
 Worth noting the direction was never right either. A rougher null field has more effective resels,
 so its maximum is larger, which would make the test conservative rather than liberal.
+
+## The two imputation claims, now measured instead of asserted
+
+`experiments/copula_imputation_check.py`, 1-D, 4096 points, 93% of voxels silent, target field
+autocorrelation 0.802 at lag 4.
+
+  construction                      bound violations     sd   autocorr
+  independent draw                            0.0000  0.267      0.143
+  independent draw, then smoothed             0.0432  0.118      0.848
+  Gaussian copula                             0.0000  0.258      0.696
+
+Claim 1 holds: smoothing after imputation puts 4.3% of voxels outside the interval they were
+drawn from and collapses the sd by 56%. A completed map built that way no longer satisfies the
+censoring it was built from, which is the whole point of building it.
+
+Claim 2 holds, with a number attached: the copula violates nothing and recovers 0.696 of the
+target's 0.802, i.e. 87%, not 100%. A Gaussian copula preserves rank correlation, and the
+truncation's nonlinear marginal transform attenuates the Pearson correlation on top of that. Quote
+87%, not "preserves the correlation".
+
+1-D caveat, per the protocol: a kernel of a given FWHM couples far more neighbours in a volume, so
+read the retained fraction as a direction rather than a number until it is checked in 3-D.
