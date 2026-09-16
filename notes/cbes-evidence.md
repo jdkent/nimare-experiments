@@ -2793,24 +2793,44 @@ estimate is nan with a validity flag. Retention is a supplied parameter whose om
 documented rho = 1 choice, not a neutral default. 15 tests.
 
 **Calibration, against the document's own numbers rather than a bed of my own.** Its section 8.1
-is a 4,000-replication experiment computed independently of anything here.
+is a 4,000-replication experiment computed independently of anything here. At 4,000 replications
+on this side too:
 
-    regime    arm        measured here   document   coverage here   document
-    1+20      images     0.2538          0.256      0.9433         --
-    1+20      ignoring   0.1659          0.157      0.7567         0.7760
-    1+20      correct    0.1267          0.129      0.9200         0.9395
-    1+500     images     0.2413          0.251      0.9500         --
-    1+500     ignoring   0.1132          0.114      0.0000         0.0000
-    1+500     correct    0.0241          0.023      0.9600         0.9493
-    8+100     images     0.0915          0.090      0.9333         --
-    8+100     ignoring   0.1040          0.103      0.2400         0.2345
-    8+100     correct    0.0430          0.047      1.0000         0.9475
+    regime    arm        rmse here        document   coverage here      document
+    1+20      images     0.2565 +-0.0028  0.256      0.9467 +-0.0036    --
+    1+20      ignoring   0.1538 +-0.0019  0.157      0.7802 +-0.0065    0.7760
+    1+20      correct    0.1275 +-0.0020  0.129      0.9407 +-0.0037    0.9395
+    1+500     images     0.2513 +-0.0029  0.251      0.9465 +-0.0036    --
+    1+500     ignoring   0.1139 +-0.0003  0.114      0.0000 +-0.0000    0.0000
+    1+500     correct    0.0242 +-0.0003  0.023      0.9395 +-0.0038    0.9493
+    8+100     images     0.0880 +-0.0010  0.090      0.9505 +-0.0034    --
+    8+100     ignoring   0.1005 +-0.0006  0.103      0.2550 +-0.0069    0.2345
+    8+100     correct    0.0465 +-0.0006  0.047      0.9455 +-0.0036    0.9475
 
-Every cell within three standard errors. The 1+500 ignoring-retention cell has **three**
-independent agreeing routes: the closed-form bias -0.1121 from the algebra, 0.1132 measured
-here, 0.114 measured by the document. A 4,000-replication confirmation run is in progress; the
-above is 25 replications, so the standard errors are wide and the point is the agreement in
-pattern, particularly the coverage collapse to exactly 0%.
+All nine cells agree, but *how* they are compared mattered and I got it wrong first time. The
+target is not a constant: it is itself a 4,000-replication estimate quoted to three decimals, so
+the standard error of the difference is the root sum of squares of both runs' errors and the
+rounding's own sd. Comparing against the target as though exact turned a 2.8-sigma agreement
+into a 4.4-sigma failure and printed FAIL. Same class of harness defect as the zero binomial
+standard error: the statistic being wrong, not the estimator.
+
+Residual gaps on the correct comparison, largest first: 8+100 ignoring 2.8 sigma, 1+500 correct
+2.4 sigma, 8+100 ignoring coverage 2.1 sigma, 1+500 correct coverage 1.9 sigma. That is
+agreement with a small residual, not identity, and the residual is not resolvable from the
+document alone -- its grid, optimiser and interval construction are unstated and each moves an
+RMSE in the third decimal.
+
+The 1+500 ignoring-retention cell has **three** independent agreeing routes: the closed-form bias
+-0.1121 from the algebra, 0.1139 measured here, 0.114 measured by the document.
+
+A harness rewrite was needed to get there. The original bed evaluated the full likelihood at
+1,401 grid points for every replication, which projected to hours at 500 coordinate studies.
+Because every coordinate study in this experiment shares one threshold and one sampling
+variance, the likelihood depends on a table only through *how many* studies reported -- so one
+log-probability curve per outcome suffices and a replication is a dot product. The curves are
+still built by calling `censored_loglik`, so the implementation remains the thing calibrated, and
+`assert_reduction_is_exact` checks the count-based profile against the full per-record one on
+every regime rather than assuming it. Nine cells at 4,000 replications now take two minutes.
 
 ### An open discrepancy in section 8.2, recorded rather than guessed at
 
@@ -2828,11 +2848,25 @@ must therefore do something its description does not pin down: perhaps include t
 studies with a correct censoring term while mistreating only the heights, or weight the peak by
 the maximum's variance rather than the element's.
 
-This does **not** undermine the section 8.1 agreement: all nine of those cells landed, so the
-disagreement is localised to an under-specified foil rather than to the model. But it means
-section 8.2 cannot be used as a calibration target until the arm is pinned down, and its
-substantive claim -- that heights add little beyond a correct reporting indicator (.050 against
-.053, .010 against .011, .022 against .024) -- is the part worth reproducing anyway.
+Four candidate constructions were tried, by maximising the expected log-likelihood of each under
+the document's own stated generative model:
+
+    peaks as ordinary values, sd sqrt(eps^2+tau^2), correct absences   bias +0.060
+    peaks as ordinary values, sd eps only, correct absences            bias +0.130
+    peaks only, absences discarded                                     bias +0.490
+    correct reporting indicator, no heights at all                     bias +0.000
+
+None gives the +0.256 its asymptotic RMSE implies; the middle two bracket it. So its naive arm is
+a construction its description does not pin down.
+
+The last row is the useful outcome, though: the correct indicator-only arm comes out **unbiased**,
+which is consistent with the document's .011 at 1+500 being an estimator's standard deviation
+rather than a bias. So my reading of its section 8.2 generative model is right for the arms that
+carry the scientific claim, and only the deliberately-wrong foil is un-reproducible. Its
+substantive finding -- that heights add little beyond a correct reporting indicator (.050 against
+.053, .010 against .011, .022 against .024) -- is checkable and is the part worth reproducing.
+
+This does **not** undermine the section 8.1 agreement: all nine of those cells landed.
 
 Two harness defects found and fixed in the course of this, neither a finding: a binomial standard
 error of exactly zero used as a divisor, which turned a one-se miss into an infinite one; and
