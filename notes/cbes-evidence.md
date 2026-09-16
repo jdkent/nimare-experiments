@@ -2208,3 +2208,38 @@ invisible in the output.
 What this does not settle: whether a stated lambda would be better. The measurements say the
 shrinkage is buying real accuracy on mu (rmse 0.183 at 10 iterations against 0.289 at 400), so a
 replacement has to beat it in simulation before it is worth writing.
+
+## The familywise inflation is probably not real: 0.055 at 200 simulations
+
+Every "0.150 at 12 studies" figure in this file came from a 40-simulation run. The binomial
+standard error of a rate estimate at n=40 near 0.05 is 0.034. A 40-simulation run cannot
+distinguish 0.05 from 0.15. It was never evidence.
+
+Re-run at 200 simulations, same erosion, same permutation count, same seeds:
+
+  arm                         sims    se    uncorrected  familywise
+  12 studies, 2 images          40  0.034       0.0501       0.150
+  12 studies, 2 images         200  0.015       0.0498       0.055
+  2 studies, 2 images           100  0.022       0.0507       0.080
+  6 studies, 6 images           100  0.022       0.0487       0.030
+
+The 200-simulation estimate is 0.055 against a nominal 0.05, i.e. nominal. The no-table arms are
+0.080 and 0.030, both within noise of 0.05 at their precision.
+
+What this invalidates, and it is a lot:
+
+  * the family-wise numbers I wrote into the null_method docstring -- 0.150, 0.075, 0.100 --
+    stated as evidence that the rate is "too liberal in small collections". They are not evidence.
+  * the spatial-null comparison's *numbers*. "Identical on all three arms" is true and useless at
+    se 0.034. Its conclusion survives only because roughness_cannot_be_liberal.py is an
+    independent argument.
+  * the whole #82 investigation, including the arms still running to test mechanisms for an
+    effect that may not exist.
+
+What survives: #79, where eroding the boundary moved the rate 0.375 to 0.075. That is nine
+standard errors even at n=40.
+
+The lesson is the same one three times over today, now at its most expensive: a 40-replicate run
+is a pilot that sizes the real run. Reporting one as a finding, and worse, writing one into a
+shipped docstring, is how a session spends hours chasing an artefact. Simulation counts need a
+stated standard error before the number is written down anywhere.
