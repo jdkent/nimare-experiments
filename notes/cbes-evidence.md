@@ -2158,3 +2158,53 @@ Two reasons, of unequal weight.
 Also worth documenting either way: a collection of uniformly-sized studies at one threshold gets
 *no* separating information from its tables, exactly. That belongs in the Warnings beside "the
 correction can make g worse than doing nothing".
+
+## Two more proofs: the boundary test for pi = 1, and what max_iter really is
+
+### proofs/boundary_test_for_full_prevalence.py (5 claims)
+
+The worst failure mode -- nothing tells a user whether their collection has pi < 1, and the
+correction helps in one regime and hurts in the other -- is a hypothesis test that has not been
+written down because the usual recipe does not apply. pi = 1 is on the boundary of the parameter
+space, so 2 log Lambda is not chi^2_1 but Chernoff's half-and-half mixture of chi^2_0 and chi^2_1
+(Self and Liang 1987, doi:10.1080/01621459.1987.10478472; Chernoff 1954,
+doi:10.1214/aoms/1177728725). Marked in the proof as asserted rather than derived, because it is a
+distributional result about where the unconstrained maximum falls, not an algebraic identity.
+
+Practical content, a factor of two: the level-0.05 critical value is **2.7055**, not 3.8415. Using
+the naive chi^2_1 cut runs the test at half its nominal level.
+
+Verified: the score in pi is (f_1 - f_0)/f, which at the boundary is 1 - f_0/f_1 and needs no fit;
+the local expansion about the boundary is eps*r - eps^2 r^2 / 2 with r = f_0/f_1 - 1, so the
+statistic is quadratic in the departure and its scale is E[r^2] = I_pipi.
+
+**Where the power comes from, and this is the useful part.** The rank-1 theorem says the
+coordinate channel cannot separate mu from pi. It does *not* say the channel is silent about pi
+alone: one indicator contributes I_pipi = n_t v^2 / D with v = s_a - s_0, increasing in the number
+of tables. So unlike the split, this test does draw power from a wall of tables. Power vanishes
+only when v -> 0, i.e. when a study with the effect is no more likely to report than one without.
+
+Next per the order of operations: simulate its size and power before writing any of it into the
+estimator.
+
+### proofs/early_stopping_is_shrinkage.py (5 claims)
+
+An EM map converges linearly with rate rho = the fraction of information the missing data hides
+(Dempster, Laird and Rubin 1977). So stopping at t iterations does not return an approximate MLE
+with unspecified error; it returns
+
+    theta_t = (1 - rho^t) theta* + rho^t theta_0
+
+an exact convex combination of the MLE and the starting value. Equating that to the optimum of a
+quadratic penalty towards theta_0 gives the penalty the cap is silently imposing:
+
+    lambda_eff = I rho^t / (1 - rho^t)
+
+and lambda_eff is increasing in the missing information. **So a fixed cap shrinks hardest at the
+voxels where the censoring hides the most -- which is where the coordinate channel is carrying the
+estimate and the images are carrying least.** A prior nobody chose, different at every voxel, and
+invisible in the output.
+
+What this does not settle: whether a stated lambda would be better. The measurements say the
+shrinkage is buying real accuracy on mu (rmse 0.183 at 10 iterations against 0.289 at 400), so a
+replacement has to beat it in simulation before it is worth writing.
