@@ -2912,3 +2912,57 @@ Two harness defects found and fixed in the course of this, neither a finding: a 
 error of exactly zero used as a divisor, which turned a one-se miss into an infinite one; and
 uninformative records reaching the optimiser's starting values through a mean taken over every
 row, which made "contributes nothing" true only to 7e-9.
+
+
+## Section 8.2 reproduced in code as well as algebra (2026-09-16, later)
+
+`nimare/meta/cbma/blocks.py` implements the block peak-selection likelihood; ten tests, including
+exact agreement with the scalar reference for a one-element block, which is the strongest
+consistency condition available between the two modules.
+
+`experiments/block_reference_calibration.py` at 1,000 replications, against the assessment's own
+1,000-replication table:
+
+    regime    arm        rmse here        document   coverage
+    1+20      images     0.1680 +-0.0038  0.165      0.9360
+    1+20      heights    0.0501 +-0.0012  0.050      0.9470
+    1+20      indicator  0.0541 +-0.0012  0.053      0.9420
+              ratio      0.9252 +-0.0102  0.929
+    1+500     images     0.1701 +-0.0038  0.167      0.9400
+    1+500     heights    0.0101 +-0.0002  0.010      0.9500
+    1+500     indicator  0.0109 +-0.0002  0.011      0.9500
+              ratio      0.9296 +-0.0110  0.929
+    8+100     images     0.0583 +-0.0013  0.057      0.9480
+    8+100     heights    0.0217 +-0.0005  0.022      0.9410
+    8+100     indicator  0.0232 +-0.0005  0.024      0.9490
+              ratio      0.9367 +-0.0096  0.929
+
+Both modelled columns land in all three regimes, and the height-to-indicator ratio agrees with
+the analytic Fisher-information prediction to within one bootstrap standard error each time. So
+section 8.2's substantive finding is now confirmed twice over and from two directions: computed
+from the informations, and measured from the estimator.
+
+The naive column stays unattempted. Its construction is not pinned down by the description, and
+a guessed construction produces a number that means nothing.
+
+### Three harness defects on the way, none of them findings
+
+  * **A ratio compared to a band with no standard error.** At 60 replications the 8+100 ratio read
+    0.9697 and my check called it outside the 0.90-0.95 band -- but the ratio is a quotient of two
+    *correlated* random quantities (both arms see the same replication) and I had given it no
+    standard error at all. A bootstrap that resamples replications, keeping the pairing, puts it
+    at +-0.0096 at 1,000 replications, hence +-0.039 at 60: the "failure" was 1.2 standard errors
+    inside the band. Same class as the zero binomial standard error and the target-treated-as-
+    constant: the statistic was wrong, not the estimator.
+  * **A tolerance tighter than the interpolation scheme.** The bed tabulates the height's
+    log-density against `h - m` -- affordable only because the location-family claim says one
+    curve serves every pair -- and the exactness check against direct evaluation failed at 3e-5.
+    That is linear interpolation's own error on a 0.0014 grid, about 2e-6 per point over eight
+    points. Replaced with a cubic spline, which puts the check back to testing the identity
+    rather than the interpolator.
+  * **Bit-identity demanded where the arithmetic cannot deliver it.** The location-family test
+    shifts the mean and every height together and asserts nothing changes. It failed at 3e-15,
+    because the *shift itself* rounds: `(0.9 + 0.17) - (0.4 + 0.17)` differs from `0.9 - 0.4` in
+    the last bit. Bit-identity is now asserted only for dyadic shifts of dyadic heights, where
+    the sums are exact, with a separate few-ulp check for the rest. The strong form is kept
+    where it is true rather than weakened everywhere.
