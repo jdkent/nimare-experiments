@@ -2117,3 +2117,44 @@ What would be needed instead: a proof about Var(mu_hat) rather than about the in
 fitted point -- the failure at high identified_share is between-collection wandering that the
 observed information does not see, which is a statement about the sampling distribution of the
 estimator, not about the curvature of one likelihood.
+
+## Sample-size spread buys prevalence accuracy, and the cross-product predicts how much
+
+`experiments/does_sample_size_spread_identify_prevalence.py`, 9,600 fits per arm, kill condition
+stated in the docstring before running (under 10% and the inference from the theorem fails).
+
+  arm                  cross-prod   pi bias   pi rmse   mu rmse
+  no spread at all         0.0000   -0.0252    0.2438    0.4586
+  sample sizes 12-40       0.8137   -0.0139    0.2325    0.4781
+  thresholds 2.3-4.5       0.8451   -0.0073    0.2363    0.4371
+  sample sizes 12-120     37.2951   +0.0303    0.2075    0.4405
+  both spread             36.4866   +0.0302    0.2161    0.4301
+
+14.9% of prevalence rmse between no spread and the widest, so the kill condition is not met and
+the inference from the theorem stands. A 40-rep pilot read 14.8%, which is the first time this
+session a pilot and the full run have agreed.
+
+The better result is the correspondence. Accuracy tracks the cross-product, not the nominal
+design: the 12-to-40 sample-size arm and the threshold arm have nearly equal cross-products (0.81
+against 0.85) and nearly equal prevalence rmse (0.2325 against 0.2363), despite being different
+kinds of heterogeneity. That equivalence is not obvious and the identity predicted it. The
+no-spread arm's cross-product is exactly 0.0000, as the algebra requires.
+
+mu rmse does not improve (0.44 to 0.48 across all arms, no ordering). The spread buys prevalence,
+not magnitude -- which fits, since mu is carried by the images either way.
+
+### What this means for requiring a sample size
+
+Two reasons, of unequal weight.
+
+  1. The silent drop, which is the bigger one. `_all_sample_sizes` raises only when *every*
+     sample size is missing; otherwise `series[series.notna()]` removes those studies and
+     `study_ids = list(sample_sizes.index)` makes that series the roster. A study without a
+     sample size never enters the model, so its silence -- "the single most informative
+     observation about how common the effect is", by the estimator's own docstring -- is
+     discarded with no warning. Studies missing the field are not a random subset.
+  2. Identification, worth about 15% of prevalence rmse here. Real, confirmed, and modest.
+
+Also worth documenting either way: a collection of uniformly-sized studies at one threshold gets
+*no* separating information from its tables, exactly. That belongs in the Warnings beside "the
+correction can make g worse than doing nothing".
