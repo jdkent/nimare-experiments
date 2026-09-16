@@ -164,6 +164,11 @@ def fit(studies, **kwargs):
     # exactly the situation the clamp was built for.
     threshold = "reporting_threshold" if TABLES == "extracted" else 3.09
     kwargs.setdefault("report_radius", REPORT_RADIUS)
+    #: The EM's iteration cap is not only a runtime knob: stopping early shrinks mu toward the
+    #: images-only pool and leaves the prevalence short of its value. Exposed so the trade can be
+    #: measured on real data rather than assumed from the scalar bed.
+    if os.environ.get("MAXITER"):
+        kwargs.setdefault("max_iter", int(os.environ["MAXITER"]))
     est = CBES(mask=masker, null_method="none", threshold=threshold, **kwargs)
     res = est.fit(Studyset({"id": "x", "name": "x", "studies": studies},
                            target=None, mask=mask_img))

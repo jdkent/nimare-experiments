@@ -1820,3 +1820,64 @@ Gibbs under a GMRF prior is exact and much slower.
 
 Noted for #82: SDM-PSI's own validation found its FWER control "might be too conservative". Ours
 is liberal at small collections, so their diagnosis will not transfer.
+
+## The Fisher fix is inert on real data, and the earlier "slight weakening" was mine
+
+Clean A/B on published pain, 8 splits, same seeds, the pre-fix code run from a git worktree at
+41f9213 through PYTHONPATH:
+
+                              before        after
+  shipped CBES g, r           +0.583       +0.575
+  mean err                    +0.072       +0.073
+  err at top                  +0.013       +0.014
+  rmse                         0.236        0.240
+
+Everything else -- images only, silence switched off, g_marginal -- is bit-identical. So the
+Fisher fallback moves pain by 0.004 rmse and nothing else, which matches the stall rate measured
+at whole-brain scale: 18 to 46 (voxel, iteration) pairs out of 3.7 million on synthetic fits with
+12 to 30 studies, i.e. at most about 0.1% of voxels.
+
+I earlier read the post-fix numbers as weaker than rr_pain.log's. That comparison was against a
+differently-configured run, not against the same code. The worktree A/B is the right comparison
+and it says the fix is inert.
+
+## _observed_information is exactly right, and max_iter=25 is doing something else
+
+`experiments/zero_inflated_oracle.py`. The first version compared the fit against the argmax of a
+2-D grid over (mu, pi) and produced an oracle *worse* than the estimator -- bias +0.19 against
+-0.01, sd 0.48 against 0.40. That is the bed's fault. The mixture likelihood has a near-flat
+ridge, so a global argmax wanders while an EM started at the pooled estimate settles nearby.
+"The MLE" is not a well-defined target here the way it is without the mixture. Rebuilt to ask two
+questions that need no unique maximum.
+
+**Is the interval right?** Reported se against the exact Schur standard error from a
+finite-difference 2-D Hessian of the analytic log-likelihood, evaluated at the estimator's own
+(mu, pi): ratio median 1.0000, 10th-90th percentile 1.0000 to 1.0000, at every max_iter tried.
+_observed_information is arithmetically correct. Whatever se/sd is in a given configuration is the
+likelihood's, not the code's. Worth noting that in this bed se/sd is 0.78, below 1, where the
+Notes say 1.2 to 2.2 -- so that figure is configuration-dependent and not a property of the
+estimator.
+
+**Is the fit at a maximum?** No. At max_iter=25, 75% of voxels sit more than 0.01 log-likelihood
+below the best a coarse grid can find, median gap 0.096. At 100 it is 21%, at 400 it is 3.6%.
+
+Converging changes the estimator consistently across four configurations (20 tables throughout):
+
+  images  true pi | rmse(mu) @25  @400 | pi hat @25   @400
+       6      1.0 |       0.083  0.085 |      0.970  0.999
+       6      0.6 |       0.218  0.302 |      0.650  0.666
+       2      1.0 |       0.210  0.294 |      0.847  0.998
+       2      0.6 |       0.482  0.739 |      0.554  0.611
+
+Early stopping shrinks mu toward the images-only pool and leaves the prevalence short. The
+shrinkage is buying real accuracy on mu -- up to 0.26 of rmse -- and costing the prevalence up to
+0.15. Three consequences, none of them currently documented:
+
+  * the estimator does not compute the censored MLE at its default, and says nothing about it
+  * the reported se is the exact curvature at a point that is not a maximum, so it is the right
+    se for the wrong estimator
+  * "prevalence is ordinal, not a fraction" may be an artefact of stopping at 25: at 400 the
+    fitted prevalence reads 0.999, 0.666, 0.998, 0.611 against truths 1.0, 0.6, 1.0, 0.6
+
+A full sweep over max_iter at four regimes is running, plus pain at 400. Nothing changes until
+those land, and max_iter must not be tuned to a collection.
