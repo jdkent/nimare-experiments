@@ -2655,3 +2655,53 @@ M 2^(M-1)/(2^M - 1), because Phi(0) is 1/2 and not 0. The claim failed and I fix
     maxima, so their test condition is censored summary data. The sentence I quoted concerns
     missing *peak effect sizes*, not absence of censoring. I over-read it and the note saying
     "no existing benchmark for what CBES does" is too strong.
+
+## Real data kills the control variate on pain, and shows why
+
+`experiments/control_variate_on_pain.py`. 21 NIDM pain studies, 267 published peaks, no cap. Eight
+studies held out as the reference so the truth never touches a coordinate used in the fit, six as
+the image cohort, seven coordinate-only. 40 splits.
+
+**Two correlations, and only one is the one in the formula.** The variance formula's rho is
+Corr(Y, f) *across studies at a fixed voxel*, because that is the covariance the estimator
+averages over. I first measured the within-study, across-voxel spatial correlation -- whether the
+kernel recreates a study's map shape -- which is a different and much larger number.
+
+  fwhm   rho_spatial   rho_between   ratio at 6+7   floor
+    10         0.173         0.115          0.993   0.987
+    20         0.266         0.094          0.995   0.991
+    30         0.287         0.062          0.998   0.996
+    45         0.241        -0.002          1.000   1.000
+
+Stated kill condition was rho below 0.3. The right rho is **0.06 to 0.12**, an order of magnitude
+short, and the achievable variance reduction is under 1%. Measured performance agrees: rmse 0.1707
+against 0.1710 for images alone, a 0.2% difference that is noise at 40 splits.
+
+**The mechanism, and it is the useful part.** A kernel over reported peaks does capture the shape
+of a study's own map -- rho_spatial 0.29 at 30 mm, which is roughly what ES-SDM's recreation
+validation would predict. It carries almost nothing about how *this* study differs from *another*
+at a given voxel, which is the only thing a control variate can exploit. Where a paper reports is
+largely common across a domain; the between-study variation is in magnitudes the table does not
+record.
+
+Note the widths disagree about which is best: 30 mm maximises the spatial correlation and 10 mm
+the between-study one, and at 45 mm the between-study correlation is zero. A wider kernel washes
+out exactly the study-to-study differences the estimator needs.
+
+So the design document's 23% and 59% are attainable only with a predictor far better than a peak
+kernel. Its own text says as much -- "algebraic targets, not measured Neurostore prediction
+quality" -- and this is that measurement. To make this estimator worth running, the predictor has
+to track between-study variation, which means it has to use the reported heights or study
+covariates, not just peak locations.
+
+Also recorded: the cohort shift runs 1.11 of its own standard errors, so on pain the image and
+coordinate cohorts are not detectably non-exchangeable at this size. That is a necessary check,
+not a reassuring one -- 21 studies cannot resolve a shift that matters.
+
+### What survives
+
+The estimator itself is correct and validated: 8,000-replication simulation matched the proven
+bias, variance, ratio and floor, and the two failure modes reproduce. It is the *predictor* that
+fails on this corpus. That is worth having, because the implementation is now a measuring device
+for any future predictor: hand it one, read rho_between, and the ceiling follows without fitting
+anything.
