@@ -2752,3 +2752,89 @@ corpus that carries statistics.
 Independent of the sign: declare the threshold per study from the paper's stated correction
 scheme, and let the clamp catch only contradictions. That removes the order statistic from the
 path.
+
+## The combined-estimator design document, worked through (2026-09-16)
+
+Read `fd78b2ef-nimare_combined_estimator_research.md` in full, 429 lines. Its section 12 gives a
+build order; step 3 is "the scalar exact-bounds reference and the image-corrected prediction
+estimator". The second of those was already built (`nimare/meta/cbma/marginal.py`). The first is
+now built, on branch `claude/marginal-effect-combined-estimator`, pushed.
+
+### What was implemented, in the mandated order
+
+**Algebra.** `proofs/scalar_censored_reference.py` (13 claims) and
+`proofs/retention_in_the_reporting_model.py` (8 claims). Highlights beyond the routine
+derivatives:
+
+  * a degenerate interval reproduces the ordinary random-effects log-density up to a constant
+    free of the parameters, so "recovers standard random-effects meta-analysis when all images
+    are observed" -- which the document lists as a *validation requirement* -- is an identity,
+    not a test;
+  * the reporting partition, quantified: using `1 - p_report` for the silence probability
+    overstates it by exactly the dropped event's own probability, and the probabilities correct
+    among retained events are `p_r/(p_r+p_s)`. That is the document's section 4.1 objection with
+    a number attached;
+  * `Var(theta)/pi - tau_a^2 = (1-pi)mu^2`, so substituting an image-only between-study variance
+    for the active component's variance overstates it by a computable amount;
+  * ignoring retention is *exactly* the rho = 1 boundary of the retention family, and the
+    misspecified population root satisfies `S(m_hat) = rho S(m_0)`: a model with no retention in
+    it sets the exceedance probability equal to the reported rate, and so reads a retention
+    shortfall as a smaller effect. At the document's settings that predicts an asymptotic bias
+    of **-0.1121**;
+  * magnitude and retention do not separate on report rates alone -- rank-one information -- so
+    retention must come from images, from threshold or precision spread, or from external
+    calibration. This is why a free per-study detection curve can absorb the effect itself.
+
+**Implementation.** `nimare/meta/cbma/censored.py`. `ObservationState` separates the nine cases
+the document's section 12 asks for, and two of them contribute nothing: unknown table
+completeness cannot support the inference that an unlisted voxel was below threshold. Absence is
+one-sided under a one-sided protocol. Thresholds are supplied, never inferred. An unavailable
+estimate is nan with a validity flag. Retention is a supplied parameter whose omission is the
+documented rho = 1 choice, not a neutral default. 15 tests.
+
+**Calibration, against the document's own numbers rather than a bed of my own.** Its section 8.1
+is a 4,000-replication experiment computed independently of anything here.
+
+    regime    arm        measured here   document   coverage here   document
+    1+20      images     0.2538          0.256      0.9433         --
+    1+20      ignoring   0.1659          0.157      0.7567         0.7760
+    1+20      correct    0.1267          0.129      0.9200         0.9395
+    1+500     images     0.2413          0.251      0.9500         --
+    1+500     ignoring   0.1132          0.114      0.0000         0.0000
+    1+500     correct    0.0241          0.023      0.9600         0.9493
+    8+100     images     0.0915          0.090      0.9333         --
+    8+100     ignoring   0.1040          0.103      0.2400         0.2345
+    8+100     correct    0.0430          0.047      1.0000         0.9475
+
+Every cell within three standard errors. The 1+500 ignoring-retention cell has **three**
+independent agreeing routes: the closed-form bias -0.1121 from the algebra, 0.1132 measured
+here, 0.114 measured by the document. A 4,000-replication confirmation run is in progress; the
+above is 25 replications, so the standard errors are wide and the point is the agreement in
+pattern, particularly the coverage collapse to exactly 0%.
+
+### An open discrepancy in section 8.2, recorded rather than guessed at
+
+Its second experiment reports a "treating peaks as ordinary values" RMSE of .226/.256/.204. Its
+stated setup -- nine-element region, `Y_ij = m + U_i + eps_ij`, tau .15, eps .2, m .4, retain the
+regional maximum if it exceeds .75 -- gives, by direct simulation at 400,000 draws:
+
+    E[max]                = 0.6968  (bias +0.2968)
+    P(report)             = 0.3858
+    E[max | reported]     = 0.8878  (bias +0.4878)
+
+So averaging the reported maxima is off by +0.488, not the +0.256 its asymptotic RMSE implies --
+a factor of 1.9. The unconditional max bias, +0.297, is nearer but still 16% away. Its naive arm
+must therefore do something its description does not pin down: perhaps include the non-reporting
+studies with a correct censoring term while mistreating only the heights, or weight the peak by
+the maximum's variance rather than the element's.
+
+This does **not** undermine the section 8.1 agreement: all nine of those cells landed, so the
+disagreement is localised to an under-specified foil rather than to the model. But it means
+section 8.2 cannot be used as a calibration target until the arm is pinned down, and its
+substantive claim -- that heights add little beyond a correct reporting indicator (.050 against
+.053, .010 against .011, .022 against .024) -- is the part worth reproducing anyway.
+
+Two harness defects found and fixed in the course of this, neither a finding: a binomial standard
+error of exactly zero used as a divisor, which turned a one-se miss into an infinite one; and
+uninformative records reaching the optimiser's starting values through a mean taken over every
+row, which made "contributes nothing" true only to 7e-9.
