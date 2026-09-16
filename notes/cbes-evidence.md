@@ -2730,8 +2730,22 @@ peak-poor study keeps the default, which may sit above its true cut.
 Nothing is capped, yet the effective threshold still floats with per-study signal -- the same
 mechanism the never-cap rule describes, reached through the order statistic instead of a cap.
 
-Status: **mechanism, not result.** The sign is unproven and is not to be asserted until the
-algebra is written. Calibration target is clean, because the clamp is documented bit-identical
+Status: **algebra written, and it reverses my headline.** `proofs/clamped_threshold_order_statistic.py`,
+9 claims. Every silence scores minus the inverse Mills ratio, so it always pushes mu down; raising
+the assumed cutoff attenuates that push and the probit information alike; and attenuating the
+silent terms raises the root of the estimating equation (`dmu*/dalpha = B/S' < 0`). The unclamped
+default overstates the cutoff by the full `c_default - c_k`, the clamp by only `1/(M*theta)`, so
+**the clamp reduces the upward bias rather than creating one**. What survives of the worry is not a
+bias in mu-hat but a *differential weighting* of silences by per-study signal, which nothing there
+shows to be benign -- it is the quantity that matters for a spread across studies, not for the
+direction of mu-hat.
+
+Calibration: the Gaussian tail hazard at the default cut is 3.554, so at the pain corpus's 12.7
+peaks per study the overshoot is 0.022 z -- small, consistent with the shipped "bit-identical where
+no table contradicts the assumption". Regime it cannot speak to: a cluster-forming corpus, where
+the reported peaks are maxima of clusters that also passed an extent criterion. My first numeric
+check of that regime had no extent selection in it and measured nothing; it is removed rather than
+left reading as evidence, and the direction there is unknown. Calibration target is clean, because the clamp is documented bit-identical
 where no table contradicts the assumption: measure `clamp_threshold=True` against `False` on a
 corpus that carries statistics.
 
