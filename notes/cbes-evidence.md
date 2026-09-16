@@ -2522,3 +2522,27 @@ than as confirmation.
 
 Their cluster counts are worth recording for the reporting bed: mean 22 +- 28 clusters per map,
 median 16 +- 14, at p < 0.001 with a 10-voxel minimum extent -- the same scheme reporting.py uses.
+
+## Bossier et al. 2018: the matching validation design explicitly excluded censoring
+
+Full text via PMC5778144, doi:10.3389/fnins.2017.00745. Their design is the one PROTOCOL.md asks
+for: resample a large dataset (IMAGEN) into pseudo-studies as the test condition, score against an
+independent high-powered group analysis as the evaluation condition, across 10, 12, 14, 16, 18,
+20, 30 and 35 studies.
+
+Their Discussion states the gap directly:
+
+  "bias due to missing data if peak effect sizes for some studies are not reported (Wager et al.;
+  Costafreda). Seed based-mapping, uses imputations to solve this latter missing data problem. As
+  we did not have any missing data in our simulations, we did not evaluate the influence of these
+  missing data on the performance of the various CBMA methods."
+
+So the benchmark whose design this project copies was run in a regime with **no censoring at
+all**, and its favourable result for effect-size random-effects CBMA says nothing about what
+happens when studies fail to report. There is no existing benchmark for the thing CBES does. That
+is worth stating plainly when this is written up -- not as a claim to novelty, but because it
+means the comparison everyone would reach for does not exist yet.
+
+It also names Costafreda as a source on the missing-data bias, alongside Wager. Second
+independent pointer to Costafreda 2012 (doi:10.1016/j.jneumeth.2012.07.016) in an hour, after
+SDM-PSI cited it for the censored-likelihood MLE. That is now the paper to get.
