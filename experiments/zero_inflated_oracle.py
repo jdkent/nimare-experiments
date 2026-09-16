@@ -257,6 +257,7 @@ def main():
           f"max {gap.max():+.5f}")
     print(f"     voxels more than 0.01 below the grid: {(gap > 0.01).mean():.4f}")
     print()
+    print(f"   se/sd {reported[usable].mean() / err.std():.2f}")
     print("2. is the interval right? reported se against the exact Schur se at the same point:")
     ratio = reported[usable] / exact[usable]
     print(f"     ratio median {np.median(ratio):.4f}, mean {ratio.mean():.4f}, "

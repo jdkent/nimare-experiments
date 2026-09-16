@@ -49,6 +49,7 @@ TAIL = os.environ.get("TAIL", "1") == "1"
 #: "permute-images" scatters each image's values; "spatial-images" rearranges them with the
 #: image's own autocorrelation preserved, which is the thing the family-wise rate is sensitive to.
 NULL_METHOD = os.environ.get("NULL", "permute-images")
+MAX_ITER = int(os.environ.get("MAXITER", "25"))
 _volume = np.ones(SHAPE, np.int32)
 if ERODE > 0:
     _volume[:] = 0
@@ -84,8 +85,11 @@ if __name__ == "__main__":
                 image_dir=tempfile.mkdtemp(), noise_extent=EXTENT, field_zooms=ZOOMS,
                 blob_fwhm=10.0, threshold_z=[THRESHOLDS[i % len(THRESHOLDS)]
                                              for i in range(n_studies)])
+            #: The EM's iteration cap is shrinkage, and how much a voxel is shrunk depends on
+            #: its own data. If the observed map is shrunk differently from the permuted ones,
+            #: the permutation is not exchangeable and the rate moves with MAXITER.
             est = CBES(mask=MASK, n_iters=N_ITERS, seed=sim, null_method=NULL_METHOD,
-                       threshold="reporting_threshold")
+                       threshold="reporting_threshold", max_iter=MAX_ITER)
             try:
                 res = est.fit(ss)
             except ValueError:

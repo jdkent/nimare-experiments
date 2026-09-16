@@ -1945,3 +1945,28 @@ truncation's nonlinear marginal transform attenuates the Pearson correlation on 
 
 1-D caveat, per the protocol: a kernel of a given FWHM couples far more neighbours in a volume, so
 read the retained fraction as a direction rather than a number until it is checked in 3-D.
+
+## se/sd is prevalence-dependent, and the Notes have the sign wrong for the useful case
+
+12,800 fits per cell against a known truth, 20 tables throughout.
+
+  images  true pi  max_iter   se/sd
+       2      1.0        25    1.25
+       2      1.0       400    1.84
+       2      0.6        25    0.80
+       6      1.0        25    1.52
+       6      0.6        25    0.80
+
+The estimator's Notes say "se is conservative" with se/sd from 1.2 to 2.2. That range is real and
+it is what a prevalence of 1 gives -- which is where it was measured. At a prevalence of 0.6 it is
+0.80, i.e. the interval is *anti-conservative*, and 0.6 is the regime the estimator exists for:
+studies genuinely differing in whether they carry the effect. Where every study has the effect
+there is no absence to find, and the Warnings already say the correction can only do harm there.
+
+This is not an arithmetic error. The zero-inflated oracle verified _observed_information against
+an exact finite-difference 2-D Hessian at ratio 1.0000. The observed information at the fitted
+point simply does not capture how far mu wanders along the near-flat ridge between simulations
+when the mixture is real.
+
+The Notes entry has to change: se/sd is not a property of the estimator, it is a property of the
+configuration, and the direction flips.
